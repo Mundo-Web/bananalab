@@ -549,13 +549,6 @@
       "_createLucideIcon-Cy5Ya80P.js"
     ]
   },
-  "_hexagon-Cy8ban7Y.js": {
-    "file": "assets/hexagon-Cy8ban7Y.js",
-    "name": "hexagon",
-    "imports": [
-      "_createLucideIcon-Cy5Ya80P.js"
-    ]
-  },
   "_hoist-non-react-statics.cjs-lJxeXavk.js": {
     "file": "assets/hoist-non-react-statics.cjs-lJxeXavk.js",
     "name": "hoist-non-react-statics.cjs",
@@ -611,16 +604,6 @@
   "_index-Chjiymov.js": {
     "file": "assets/index-Chjiymov.js",
     "name": "index"
-  },
-  "_index-DorGiLl5.js": {
-    "file": "assets/index-DorGiLl5.js",
-    "name": "index",
-    "imports": [
-      "_createLucideIcon-Cy5Ya80P.js",
-      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
-      "_index-BH53Isel.js",
-      "_index-BSWw-p5k.js"
-    ]
   },
   "_index-duZ_MKqr.js": {
     "file": "assets/index-duZ_MKqr.js",
@@ -699,13 +682,6 @@
     "name": "pagination",
     "imports": [
       "resources/js/Components/Tailwind/Blogs/BlogCarousel.jsx"
-    ]
-  },
-  "_palette-Bnj905Cx.js": {
-    "file": "assets/palette-Bnj905Cx.js",
-    "name": "palette",
-    "imports": [
-      "_createLucideIcon-Cy5Ya80P.js"
     ]
   },
   "_phone-BZ94M50k.js": {
@@ -2684,7 +2660,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-B84l-Dih.js",
+    "file": "assets/BananaLab-C-D4Zhl3.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -2698,7 +2674,6 @@
       "resources/js/Components/Tailwind/BananaLab/Canva1.jsx",
       "resources/js/Components/Tailwind/BananaLab/Canva2.jsx",
       "resources/js/Components/Tailwind/BananaLab/Canva3.jsx",
-      "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx"
     ]
   },
@@ -3242,7 +3217,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Carrusel.jsx": {
-    "file": "assets/Carrusel-XaDfTZco.js",
+    "file": "assets/Carrusel-CMCgFrs1.js",
     "name": "Carrusel",
     "src": "resources/js/Components/Tailwind/Carrusel.jsx",
     "isEntry": true,
@@ -6090,7 +6065,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-BFqzxyFi.js",
+    "file": "assets/System-CPxydg8K.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
@@ -6195,7 +6170,6 @@
       "resources/js/Components/Tailwind/BananaLab/Canva1.jsx",
       "resources/js/Components/Tailwind/BananaLab/Canva2.jsx",
       "resources/js/Components/Tailwind/BananaLab/Canva3.jsx",
-      "resources/js/Components/Tailwind/BananaLab/components/Editor/EditorLayout.jsx",
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx"
     ],
     "css": [
