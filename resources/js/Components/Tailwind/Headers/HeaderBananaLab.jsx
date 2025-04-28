@@ -70,9 +70,12 @@ const HeaderBananaLab = ({
             if (menuRef.current && !menuRef.current.contains(event.target)) {
                 setOpenMenu(false);
             }
-            
+
             // Menú de usuario
-            if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+            if (
+                userMenuRef.current &&
+                !userMenuRef.current.contains(event.target)
+            ) {
                 setIsMenuOpen(false);
             }
         }
@@ -86,8 +89,8 @@ const HeaderBananaLab = ({
     const [search, setSearch] = useState("");
 
     return (
-        <motion.nav 
-            className="bg-[#F8F9FA] shadow-md fonts-paragraph"
+        <motion.nav
+            className="bg-[#F8F9FA] shadow-md fonts-paragraph "
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ duration: 0.4 }}
@@ -109,10 +112,10 @@ const HeaderBananaLab = ({
                             )}
                         </motion.button>
                     </div>
-                    
+
                     {/* Logo */}
-                    <motion.a 
-                        href="/" 
+                    <motion.a
+                        href="/"
                         className="flex-shrink-0"
                         whileHover={{ scale: 1.03 }}
                         whileTap={{ scale: 0.97 }}
@@ -126,10 +129,10 @@ const HeaderBananaLab = ({
                             }
                         />
                     </motion.a>
-                    
+
                     {/* Mobile menu button */}
                     <div className="-mr-2 flex md:hidden">
-                        <motion.button 
+                        <motion.button
                             className="inline-flex items-center justify-center p-2 rounded-md customtext-neutral-light hover:customtext-primary transition-colors duration-200"
                             whileTap={{ scale: 0.9 }}
                         >
@@ -140,7 +143,7 @@ const HeaderBananaLab = ({
                     {/* Desktop Navigation */}
                     <div className="hidden md:block">
                         <div className="ml-10 flex items-baseline space-x-4">
-                            <motion.div 
+                            <motion.div
                                 className="relative w-[450px] mx-auto"
                                 whileHover={{ scale: 1.01 }}
                             >
@@ -197,7 +200,7 @@ const HeaderBananaLab = ({
 
                             <AnimatePresence>
                                 {isMenuOpen && (
-                                    <motion.div 
+                                    <motion.div
                                         className="absolute z-50 right-0 mt-2 bg-white shadow-xl rounded-xl w-48"
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -231,7 +234,9 @@ const HeaderBananaLab = ({
                                                             className="customtext-primary"
                                                             height="1rem"
                                                         />
-                                                        <span>Cerrar sesión</span>
+                                                        <span>
+                                                            Cerrar sesión
+                                                        </span>
                                                     </button>
                                                 </motion.li>
                                             </ul>
@@ -240,21 +245,21 @@ const HeaderBananaLab = ({
                                 )}
                             </AnimatePresence>
                         </div>
-                        
-                        <motion.button 
+
+                        <motion.button
                             className="relative customtext-neutral-light hover:customtext-primary transition-colors duration-200"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
                         >
                             <Heart className="h-5 w-5" />
-                            <motion.span 
+                            <motion.span
                                 className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full"
                                 whileHover={{ scale: 1.2 }}
                             >
                                 0
                             </motion.span>
                         </motion.button>
-                        
+
                         <motion.button
                             onClick={() => setModalOpen(true)}
                             className="relative customtext-neutral-light hover:customtext-primary transition-colors duration-200"
@@ -262,15 +267,17 @@ const HeaderBananaLab = ({
                             whileTap={{ scale: 0.95 }}
                         >
                             <ShoppingCart className="h-5 w-5" />
-                            <motion.span 
+                            <motion.span
                                 className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full"
-                                animate={totalCount > 0 ? { scale: [1, 1.2, 1] } : {}}
+                                animate={
+                                    totalCount > 0 ? { scale: [1, 1.2, 1] } : {}
+                                }
                                 transition={{ repeat: Infinity, duration: 1.5 }}
                             >
                                 {totalCount}
                             </motion.span>
                         </motion.button>
-                        
+
                         <div className="hidden md:block ml-2 text-left">
                             <p className="text-xs font-medium">Tu carrito</p>
                             <p className="text-sm font-bold">
@@ -282,12 +289,12 @@ const HeaderBananaLab = ({
             </div>
 
             {/* Mobile menu */}
-            <motion.div 
+            <motion.div
                 className={`md:hidden ${openMenu ? "block" : "hidden"}`}
                 initial={{ opacity: 0, height: 0 }}
-                animate={{ 
+                animate={{
                     opacity: openMenu ? 1 : 0,
-                    height: openMenu ? "auto" : 0
+                    height: openMenu ? "auto" : 0,
                 }}
                 transition={{ duration: 0.2 }}
                 ref={menuRef}
@@ -306,13 +313,13 @@ const HeaderBananaLab = ({
                         </motion.a>
                     ))}
                     <div className="flex items-center space-x-4 px-3 py-2">
-                        <motion.button 
+                        <motion.button
                             className="customtext-neutral-light hover:customtext-primary transition-colors duration-200"
                             whileTap={{ scale: 0.9 }}
                         >
                             <Search className="h-5 w-5" />
                         </motion.button>
-                        
+
                         <div className="relative" ref={userMenuRef}>
                             {isUser ? (
                                 <motion.button
@@ -331,10 +338,10 @@ const HeaderBananaLab = ({
                                     <User className="h-5 w-5" />
                                 </motion.a>
                             )}
-                            
+
                             <AnimatePresence>
                                 {isMenuOpen && (
-                                    <motion.div 
+                                    <motion.div
                                         className="fixed z-[9999] right-4 mt-2 bg-white shadow-xl rounded-xl w-48"
                                         initial={{ opacity: 0, y: -10 }}
                                         animate={{ opacity: 1, y: 0 }}
@@ -367,7 +374,9 @@ const HeaderBananaLab = ({
                                                             className="customtext-primary"
                                                             height="1rem"
                                                         />
-                                                        <span>Cerrar sesión</span>
+                                                        <span>
+                                                            Cerrar sesión
+                                                        </span>
                                                     </button>
                                                 </motion.li>
                                             </ul>
@@ -376,8 +385,8 @@ const HeaderBananaLab = ({
                                 )}
                             </AnimatePresence>
                         </div>
-                        
-                        <motion.button 
+
+                        <motion.button
                             className="customtext-neutral-light hover:customtext-primary transition-colors duration-200 relative"
                             whileTap={{ scale: 0.9 }}
                         >
@@ -386,16 +395,18 @@ const HeaderBananaLab = ({
                                 0
                             </span>
                         </motion.button>
-                        
+
                         <motion.button
                             onClick={() => setModalOpen(true)}
                             className="customtext-neutral-light hover:customtext-primary transition-colors duration-200 relative"
                             whileTap={{ scale: 0.9 }}
                         >
                             <ShoppingCart className="h-5 w-5" />
-                            <motion.span 
+                            <motion.span
                                 className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full"
-                                animate={totalCount > 0 ? { scale: [1, 1.2, 1] } : {}}
+                                animate={
+                                    totalCount > 0 ? { scale: [1, 1.2, 1] } : {}
+                                }
                                 transition={{ repeat: Infinity, duration: 1.5 }}
                             >
                                 {totalCount}
@@ -404,7 +415,7 @@ const HeaderBananaLab = ({
                     </div>
                 </div>
             </motion.div>
-            
+
             <CartModalBananaLab
                 data={data}
                 cart={cart}

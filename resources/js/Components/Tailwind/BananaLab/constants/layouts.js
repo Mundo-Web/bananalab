@@ -2,7 +2,7 @@ export const layouts = [
     {
         id: "layout-1",
         name: "Cuatro fotos",
-        template: "grid-cols-2 grid-rows-2 gap-4",
+        template: "grid-cols-2 grid-rows-2",
         cells: 4,
         maskCategories: [
             {
@@ -61,7 +61,7 @@ export const layouts = [
     {
         id: "layout-2",
         name: "Dos fotos horizontales",
-        template: "grid-rows-2",
+        template: "grid-cols-1 grid-rows-2",
         cells: 2,
         maskCategories: [
             {

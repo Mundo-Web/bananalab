@@ -62,6 +62,14 @@ use App\Http\Controllers\ScrapController;
 |
 */
 
+/**Editor */
+// routes/api.php
+Route::post('/albums', 'AlbumController@store');
+Route::get('/albums/{id}', 'AlbumController@show');
+Route::post('/pages', 'PageController@store');
+Route::post('/upload-image', 'ImageController@upload');
+/**FIN EDITOR */
+
 
 Route::post('/scrap', [ScrapController::class, 'scrap']);
 Route::post('/scrap-shopsimon', [ScrapController::class, 'scrapShopSimon']);
