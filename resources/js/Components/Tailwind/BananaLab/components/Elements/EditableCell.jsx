@@ -12,12 +12,12 @@ export default function EditableCell({
     onUpdateElement,
     onDeleteElement,
     availableMasks = [],
+    size = "square", // nuevo prop para controlar el tamaño
 }) {
     const [{ isOver }, drop] = useDrop(() => ({
         accept: ["IMAGE_FILE", "TEXT_ELEMENT", "IMAGE_ELEMENT"],
         drop: (item) => {
             if (item.files) {
-                // Es un archivo de imagen
                 const reader = new FileReader();
                 reader.onload = (e) => {
                     if (e.target?.result) {
@@ -41,6 +41,7 @@ export default function EditableCell({
                             mask: "none",
                         };
                         onAddElement(newElement);
+                        onSelectElement(newElement.id, id);
                     }
                 };
                 reader.readAsDataURL(item.files[0]);
@@ -80,6 +81,7 @@ export default function EditableCell({
                             mask: "none",
                         };
                         onAddElement(newElement);
+                        onSelectElement(newElement.id, id);
                     }
                 };
                 reader.readAsDataURL(e.target.files[0]);
@@ -88,18 +90,41 @@ export default function EditableCell({
         input.click();
     };
 
+    // Definir las clases de tamaño
+    const sizeClasses = {
+        square: "aspect-square", // 1:1
+        landscape: "aspect-video", // 16:9
+        portrait: "aspect-[3/4]", // 3:4
+        wide: "aspect-[2/1]", // 2:1
+        tall: "aspect-[9/16]", // 9:16
+        custom: "h-[500px]", // tamaño personalizado
+    };
+
     return (
         <div
             ref={drop}
-            className={`relative aspect-square   bg-gray-50 rounded-lg overflow-hidden ${
+            className={`relative ${
+                sizeClasses[size]
+            } bg-gray-50 rounded-lg overflow-hidden ${
                 isOver ? "ring-2 ring-purple-500 bg-purple-50" : ""
             }`}
-            onClick={() => onSelectElement(null)}
+            onClick={(e) => {
+                if (e.target === e.currentTarget) {
+                    onSelectElement(null, id);
+                }
+            }}
+            style={{
+                isolation: "isolate", // Esto crea un nuevo contexto de apilamiento
+                background: "white", // Asegura un fondo para que los blend modes funcionen
+            }}
         >
             {elements.length === 0 ? (
                 <div
                     className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={openFileExplorer}
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        openFileExplorer();
+                    }}
                 >
                     <Upload className="h-8 w-8 text-gray-400" />
                     <p className="text-sm text-gray-500">
@@ -108,12 +133,16 @@ export default function EditableCell({
                 </div>
             ) : (
                 elements.map((element) => (
-                    <div key={element.id} className="absolute inset-0">
+                    <div
+                        key={element.id}
+                        className="absolute inset-0"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         {element.type === "image" ? (
                             <ImageElement
                                 element={element}
                                 isSelected={selectedElement === element.id}
-                                onSelect={() => onSelectElement(element.id)}
+                                onSelect={() => onSelectElement(element.id, id)}
                                 onUpdate={(updates) =>
                                     onUpdateElement(element.id, updates)
                                 }
@@ -124,7 +153,7 @@ export default function EditableCell({
                             <TextElement
                                 element={element}
                                 isSelected={selectedElement === element.id}
-                                onSelect={() => onSelectElement(element.id)}
+                                onSelect={() => onSelectElement(element.id, id)}
                                 onUpdate={(updates) =>
                                     onUpdateElement(element.id, updates)
                                 }

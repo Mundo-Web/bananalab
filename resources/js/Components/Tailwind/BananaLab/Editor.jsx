@@ -1,48 +1,20 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { DndProvider, useDrag, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import LayerPanel from "./components/Elements/LayerPanel";
 import {
-    Camera,
     Undo2,
     Redo2,
     Trash2,
     ChevronLeft,
     ImageIcon,
-    Move,
     Type,
-    Layers,
-    Download,
     Eye,
     Plus,
-    Minus,
     FlipHorizontal,
     FlipVertical,
-    RotateCw,
-    Crop,
-    Sliders,
-    Palette,
-    Text,
-    ImagePlus,
-    Upload,
-    Replace,
-    ImageOff,
     Copy,
-    Layers2,
-    Blend,
-    CircleDot,
-    Grid,
-    Square,
-    Circle,
-    Heart,
-    Star,
-    Hexagon,
-    Diamond,
-    Film,
-    Feather,
-    Cloud,
-    Flower,
-    Zap,
-    Scissors,
+    Book,
 } from "lucide-react";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
@@ -50,11 +22,15 @@ import { layouts } from "./constants/layouts";
 import { imageMasks } from "./constants/masks";
 import { filterPresets } from "./constants/filters";
 import Button from "./components/UI/Button";
+
 import Slider from "./components/UI/Slider";
 import EditableCell from "./components/Elements/EditableCell";
 import { AdvancedSettings } from "./components/Editor/AdvancedSettings";
 import { FilterPresets } from "./components/Editor/FilterPresets";
 import { MaskSelector } from "./components/Elements/MaskSelector";
+import TextToolbar from "./components/Elements/TextToolbar";
+import WorkspaceControls from "./components/Elements/WorkspaceControls";
+import BookPreviewModal from "./components/Editor/BookPreview ";
 
 // Componente principal del editor
 export default function EditorLibro() {
@@ -77,6 +53,59 @@ export default function EditorLibro() {
     const [history, setHistory] = useState([JSON.stringify(pages)]);
     const [historyIndex, setHistoryIndex] = useState(0);
     const [previewMode, setPreviewMode] = useState(false);
+    const [selectedImage, setSelectedImage] = useState(null);
+    const [pageThumbnails, setPageThumbnails] = useState({});
+    // Añade estos estados al principio del componente EditorLibro
+    const [textToolbarVisible, setTextToolbarVisible] = useState(false);
+    const [textEditingOptions, setTextEditingOptions] = useState({
+        elementId: null,
+        cellId: null,
+    });
+    const [isBookPreviewOpen, setIsBookPreviewOpen] = useState(false);
+    // Modifica la función getSelectedElement para que use useCallback
+    const getSelectedElement = useCallback(() => {
+        if (!selectedElement || !selectedCell) return null;
+        const cell = pages[currentPage].cells.find(
+            (cell) => cell.id === selectedCell
+        );
+        if (!cell) return null;
+        return cell.elements.find((el) => el.id === selectedElement);
+    }, [selectedElement, selectedCell, pages, currentPage]);
+
+    // Añade esta función para manejar la selección de elementos
+    const handleSelectElement = (elementId, cellId) => {
+        // Siempre actualizar la celda seleccionada si se proporciona
+        if (cellId) {
+            setSelectedCell(cellId);
+        }
+
+        // Actualizar el elemento seleccionado
+        setSelectedElement(elementId);
+
+        // Manejo del toolbar
+        if (elementId) {
+            const cell = pages[currentPage].cells.find(
+                (cell) => cell.id === (cellId || selectedCell)
+            );
+            const element = cell?.elements.find((el) => el.id === elementId);
+
+            if (element?.type === "image") {
+                setSelectedImage(element);
+                console.log(selectedImage);
+            } else if (element?.type === "text") {
+                setTextToolbarVisible(true);
+                setTextEditingOptions({
+                    elementId,
+                    cellId: cellId || selectedCell,
+                });
+            } else {
+                setTextToolbarVisible(false);
+            }
+        } else {
+            setTextToolbarVisible(false);
+            setSelectedImage(null);
+        }
+    };
 
     // Obtener el layout actual
     const getCurrentLayout = () => {
@@ -87,7 +116,7 @@ export default function EditorLibro() {
     };
 
     // Obtener el elemento seleccionado
-    const getSelectedElement = () => {
+    /* const getSelectedElement = () => {
         if (!selectedElement || !selectedCell) return null;
 
         const cell = pages[currentPage].cells.find(
@@ -96,7 +125,7 @@ export default function EditorLibro() {
         if (!cell) return null;
 
         return cell.elements.find((el) => el.id === selectedElement);
-    };
+    };*/
 
     // Actualizar el estado de las páginas
     const updatePages = (newPages) => {
@@ -278,38 +307,6 @@ export default function EditorLibro() {
         }
     };
 
-    // Exportar la página actual como imagen
-    const exportPage = () => {
-        const canvas = document.createElement("canvas");
-        const pageElement = document.querySelector(".page-preview");
-
-        if (!pageElement) return;
-
-        // Configurar el canvas con las dimensiones de la página
-        const width = pageElement.offsetWidth;
-        const height = pageElement.offsetHeight;
-        canvas.width = width * 2; // Doble resolución para mejor calidad
-        canvas.height = height * 2;
-
-        const context = canvas.getContext("2d");
-        context.scale(2, 2);
-        context.fillStyle = "white";
-        context.fillRect(0, 0, width, height);
-
-        // Usar html2canvas para renderizar la página
-        html2canvas(pageElement, {
-            scale: 2,
-            backgroundColor: null,
-            canvas,
-            logging: false,
-            useCORS: true,
-        }).then((canvas) => {
-            canvas.toBlob((blob) => {
-                saveAs(blob, `diseño-pagina-${currentPage + 1}.png`);
-            });
-        });
-    };
-
     // Vista previa de la página actual
     const togglePreview = () => {
         setPreviewMode(!previewMode);
@@ -343,8 +340,8 @@ export default function EditorLibro() {
             // Añadir a la celda seleccionada
             addElementToCell(selectedCell, newElement);
         } else {
-            // Añadir a la primera celda
-            addElementToCell(pages[currentPage].cells[0].id, newElement);
+            // Si no hay celda seleccionada, no hacer nada o mostrar un mensaje
+            console.log("Selecciona una celda primero");
         }
     };
 
@@ -360,9 +357,52 @@ export default function EditorLibro() {
         });
     };
 
+    const [workspaceSize, setWorkspaceSize] = useState("square");
+
+    useEffect(() => {
+        const generateThumbnails = async () => {
+            const newThumbnails = {};
+
+            await Promise.all(
+                pages.map(async (page, index) => {
+                    const pageElement = document.getElementById(
+                        `page-${page.id}`
+                    );
+                    if (pageElement) {
+                        try {
+                            const canvas = await html2canvas(pageElement, {
+                                scale: 0.2,
+                                logging: false,
+                                useCORS: true,
+                                allowTaint: true,
+                                ignoreElements: (element) => {
+                                    return element.classList.contains(
+                                        "ignore-thumbnail"
+                                    );
+                                },
+                            });
+                            newThumbnails[page.id] = canvas.toDataURL();
+                        } catch (error) {
+                            console.error("Error generating thumbnail:", error);
+                            newThumbnails[page.id] = null;
+                        }
+                    }
+                })
+            );
+
+            setPageThumbnails({ ...pageThumbnails, ...newThumbnails });
+        };
+
+        const debouncedGenerate = setTimeout(() => {
+            generateThumbnails();
+        }, 500);
+
+        return () => clearTimeout(debouncedGenerate);
+    }, [pages, currentPage]);
+
     return (
         <DndProvider backend={HTML5Backend}>
-            <div className="bg-white py-8">
+            <div className="bg-white py-4">
                 <div className="flex flex-col min-h-screen  mx-auto  max-w-[82rem]">
                     {/* Header */}
                     <header className="border-b bg-white py-4 flex items-center justify-between ">
@@ -373,15 +413,6 @@ export default function EditorLibro() {
                             </Button>
                         </div>
 
-                        <div className="text-center">
-                            <h1 className="text-2xl font-bold text-gray-800">
-                                Editor
-                            </h1>
-                            <h2 className="text-lg text-gray-600">
-                                Crea collages y diseños impresionantes
-                            </h2>
-                        </div>
-
                         <div className="flex gap-2">
                             <Button
                                 variant="secondary"
@@ -389,6 +420,13 @@ export default function EditorLibro() {
                                 icon={<Eye className="h-4 w-4" />}
                             >
                                 {previewMode ? "Editar" : "Vista previa"}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setIsBookPreviewOpen(true)}
+                                icon={<Book className="h-4 w-4" />} // Asegúrate de importar el icono Book
+                            >
+                                Vista de Álbum
                             </Button>
                             {/*  <Button
                                 className="bg-purple-600 hover:bg-purple-700"
@@ -473,492 +511,480 @@ export default function EditorLibro() {
                                         </div>
 
                                         <div>
-                                            <h3 className="font-medium mb-2">
-                                                Añadir
-                                            </h3>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    icon={
-                                                        <ImageIcon className="h-4 w-4" />
+                                            {/* Panel de capas */}
+                                            <LayerPanel
+                                                elements={
+                                                    pages[
+                                                        currentPage
+                                                    ].cells.find(
+                                                        (cell) =>
+                                                            cell.id ===
+                                                            selectedCell
+                                                    )?.elements || []
+                                                }
+                                                onReorder={(
+                                                    reorderedElements
+                                                ) => {
+                                                    const updatedPages = [
+                                                        ...pages,
+                                                    ];
+                                                    const cellIndex =
+                                                        updatedPages[
+                                                            currentPage
+                                                        ].cells.findIndex(
+                                                            (cell) =>
+                                                                cell.id ===
+                                                                selectedCell
+                                                        );
+                                                    if (cellIndex !== -1) {
+                                                        updatedPages[
+                                                            currentPage
+                                                        ].cells[
+                                                            cellIndex
+                                                        ].elements =
+                                                            reorderedElements;
+                                                        updatePages(
+                                                            updatedPages
+                                                        );
                                                     }
-                                                    onClick={() => {
-                                                        const input =
-                                                            document.createElement(
-                                                                "input"
-                                                            );
-                                                        input.type = "file";
-                                                        input.accept =
-                                                            "image/*";
-                                                        input.onchange = (
-                                                            e
-                                                        ) => {
-                                                            if (
-                                                                e.target
-                                                                    .files &&
-                                                                e.target
-                                                                    .files[0]
-                                                            ) {
-                                                                const newId = `img-${Date.now()}`;
-                                                                const newElement =
-                                                                    {
-                                                                        id: newId,
-                                                                        type: "image",
-                                                                        content:
-                                                                            "",
-                                                                        position:
-                                                                            {
-                                                                                x: 10,
-                                                                                y: 10,
-                                                                            },
-                                                                        filters:
-                                                                            {
-                                                                                brightness: 100,
-                                                                                contrast: 100,
-                                                                                saturation: 100,
-                                                                                tint: 0,
-                                                                                hue: 0,
-                                                                                blur: 0,
-                                                                                scale: 1,
-                                                                                rotate: 0,
-                                                                                opacity: 100,
-                                                                                blendMode:
-                                                                                    "normal",
-                                                                            },
-                                                                        mask: "none",
-                                                                    };
-
-                                                                const reader =
-                                                                    new FileReader();
-                                                                reader.onload =
-                                                                    (e) => {
-                                                                        if (
-                                                                            e
-                                                                                .target
-                                                                                ?.result
-                                                                        ) {
-                                                                            newElement.content =
-                                                                                e.target.result;
-                                                                            if (
-                                                                                selectedCell
-                                                                            ) {
-                                                                                addElementToCell(
-                                                                                    selectedCell,
-                                                                                    newElement
-                                                                                );
-                                                                            } else {
-                                                                                addElementToCell(
-                                                                                    pages[
-                                                                                        currentPage
-                                                                                    ]
-                                                                                        .cells[0]
-                                                                                        .id,
-                                                                                    newElement
-                                                                                );
-                                                                            }
-                                                                        }
-                                                                    };
-                                                                reader.readAsDataURL(
-                                                                    e.target
-                                                                        .files[0]
-                                                                );
-                                                            }
-                                                        };
-                                                        input.click();
-                                                    }}
-                                                >
-                                                    Imagen
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    icon={
-                                                        <Type className="h-4 w-4" />
-                                                    }
-                                                    onClick={handleAddText}
-                                                >
-                                                    Texto
-                                                </Button>
-                                            </div>
+                                                }}
+                                                onSelect={handleSelectElement}
+                                                selectedElement={
+                                                    selectedElement
+                                                }
+                                            />
                                         </div>
                                     </div>
                                 )}
 
-                                {activeTab === "filters" && selectedElement && (
-                                    <div className="space-y-6">
-                                        <div className="flex border-b">
-                                            <button
-                                                className={`flex-1 py-2 text-sm font-medium ${
-                                                    filterTab === "basic"
-                                                        ? "text-purple-600 border-b-2 border-purple-600"
-                                                        : "text-gray-600 hover:text-gray-900"
-                                                }`}
-                                                onClick={() =>
-                                                    setFilterTab("basic")
-                                                }
-                                            >
-                                                Básicos
-                                            </button>
-                                            <button
-                                                className={`flex-1 py-2 text-sm font-medium ${
-                                                    filterTab === "transform"
-                                                        ? "text-purple-600 border-b-2 border-purple-600"
-                                                        : "text-gray-600 hover:text-gray-900"
-                                                }`}
-                                                onClick={() =>
-                                                    setFilterTab("transform")
-                                                }
-                                            >
-                                                Transformar
-                                            </button>
-                                            <button
-                                                className={`flex-1 py-2 text-sm font-medium ${
-                                                    filterTab === "advanced"
-                                                        ? "text-purple-600 border-b-2 border-purple-600"
-                                                        : "text-gray-600 hover:text-gray-900"
-                                                }`}
-                                                onClick={() =>
-                                                    setFilterTab("advanced")
-                                                }
-                                            >
-                                                Avanzados
-                                            </button>
-                                        </div>
-
-                                        {filterTab === "basic" && (
-                                            <>
-                                                {getSelectedElement()?.type ===
-                                                    "image" && (
-                                                    <FilterPresets
-                                                        onSelectPreset={
-                                                            applyFilterPreset
-                                                        }
-                                                    />
-                                                )}
-                                                <div className="space-y-4">
-                                                    <h3 className="font-medium">
-                                                        Ajustes básicos
-                                                    </h3>
-                                                    <Slider
-                                                        label="Brillo"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.brightness ||
-                                                                100,
-                                                        ]}
-                                                        min={0}
-                                                        max={200}
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        brightness:
-                                                                            value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                    <Slider
-                                                        label="Contraste"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.contrast ||
-                                                                100,
-                                                        ]}
-                                                        min={0}
-                                                        max={200}
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        contrast:
-                                                                            value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                    <Slider
-                                                        label="Saturación"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.saturation ||
-                                                                100,
-                                                        ]}
-                                                        min={0}
-                                                        max={200}
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        saturation:
-                                                                            value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                    <Slider
-                                                        label="Tono"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.hue || 0,
-                                                        ]}
-                                                        min={0}
-                                                        max={360}
-                                                        unit="°"
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        hue: value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                    <Slider
-                                                        label="Sepia"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.tint || 0,
-                                                        ]}
-                                                        min={0}
-                                                        max={100}
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        tint: value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                    <Slider
-                                                        label="Desenfoque"
-                                                        value={[
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.blur || 0,
-                                                        ]}
-                                                        min={0}
-                                                        max={20}
-                                                        unit="px"
-                                                        onValueChange={(
-                                                            value
-                                                        ) =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        blur: value[0],
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            </>
-                                        )}
-
-                                        {filterTab === "transform" && (
-                                            <div className="space-y-4">
-                                                <h3 className="font-medium">
-                                                    Transformación
-                                                </h3>
-                                                <div className="grid grid-cols-2 gap-3">
-                                                    <Button
-                                                        variant={
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.flipHorizontal
-                                                                ? "secondary"
-                                                                : "outline"
-                                                        }
-                                                        size="sm"
-                                                        icon={
-                                                            <FlipHorizontal className="h-4 w-4" />
-                                                        }
-                                                        onClick={() =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        flipHorizontal:
-                                                                            !getSelectedElement()
-                                                                                ?.filters
-                                                                                ?.flipHorizontal,
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    >
-                                                        Voltear H
-                                                    </Button>
-                                                    <Button
-                                                        variant={
-                                                            getSelectedElement()
-                                                                ?.filters
-                                                                ?.flipVertical
-                                                                ? "secondary"
-                                                                : "outline"
-                                                        }
-                                                        size="sm"
-                                                        icon={
-                                                            <FlipVertical className="h-4 w-4" />
-                                                        }
-                                                        onClick={() =>
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                {
-                                                                    filters: {
-                                                                        ...getSelectedElement()
-                                                                            ?.filters,
-                                                                        flipVertical:
-                                                                            !getSelectedElement()
-                                                                                ?.filters
-                                                                                ?.flipVertical,
-                                                                    },
-                                                                }
-                                                            )
-                                                        }
-                                                    >
-                                                        Voltear V
-                                                    </Button>
-                                                </div>
-                                                <Slider
-                                                    label="Rotación"
-                                                    value={[
-                                                        getSelectedElement()
-                                                            ?.filters?.rotate ||
-                                                            0,
-                                                    ]}
-                                                    min={0}
-                                                    max={360}
-                                                    unit="°"
-                                                    onValueChange={(value) =>
-                                                        updateElementInCell(
-                                                            selectedCell,
-                                                            selectedElement,
-                                                            {
-                                                                filters: {
-                                                                    ...getSelectedElement()
-                                                                        ?.filters,
-                                                                    rotate: value[0],
-                                                                },
+                                {activeTab === "filters" && (
+                                    <>
+                                        {selectedElement ? (
+                                            <div className="space-y-6">
+                                                <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-full max-w-md mx-auto">
+                                                    {[
+                                                        {
+                                                            key: "basic",
+                                                            label: "Básicos",
+                                                        },
+                                                        {
+                                                            key: "transform",
+                                                            label: "Avanzados",
+                                                        },
+                                                    ].map((tab) => (
+                                                        <button
+                                                            key={tab.key}
+                                                            onClick={() =>
+                                                                setFilterTab(
+                                                                    tab.key
+                                                                )
                                                             }
-                                                        )
-                                                    }
-                                                />
-                                                <Slider
-                                                    label="Escala"
-                                                    value={[
-                                                        (getSelectedElement()
-                                                            ?.filters?.scale ||
-                                                            1) * 100,
-                                                    ]}
-                                                    min={10}
-                                                    max={200}
-                                                    onValueChange={(value) =>
-                                                        updateElementInCell(
-                                                            selectedCell,
-                                                            selectedElement,
-                                                            {
-                                                                filters: {
-                                                                    ...getSelectedElement()
-                                                                        ?.filters,
-                                                                    scale:
-                                                                        value[0] /
+                                                            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                ${
+                    filterTab === tab.key
+                        ? "bg-purple-600 text-white shadow"
+                        : "text-gray-700 hover:bg-white hover:shadow-sm"
+                }`}
+                                                        >
+                                                            {tab.label}
+                                                        </button>
+                                                    ))}
+                                                </div>
+
+                                                {filterTab === "basic" && (
+                                                    <>
+                                                        <FilterPresets
+                                                            onSelectPreset={
+                                                                applyFilterPreset
+                                                            }
+                                                            selectedImage={
+                                                                selectedImage
+                                                            }
+                                                        />
+                                                        <div className="space-y-4">
+                                                            <h3 className="font-medium">
+                                                                Ajustes básicos
+                                                            </h3>
+                                                            <Slider
+                                                                label="Brillo"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.brightness ||
                                                                         100,
-                                                                },
-                                                            }
-                                                        )
-                                                    }
-                                                />
-                                            </div>
-                                        )}
-
-                                        {filterTab === "advanced" && (
-                                            <AdvancedSettings
-                                                element={getSelectedElement()}
-                                                onUpdate={(updates) =>
-                                                    updateElementInCell(
-                                                        selectedCell,
-                                                        selectedElement,
-                                                        updates
-                                                    )
-                                                }
-                                            />
-                                        )}
-
-                                        {getSelectedElement()?.type ===
-                                            "image" && (
-                                            <MaskSelector
-                                                onSelect={(mask) =>
-                                                    updateElementInCell(
-                                                        selectedCell,
-                                                        selectedElement,
-                                                        { mask }
-                                                    )
-                                                }
-                                                selectedMask={
-                                                    getSelectedElement()
-                                                        ?.mask || "none"
-                                                }
-                                                availableMasks={getCurrentLayout().maskCategories.flatMap(
-                                                    (cat) => cat.masks
+                                                                ]}
+                                                                min={0}
+                                                                max={200}
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    brightness:
+                                                                                        value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                            <Slider
+                                                                label="Contraste"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.contrast ||
+                                                                        100,
+                                                                ]}
+                                                                min={0}
+                                                                max={200}
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    contrast:
+                                                                                        value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                            <Slider
+                                                                label="Saturación"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.saturation ||
+                                                                        100,
+                                                                ]}
+                                                                min={0}
+                                                                max={200}
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    saturation:
+                                                                                        value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                            <Slider
+                                                                label="Tono"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.hue ||
+                                                                        0,
+                                                                ]}
+                                                                min={0}
+                                                                max={360}
+                                                                unit="°"
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    hue: value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                            <Slider
+                                                                label="Sepia"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.tint ||
+                                                                        0,
+                                                                ]}
+                                                                min={0}
+                                                                max={100}
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    tint: value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                            <Slider
+                                                                label="Desenfoque"
+                                                                value={[
+                                                                    getSelectedElement()
+                                                                        ?.filters
+                                                                        ?.blur ||
+                                                                        0,
+                                                                ]}
+                                                                min={0}
+                                                                max={20}
+                                                                unit="px"
+                                                                onValueChange={(
+                                                                    value
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        {
+                                                                            filters:
+                                                                                {
+                                                                                    ...getSelectedElement()
+                                                                                        ?.filters,
+                                                                                    blur: value[0],
+                                                                                },
+                                                                        }
+                                                                    )
+                                                                }
+                                                            />
+                                                        </div>
+                                                    </>
                                                 )}
-                                            />
+
+                                                {filterTab === "transform" && (
+                                                    <div className="space-y-4">
+                                                        {getSelectedElement()
+                                                            ?.type ===
+                                                            "image" && (
+                                                            <MaskSelector
+                                                                onSelect={(
+                                                                    mask
+                                                                ) =>
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        { mask }
+                                                                    )
+                                                                }
+                                                                selectedMask={
+                                                                    getSelectedElement()
+                                                                        ?.mask ||
+                                                                    "none"
+                                                                }
+                                                                availableMasks={getCurrentLayout().maskCategories.flatMap(
+                                                                    (cat) =>
+                                                                        cat.masks
+                                                                )}
+                                                                selectedImage={
+                                                                    selectedImage
+                                                                }
+                                                            />
+                                                        )}
+                                                        <AdvancedSettings
+                                                            selectedImage={
+                                                                selectedImage
+                                                            }
+                                                            element={getSelectedElement()}
+                                                            onUpdate={(
+                                                                updates
+                                                            ) =>
+                                                                updateElementInCell(
+                                                                    selectedCell,
+                                                                    selectedElement,
+                                                                    updates
+                                                                )
+                                                            }
+                                                        />
+
+                                                        <div className="mt-6 space-y-4">
+                                                            <div className="flex items-center justify-between">
+                                                                <h3 className=" font-medium pt-4">
+                                                                    Transformación
+                                                                </h3>
+                                                            </div>
+
+                                                            <div className="grid grid-cols-2 gap-2">
+                                                                <Button
+                                                                    variant={
+                                                                        getSelectedElement()
+                                                                            ?.filters
+                                                                            ?.flipHorizontal
+                                                                            ? "secondary"
+                                                                            : "outline"
+                                                                    }
+                                                                    size="sm"
+                                                                    icon={
+                                                                        <FlipHorizontal className="h-4 w-4" />
+                                                                    }
+                                                                    className="justify-start "
+                                                                    onClick={() =>
+                                                                        updateElementInCell(
+                                                                            selectedCell,
+                                                                            selectedElement,
+                                                                            {
+                                                                                filters:
+                                                                                    {
+                                                                                        ...getSelectedElement()
+                                                                                            ?.filters,
+                                                                                        flipHorizontal:
+                                                                                            !getSelectedElement()
+                                                                                                ?.filters
+                                                                                                ?.flipHorizontal,
+                                                                                    },
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Giro
+                                                                    Horizontal
+                                                                </Button>
+                                                                <Button
+                                                                    variant={
+                                                                        getSelectedElement()
+                                                                            ?.filters
+                                                                            ?.flipVertical
+                                                                            ? "secondary"
+                                                                            : "outline"
+                                                                    }
+                                                                    size="sm"
+                                                                    icon={
+                                                                        <FlipVertical className="h-4 w-4" />
+                                                                    }
+                                                                    className="justify-start"
+                                                                    onClick={() =>
+                                                                        updateElementInCell(
+                                                                            selectedCell,
+                                                                            selectedElement,
+                                                                            {
+                                                                                filters:
+                                                                                    {
+                                                                                        ...getSelectedElement()
+                                                                                            ?.filters,
+                                                                                        flipVertical:
+                                                                                            !getSelectedElement()
+                                                                                                ?.filters
+                                                                                                ?.flipVertical,
+                                                                                    },
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Giro
+                                                                    Vertical
+                                                                </Button>
+                                                            </div>
+
+                                                            <div className="space-y-2">
+                                                                <Slider
+                                                                    label="Rotación"
+                                                                    value={[
+                                                                        getSelectedElement()
+                                                                            ?.filters
+                                                                            ?.rotate ||
+                                                                            0,
+                                                                    ]}
+                                                                    min={0}
+                                                                    max={360}
+                                                                    unit="°"
+                                                                    onValueChange={(
+                                                                        value
+                                                                    ) =>
+                                                                        updateElementInCell(
+                                                                            selectedCell,
+                                                                            selectedElement,
+                                                                            {
+                                                                                filters:
+                                                                                    {
+                                                                                        ...getSelectedElement()
+                                                                                            ?.filters,
+                                                                                        rotate: value[0],
+                                                                                    },
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                />
+                                                                <Slider
+                                                                    label="Escala"
+                                                                    value={[
+                                                                        (getSelectedElement()
+                                                                            ?.filters
+                                                                            ?.scale ||
+                                                                            1) *
+                                                                            100,
+                                                                    ]}
+                                                                    min={10}
+                                                                    max={200}
+                                                                    unit="%"
+                                                                    onValueChange={(
+                                                                        value
+                                                                    ) =>
+                                                                        updateElementInCell(
+                                                                            selectedCell,
+                                                                            selectedElement,
+                                                                            {
+                                                                                filters:
+                                                                                    {
+                                                                                        ...getSelectedElement()
+                                                                                            ?.filters,
+                                                                                        scale:
+                                                                                            value[0] /
+                                                                                            100,
+                                                                                    },
+                                                                            }
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <h2 className="font-medium text-center">
+                                                Agrega imágenes y textos al área
+                                                de trabajo y selecciona tu
+                                                imagen para ver nuevas opciones
+                                            </h2>
                                         )}
-                                    </div>
+                                    </>
                                 )}
                             </div>
                         </aside>
+                        <BookPreviewModal
+                            isOpen={isBookPreviewOpen}
+                            onRequestClose={() => setIsBookPreviewOpen(false)}
+                            pages={pages.map((page) => ({
+                                ...page,
+                                layout:
+                                    layouts.find((l) => l.id === page.layout) ||
+                                    layouts[0],
+                            }))}
+                        />
 
                         {/* Área principal de edición */}
                         <main className="flex-1 overflow-auto bg-gray-100 p-6">
@@ -1141,143 +1167,179 @@ export default function EditorLibro() {
                                 ) : (
                                     <div className="space-y-6">
                                         {/* Barra de herramientas */}
-                                        <div className="bg-white rounded-lg shadow-sm p-4 flex items-center gap-4">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={undo}
-                                                disabled={historyIndex <= 0}
-                                            >
-                                                <Undo2 className="h-5 w-5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={redo}
-                                                disabled={
-                                                    historyIndex >=
-                                                    history.length - 1
-                                                }
-                                            >
-                                                <Redo2 className="h-5 w-5" />
-                                            </Button>
-                                            <div className="h-6 border-l"></div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => {
-                                                    const input =
-                                                        document.createElement(
-                                                            "input"
-                                                        );
-                                                    input.type = "file";
-                                                    input.accept = "image/*";
-                                                    input.onchange = (e) => {
-                                                        if (
-                                                            e.target.files &&
-                                                            e.target.files[0]
-                                                        ) {
-                                                            const newId = `img-${Date.now()}`;
-                                                            const newElement = {
-                                                                id: newId,
-                                                                type: "image",
-                                                                content: "",
-                                                                position: {
-                                                                    x: 10,
-                                                                    y: 10,
-                                                                },
-                                                                filters: {
-                                                                    brightness: 100,
-                                                                    contrast: 100,
-                                                                    saturation: 100,
-                                                                    tint: 0,
-                                                                    hue: 0,
-                                                                    blur: 0,
-                                                                    scale: 1,
-                                                                    rotate: 0,
-                                                                    opacity: 100,
-                                                                    blendMode:
-                                                                        "normal",
-                                                                },
-                                                                mask: "none",
-                                                            };
 
-                                                            const reader =
-                                                                new FileReader();
-                                                            reader.onload = (
-                                                                e
-                                                            ) => {
-                                                                if (
-                                                                    e.target
-                                                                        ?.result
-                                                                ) {
-                                                                    newElement.content =
-                                                                        e.target.result;
-                                                                    if (
-                                                                        selectedCell
-                                                                    ) {
-                                                                        addElementToCell(
-                                                                            selectedCell,
-                                                                            newElement
-                                                                        );
-                                                                    } else {
-                                                                        addElementToCell(
-                                                                            pages[
-                                                                                currentPage
-                                                                            ]
-                                                                                .cells[0]
-                                                                                .id,
-                                                                            newElement
-                                                                        );
-                                                                    }
-                                                                }
-                                                            };
-                                                            reader.readAsDataURL(
+                                        {textToolbarVisible ? (
+                                            <TextToolbar
+                                                element={getSelectedElement()}
+                                                onUpdate={(updates) => {
+                                                    updateElementInCell(
+                                                        textEditingOptions.cellId,
+                                                        textEditingOptions.elementId,
+                                                        updates
+                                                    );
+                                                }}
+                                                onClose={() =>
+                                                    setTextToolbarVisible(false)
+                                                }
+                                            />
+                                        ) : (
+                                            <div className="bg-white rounded-lg shadow-sm p-4 flex items-center gap-4">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={undo}
+                                                    disabled={historyIndex <= 0}
+                                                >
+                                                    <Undo2 className="h-5 w-5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={redo}
+                                                    disabled={
+                                                        historyIndex >=
+                                                        history.length - 1
+                                                    }
+                                                >
+                                                    <Redo2 className="h-5 w-5" />
+                                                </Button>
+                                                <div className="h-6 border-l"></div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        const input =
+                                                            document.createElement(
+                                                                "input"
+                                                            );
+                                                        input.type = "file";
+                                                        input.accept =
+                                                            "image/*";
+                                                        input.onchange = (
+                                                            e
+                                                        ) => {
+                                                            if (
+                                                                e.target
+                                                                    .files &&
                                                                 e.target
                                                                     .files[0]
+                                                            ) {
+                                                                const newId = `img-${Date.now()}`;
+                                                                const newElement =
+                                                                    {
+                                                                        id: newId,
+                                                                        type: "image",
+                                                                        content:
+                                                                            "",
+                                                                        position:
+                                                                            {
+                                                                                x: 10,
+                                                                                y: 10,
+                                                                            },
+                                                                        filters:
+                                                                            {
+                                                                                brightness: 100,
+                                                                                contrast: 100,
+                                                                                saturation: 100,
+                                                                                tint: 0,
+                                                                                hue: 0,
+                                                                                blur: 0,
+                                                                                scale: 1,
+                                                                                rotate: 0,
+                                                                                opacity: 100,
+                                                                                blendMode:
+                                                                                    "normal",
+                                                                            },
+                                                                        mask: "none",
+                                                                    };
+
+                                                                const reader =
+                                                                    new FileReader();
+                                                                reader.onload =
+                                                                    (e) => {
+                                                                        if (
+                                                                            e
+                                                                                .target
+                                                                                ?.result
+                                                                        ) {
+                                                                            newElement.content =
+                                                                                e.target.result;
+                                                                            if (
+                                                                                selectedCell
+                                                                            ) {
+                                                                                addElementToCell(
+                                                                                    selectedCell,
+                                                                                    newElement
+                                                                                );
+                                                                            } else {
+                                                                                addElementToCell(
+                                                                                    pages[
+                                                                                        currentPage
+                                                                                    ]
+                                                                                        .cells[0]
+                                                                                        .id,
+                                                                                    newElement
+                                                                                );
+                                                                            }
+                                                                        }
+                                                                    };
+                                                                reader.readAsDataURL(
+                                                                    e.target
+                                                                        .files[0]
+                                                                );
+                                                            }
+                                                        };
+                                                        input.click();
+                                                    }}
+                                                >
+                                                    <ImageIcon className="h-5 w-5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={handleAddText}
+                                                >
+                                                    <Type className="h-5 w-5" />
+                                                </Button>
+                                                <div className="h-6 border-l"></div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => {
+                                                        if (
+                                                            selectedElement &&
+                                                            selectedCell
+                                                        ) {
+                                                            deleteElementFromCell(
+                                                                selectedCell,
+                                                                selectedElement
                                                             );
                                                         }
-                                                    };
-                                                    input.click();
-                                                }}
-                                            >
-                                                <ImageIcon className="h-5 w-5" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={handleAddText}
-                                            >
-                                                <Type className="h-5 w-5" />
-                                            </Button>
-                                            <div className="h-6 border-l"></div>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => {
-                                                    if (
-                                                        selectedElement &&
-                                                        selectedCell
-                                                    ) {
-                                                        deleteElementFromCell(
-                                                            selectedCell,
-                                                            selectedElement
-                                                        );
+                                                    }}
+                                                    disabled={!selectedElement}
+                                                >
+                                                    <Trash2 className="h-5 w-5" />
+                                                </Button>
+                                                <WorkspaceControls
+                                                    currentSize={workspaceSize}
+                                                    onSizeChange={
+                                                        setWorkspaceSize
                                                     }
-                                                }}
-                                                disabled={!selectedElement}
-                                            >
-                                                <Trash2 className="h-5 w-5" />
-                                            </Button>
-                                        </div>
-
+                                                />
+                                            </div>
+                                        )}
                                         {/* Área de edición */}
                                         <div
+                                            id={`page-${pages[currentPage].id}`}
                                             className={`bg-white rounded-lg shadow-lg overflow-hidden page-preview w-full ${
                                                 getCurrentLayout().cells <= 4
                                                     ? ""
                                                     : ""
                                             }`}
+                                            style={{
+                                                width: workspaceSize.width,
+                                                height: workspaceSize.height,
+                                            }}
                                         >
                                             <div
                                                 className={`grid ${
@@ -1292,13 +1354,14 @@ export default function EditorLibro() {
                                                             elements={
                                                                 cell.elements
                                                             }
+                                                            size={workspaceSize}
                                                             selectedElement={
                                                                 selectedCell ===
                                                                 cell.id
                                                                     ? selectedElement
                                                                     : null
                                                             }
-                                                            onSelectElement={(
+                                                            /*   onSelectElement={(
                                                                 elementId
                                                             ) => {
                                                                 setSelectedElement(
@@ -1307,7 +1370,10 @@ export default function EditorLibro() {
                                                                 setSelectedCell(
                                                                     cell.id
                                                                 );
-                                                            }}
+                                                            }}*/
+                                                            onSelectElement={
+                                                                handleSelectElement
+                                                            }
                                                             onAddElement={(
                                                                 element
                                                             ) => {
@@ -1486,108 +1552,93 @@ export default function EditorLibro() {
                                     </div>
                                 )}
                             </div>
-                            {/* Sidebar derecho - Navegación de páginas */}
-                            <aside className="max-w-5xl mt-6 mx-auto border-l bg-white p-4 overflow-y-auto shadow-sm rounded-lg">
+
+                            {/* Sidebar footer - Navegación de páginas */}
+                            {/* Sidebar footer - Navegación de páginas */}
+                            <aside className="max-w-5xl mt-6 mx-auto bg-white p-4 rounded-lg border">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-center">
                                         <h3 className="font-medium">Páginas</h3>
-                                        <div className="flex gap-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
+                                        <div className="flex gap-2">
+                                            <button
+                                                className="p-1 rounded hover:bg-gray-100"
                                                 onClick={duplicateCurrentPage}
+                                                title="Duplicar página"
                                             >
-                                                <svg
-                                                    width="15"
-                                                    height="15"
-                                                    viewBox="0 0 15 15"
-                                                    fill="none"
-                                                    xmlns="http://www.w3.org/2000/svg"
-                                                    className="h-4 w-4"
-                                                >
-                                                    <path
-                                                        d="M1 9.50006C1 10.3285 1.67157 11.0001 2.5 11.0001H4L4 10.0001H2.5C2.22386 10.0001 2 9.7762 2 9.50006L2 2.50006C2 2.22392 2.22386 2.00006 2.5 2.00006L9.5 2.00006C9.77614 2.00006 10 2.22392 10 2.50006V4.00002H5.5C4.67158 4.00002 4 4.67159 4 5.50002V12.5C4 13.3284 4.67158 14 5.5 14H12.5C13.3284 14 14 13.3284 14 12.5V5.50002C14 4.67159 13.3284 4.00002 12.5 4.00002H11V2.50006C11 1.67163 10.3284 1.00006 9.5 1.00006H2.5C1.67157 1.00006 1 1.67163 1 2.50006V9.50006ZM5 5.50002C5 5.22388 5.22386 5.00002 5.5 5.00002H12.5C12.7761 5.00002 13 5.22388 13 5.50002V12.5C13 12.7762 12.7761 13 12.5 13H5.5C5.22386 13 5 12.7762 5 12.5V5.50002Z"
-                                                        fill="currentColor"
-                                                        fillRule="evenodd"
-                                                        clipRule="evenodd"
-                                                    ></path>
-                                                </svg>
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon-sm"
+                                                <Copy className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                className="p-1 rounded hover:bg-gray-100"
                                                 onClick={deleteCurrentPage}
                                                 disabled={pages.length <= 1}
+                                                title="Eliminar página"
                                             >
                                                 <Trash2 className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                icon={
-                                                    <Plus className="h-4 w-4" />
-                                                }
+                                            </button>
+                                            <button
+                                                className="flex items-center gap-1 px-3 py-1 text-sm border rounded-md hover:bg-gray-50"
                                                 onClick={addPage}
                                             >
-                                                Añadir página
-                                            </Button>
+                                                <Plus className="h-4 w-4" />
+                                                <span>Nueva página</span>
+                                            </button>
                                         </div>
                                     </div>
-                                    <div className="flex overflow-x-auto  gap-3">
-                                        {pages.map((page, index) => (
+
+                                    <div className="flex overflow-x-auto gap-3 custom-scroll">
+                                        {pages?.map((page, index) => (
                                             <div
                                                 key={page.id}
-                                                className={`border rounded-md p-2 cursor-pointer hover:border-purple-500 transition-colors ${
-                                                    currentPage === index
-                                                        ? "border-purple-500 ring-2 ring-purple-200"
-                                                        : ""
-                                                }`}
+                                                className={`flex-shrink-0 w-40 p-4 `}
                                                 onClick={() =>
                                                     setCurrentPage(index)
                                                 }
                                             >
-                                                <div className="bg-gray-100 w-40   aspect-[4/3] rounded-sm flex items-center justify-center text-xs text-gray-500 relative">
-                                                    Pág. {index + 1}
-                                                    {page.cells.some((cell) =>
-                                                        cell.elements.some(
-                                                            (el) =>
-                                                                el.type ===
-                                                                    "image" &&
-                                                                el.content
-                                                        )
-                                                    ) && (
-                                                        <div className="absolute inset-0 grid grid-cols-2 grid-rows-2 gap-1 p-1">
-                                                            {Array.from({
-                                                                length: 4,
-                                                            }).map((_, i) => {
-                                                                const cell =
-                                                                    page.cells[
-                                                                        i
-                                                                    ];
-                                                                const image =
-                                                                    cell?.elements.find(
-                                                                        (el) =>
-                                                                            el.type ===
-                                                                                "image" &&
-                                                                            el.content
-                                                                    );
-                                                                return (
-                                                                    <div
-                                                                        key={i}
-                                                                        className="bg-gray-200 rounded-sm overflow-hidden"
-                                                                    >
-                                                                        {image && (
-                                                                            <img
-                                                                                src={
-                                                                                    image.content
-                                                                                }
-                                                                                alt=""
-                                                                                className="w-full h-full object-cover"
-                                                                            />
-                                                                        )}
-                                                                    </div>
-                                                                );
-                                                            })}
+                                                <div
+                                                    className={`relative bg-gray-100 h-48 rounded-md overflow-hidden ${
+                                                        currentPage === index
+                                                            ? "border border-primary"
+                                                            : ""
+                                                    }`}
+                                                >
+                                                    <span className="absolute top-1 left-1 text-xs bg-white/80 px-1 rounded z-10">
+                                                        Pág. {index + 1}
+                                                    </span>
+
+                                                    {pageThumbnails[page.id] ? (
+                                                        <img
+                                                            src={
+                                                                pageThumbnails[
+                                                                    page.id
+                                                                ]
+                                                            }
+                                                            alt={`Miniatura página ${
+                                                                index + 1
+                                                            }`}
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <div
+                                                                className={`grid ${
+                                                                    getCurrentLayout()
+                                                                        .template
+                                                                } gap-1 w-full h-full p-1`}
+                                                            >
+                                                                {Array.from({
+                                                                    length: getCurrentLayout()
+                                                                        .cells,
+                                                                }).map(
+                                                                    (_, i) => (
+                                                                        <div
+                                                                            key={
+                                                                                i
+                                                                            }
+                                                                            className="bg-gray-200 rounded-sm"
+                                                                        ></div>
+                                                                    )
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -1603,3 +1654,20 @@ export default function EditorLibro() {
         </DndProvider>
     );
 }
+<style jsx>{`
+    .custom-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: #c7d2fe #f5f3ff;
+    }
+    .custom-scroll::-webkit-scrollbar {
+        height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+        background: #f5f3ff;
+        border-radius: 3px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+        background-color: #c7d2fe;
+        border-radius: 3px;
+    }
+`}</style>;

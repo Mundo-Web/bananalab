@@ -9,28 +9,25 @@
     text-shadow: 0px 0px 32px rgba(0, 0, 0, 0.5);
 }
 
-
 .hamburguesa {
-  @apply w-10 h-10 rounded-lg cursor-pointer;
+    @apply w-10 h-10 rounded-lg cursor-pointer;
 }
 
 .menu:checked ~ label p:nth-child(2) {
-  @apply hidden;
+    @apply hidden;
 }
 
 .menu:checked ~ label p:nth-child(1) {
-  @apply -rotate-45 translate-y-[3px];
+    @apply -rotate-45 translate-y-[3px];
 }
 
 .menu:checked ~ label p:nth-child(3) {
-  @apply rotate-45 -translate-y-[5px];
+    @apply rotate-45 -translate-y-[5px];
 }
 
+/*  */
 
-  
-  /*  */
-  
-  /* @layer utilities {
+/* @layer utilities {
     .clip-circle-0 {
         clip-path: circle(0% at top right);
     }
@@ -100,73 +97,193 @@
     background: #bbb;
   } */
 
-
-  /* Máscaras personalizadas */
 /* Máscaras personalizadas */
-.mask-heart {
-  clip-path: path('M10,6 Q10,0 15,0 T20,6 Q20,10 10,16 Q0,10 0,6 Q0,0 5,0 T10,6');
+/* FORMAS */
+/* Reemplazo personalizado de Tailwind rounded-md */
+.mask-rounded-sm {
+    border-radius: 6px;
+    overflow: hidden;
 }
 
-.mask-star {
-  clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+/* Reemplazo personalizado de Tailwind rounded-xl */
+.mask-rounded {
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+/* Reemplazo personalizado de Tailwind rounded-2xl */
+.mask-rounded-lg {
+    border-radius: 24px;
+    overflow: hidden;
+}
+
+/* Rectángulo redondeado uniforme */
+.mask-rounded-rect {
+    border-radius: 16px;
+    overflow: hidden;
+}
+.mask-circle {
+    clip-path: circle(50% at 50% 50%);
+}
+
+.mask-star-2 {
+    clip-path: polygon(
+        50% 0%,
+        61% 35%,
+        98% 35%,
+        68% 57%,
+        79% 91%,
+        50% 70%,
+        21% 91%,
+        32% 57%,
+        2% 35%,
+        39% 35%
+    );
 }
 
 .mask-hexagon {
-  clip-path: polygon(25% 0%, 75% 0%, 100% 50%, 75% 100%, 25% 100%, 0% 50%);
+    clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%);
 }
 
 .mask-triangle {
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+    clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
 }
 
 .mask-diamond {
-  clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
 }
 
+.mask-speech {
+    clip-path: polygon(
+        10% 0%,
+        90% 0%,
+        90% 80%,
+        60% 80%,
+        50% 100%,
+        40% 80%,
+        10% 80%
+    );
+}
+
+.mask-burst {
+    clip-path: polygon(
+        50% 0%,
+        60% 20%,
+        80% 10%,
+        70% 30%,
+        90% 50%,
+        70% 70%,
+        80% 90%,
+        60% 80%,
+        50% 100%,
+        40% 80%,
+        20% 90%,
+        30% 70%,
+        10% 50%,
+        30% 30%,
+        20% 10%,
+        40% 20%
+    );
+}
+
+/* FOTOGRÁFICOS */
 .mask-polaroid {
-  clip-path: inset(5% 5% 15% 5% round 2%);
+    clip-path: inset(5% 5% 20% 5%);
 }
 
 .mask-vintage {
-  clip-path: inset(5% round 5% 5% 10% 5%);
-}
-
-.mask-wave {
-  clip-path: path('M0,10 C20,8 50,15 80,10 C110,5 140,15 160,10 L160,0 L0,0 Z');
+    clip-path: ellipse(45% 45% at 50% 50%);
 }
 
 .mask-diagonal {
-  clip-path: polygon(0 0, 100% 0, 100% 80%, 0 100%);
+    clip-path: polygon(0 0, 100% 10%, 100% 90%, 0% 100%);
 }
 
 .mask-frame {
-  clip-path: inset(10% round 10%);
+    mask-image: radial-gradient(ellipse at center, black 50%, transparent 70%);
+    mask-mode: alpha;
+    -webkit-mask-image: radial-gradient(
+        ellipse at center,
+        black 50%,
+        transparent 70%
+    );
 }
 
+/* CREATIVAS */
 .mask-leaf {
-  clip-path: path('M10,0 Q12,5 10,10 Q5,12 0,10 Q-2,5 0,0 Q5,-2 10,0');
+    clip-path: path("M50 0 Q65 20 50 40 Q35 20 50 0 Z");
 }
 
 .mask-cloud {
-  clip-path: path('M10,5 Q15,0 20,5 Q25,3 30,5 Q35,7 30,10 Q25,12 20,10 Q15,15 10,10 Q5,12 0,10 Q-5,7 0,5 Q5,3 10,5');
+    clip-path: path("M30 40 Q20 20 40 20 Q45 5 60 20 Q80 20 70 40 Z");
 }
 
 .mask-flower {
-  clip-path: path('M10,0 Q12,5 10,10 Q5,12 0,10 Q-2,5 0,0 Q5,-2 10,0 M5,3 Q7,5 5,7 Q3,5 5,3 M15,3 Q17,5 15,7 Q13,5 15,3');
+    clip-path: path(
+        "M50 10 Q60 30 50 50 Q40 30 50 10 M10 50 Q30 60 50 50 Q30 40 10 50"
+    );
 }
 
 .mask-ornate {
-  clip-path: path('M0,5 Q5,0 10,5 Q15,0 20,5 Q25,0 30,5 Q35,0 40,5 Q40,10 35,10 Q30,15 25,10 Q20,15 15,10 Q10,15 5,10 Q0,10 0,5');
+    clip-path: path(
+        "M50 0 Q100 25 75 50 Q100 75 50 100 Q0 75 25 50 Q0 25 50 0"
+    );
 }
 
 .mask-blob1 {
-  clip-path: path('M10,0 C15,0 20,5 20,10 C20,15 15,20 10,20 C5,20 0,15 0,10 C0,5 5,0 10,0 Z');
+    clip-path: path(
+        "M40 10 Q70 0 80 30 Q100 60 60 80 Q30 100 10 60 Q0 30 40 10"
+    );
 }
 
 .mask-blob2 {
-  clip-path: path('M10,0 C15,5 20,10 15,15 C10,20 5,15 0,10 C5,5 5,5 10,0 Z');
+    clip-path: path(
+        "M50 10 Q90 10 90 50 Q90 90 50 90 Q10 90 10 50 Q10 10 50 10"
+    );
 }
 
 .mask-blob3 {
-  clip-path: path('M10,0 C15,0 20,5 15,10 C20,15 15,20 10,15 C5,20 0,15 5,10 C0,5 5,0 10,0 Z');
+    clip-path: path(
+        "M50 0 Q75 25 100 50 Q75 75 50 100 Q25 75 0 50 Q25 25 50 0"
+    );
+}
+
+/* RECTÁNGULO REDONDEADO */
+.mask-rounded-rect {
+    clip-path: inset(0% round 20px);
+}
+
+/* BOOK FLIP */
+
+/* Efectos 3D para el flipbook */
+.page-flip-book .page {
+    background-color: white;
+    border: 1px solid #e5e5e5;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Página izquierda */
+.page-flip-book .page.--left {
+    box-shadow: -5px 0 15px rgba(0, 0, 0, 0.1);
+    border-right: 1px solid #ddd;
+}
+
+/* Página derecha */
+.page-flip-book .page.--right {
+    box-shadow: 5px 0 15px rgba(0, 0, 0, 0.1);
+    border-left: 1px solid #ddd;
+}
+
+/* Efecto al pasar página */
+.page-flip-book .page.--hard {
+    background-color: #f9f9f9;
+    box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .page-flip-book {
+        width: 95vw !important;
+        height: 70vh !important;
+    }
 }

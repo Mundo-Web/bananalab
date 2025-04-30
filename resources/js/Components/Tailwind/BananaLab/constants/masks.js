@@ -9,31 +9,18 @@ export const imageMasks = [
     {
         id: "circle",
         name: "Círculo",
-        class: "rounded-full",
+        class: "mask-circle",
         category: "Básicas",
         //icon: () => <Circle className="h-4 w-4" />,
     },
     {
         id: "rounded",
         name: "Redondeado",
-        class: "rounded-xl",
+        class: "mask-rounded",
         category: "Básicas",
         //icon: () => <Square className="h-4 w-4 rounded-md" />,
     },
-    {
-        id: "square",
-        name: "Cuadrado",
-        class: "",
-        category: "Básicas",
-        //icon: () => <Square className="h-4 w-4" />,
-    },
-    {
-        id: "heart",
-        name: "Corazón",
-        class: "mask-heart",
-        category: "Formas",
-        //icon: () => <Heart className="h-4 w-4" />,
-    },
+
     {
         id: "star",
         name: "Estrella",
@@ -76,13 +63,7 @@ export const imageMasks = [
         category: "Fotográficos",
         //icon: () => <Feather className="h-4 w-4" />,
     },
-    {
-        id: "wave",
-        name: "Onda",
-        class: "mask-wave",
-        category: "Fotográficos",
-        //icon: () => <Zap className="h-4 w-4" />,
-    },
+
     {
         id: "diagonal",
         name: "Diagonal",
@@ -97,34 +78,7 @@ export const imageMasks = [
         category: "Fotográficos",
         //icon: () => <Square className="h-4 w-4" />,
     },
-    {
-        id: "leaf",
-        name: "Hoja",
-        class: "mask-leaf",
-        category: "Creativas",
-        //icon: () => <Feather className="h-4 w-4" />,
-    },
-    {
-        id: "cloud",
-        name: "Nube",
-        class: "mask-cloud",
-        category: "Creativas",
-        //icon: () => <Cloud className="h-4 w-4" />,
-    },
-    {
-        id: "flower",
-        name: "Flor",
-        class: "mask-flower",
-        category: "Creativas",
-        //icon: () => <Flower className="h-4 w-4" />,
-    },
-    {
-        id: "ornate",
-        name: "Ornamento",
-        class: "mask-ornate",
-        category: "Creativas",
-        //icon: () => <div className="w-4 h-4 bg-current clip-ornate" />,
-    },
+
     {
         id: "blob1",
         name: "Mancha 1",
@@ -149,45 +103,18 @@ export const imageMasks = [
     {
         id: "rounded-sm",
         name: "Redondeado pequeño",
-        class: "rounded-md",
+        class: "mask-rounded-sm",
         category: "Básicas",
         //icon: () => <Square className="h-4 w-4 rounded-sm" />,
     },
     {
         id: "rounded-lg",
         name: "Redondeado grande",
-        class: "rounded-2xl",
+        class: "mask-rounded-lg",
         category: "Básicas",
         //icon: () => <Square className="h-4 w-4 rounded-lg" />,
     },
-    {
-        id: "rounded-full",
-        name: "Círculo perfecto",
-        class: "rounded-full",
-        category: "Básicas",
-        //icon: () => <Circle className="h-4 w-4" />,
-    },
-    {
-        id: "bevel",
-        name: "Biselado",
-        class: "mask-bevel",
-        category: "Fotográficos",
-        //icon: () => <Square className="h-4 w-4" />,
-    },
-    {
-        id: "poster",
-        name: "Poster",
-        class: "mask-poster",
-        category: "Fotográficos",
-        //icon: () => <Film className="h-4 w-4" />,
-    },
-    {
-        id: "badge",
-        name: "Insignia",
-        class: "mask-badge",
-        category: "Formas",
-        //icon: () => <div className="w-4 h-4 bg-current clip-badge" />,
-    },
+
     {
         id: "speech",
         name: "Globo de texto",
@@ -208,12 +135,5 @@ export const imageMasks = [
         class: "mask-rounded-rect",
         category: "Básicas",
         //icon: () => <Square className="h-4 w-4 rounded-md" />,
-    },
-    {
-        id: "inner-frame",
-        name: "Marco interno",
-        class: "mask-inner-frame",
-        category: "Fotográficos",
-        //icon: () => <Square className="h-4 w-4" />,
     },
 ];

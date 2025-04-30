@@ -1,36 +1,50 @@
 import { FlipHorizontal, FlipVertical } from "lucide-react";
-import { blendModes } from "../../constants/blendModes";
+import { blendModeOptions } from "../../constants/blendModes";
 import Button from "../UI/Button";
 import Slider from "../UI/Slider";
 
-export const AdvancedSettings = ({ element, onUpdate }) => {
+export const AdvancedSettings = ({ element, onUpdate, selectedImage }) => {
     return (
         <div className="space-y-4">
             <h3 className="font-medium">Ajustes avanzados</h3>
 
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Modo de mezcla
-                </label>
-                <select
-                    className="w-full border rounded-md p-2 text-sm"
-                    value={element.filters?.blendMode || "normal"}
-                    onChange={(e) =>
-                        onUpdate({
-                            filters: {
-                                ...element.filters,
-                                blendMode: e.target.value,
-                            },
-                        })
-                    }
-                >
-                    {blendModes.map((mode) => (
-                        <option key={mode} value={mode}>
-                            {mode}
-                        </option>
-                    ))}
-                </select>
-            </div>
+            {/*  <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-2">
+                    {blendModeOptions?.map((mode) => {
+                        const isActive =
+                            element.filters?.blendMode === mode.value;
+                        return (
+                            <button
+                                key={mode.value}
+                                className={`flex flex-col items-center border p-2 rounded-md text-xs transition hover:border-gray-400 ${
+                                    isActive
+                                        ? "border-purple-500 bg-purple-100"
+                                        : "border-gray-200"
+                                }`}
+                                onClick={() =>
+                                    onUpdate({
+                                        filters: {
+                                            ...element.filters,
+                                            blendMode: mode.value,
+                                        },
+                                    })
+                                }
+                            >
+                                <div
+                                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                                    style={{
+                                        mixBlendMode: mode.value,
+                                        backgroundImage: `url(${selectedImage.content})`,
+                                        backgroundSize: "cover",
+                                        backgroundPosition: "center",
+                                    }}
+                                />
+                                <span className="mt-1">{mode.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>*/}
 
             <Slider
                 label="Opacidad"
@@ -43,46 +57,6 @@ export const AdvancedSettings = ({ element, onUpdate }) => {
                     })
                 }
             />
-
-            <div className="grid grid-cols-2 gap-3">
-                <Button
-                    variant={
-                        element.filters?.flipHorizontal
-                            ? "secondary"
-                            : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                        onUpdate({
-                            filters: {
-                                ...element.filters,
-                                flipHorizontal:
-                                    !element.filters?.flipHorizontal,
-                            },
-                        })
-                    }
-                >
-                    <FlipHorizontal className="h-4 w-4 mr-1" />
-                    Voltear H
-                </Button>
-                <Button
-                    variant={
-                        element.filters?.flipVertical ? "secondary" : "outline"
-                    }
-                    size="sm"
-                    onClick={() =>
-                        onUpdate({
-                            filters: {
-                                ...element.filters,
-                                flipVertical: !element.filters?.flipVertical,
-                            },
-                        })
-                    }
-                >
-                    <FlipVertical className="h-4 w-4 mr-1" />
-                    Voltear V
-                </Button>
-            </div>
         </div>
     );
 };

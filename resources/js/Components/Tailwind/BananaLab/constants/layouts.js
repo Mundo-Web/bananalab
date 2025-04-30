@@ -92,9 +92,9 @@ export const layouts = [
     },
     {
         id: "layout-4",
-        name: "Collage 2x2",
-        template: "grid-cols-2 grid-rows-2",
-        cells: 4,
+        name: "Dos fotos verticales",
+        template: "grid-cols-2 grid-rows-1",
+        cells: 2,
         maskCategories: [
             {
                 name: "Básicas",
@@ -106,11 +106,28 @@ export const layouts = [
             },
         ],
     },
+
     {
         id: "layout-5",
         name: "Mosaico",
         template: "grid-cols-3 grid-rows-2",
         cells: 6,
+        maskCategories: [
+            {
+                name: "Básicas",
+                masks: ["none", "circle", "square"],
+            },
+            {
+                name: "Creativas",
+                masks: ["leaf", "cloud", "flower"],
+            },
+        ],
+    },
+    {
+        id: "layout-6",
+        name: "Individual",
+        template: "grid-cols-1 grid-rows-1",
+        cells: 1,
         maskCategories: [
             {
                 name: "Básicas",

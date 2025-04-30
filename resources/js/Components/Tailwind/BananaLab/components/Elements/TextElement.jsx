@@ -130,6 +130,17 @@ export default function TextElement({
           }`
         : "none";
 
+    /*  const combinedStyle = {
+        ...element.style,
+        position: "absolute",
+        left: `${element.position.x}px`,
+        top: `${element.position.y}px`,
+        cursor: isSelected && !isEditing ? "move" : "pointer",
+        textShadow,
+        zIndex: 10,
+    };*/
+    // En el TextElement, actualiza el combinedStyle:
+    // En TextElement.jsx, actualiza el combinedStyle
     const combinedStyle = {
         ...element.style,
         position: "absolute",
@@ -138,6 +149,19 @@ export default function TextElement({
         cursor: isSelected && !isEditing ? "move" : "pointer",
         textShadow,
         zIndex: 10,
+        fontFamily: element.style?.fontFamily || "Arial",
+        fontSize: element.style?.fontSize || "16px",
+        color: element.style?.color || "#000000",
+        fontWeight: element.style?.fontWeight || "normal",
+        fontStyle: element.style?.fontStyle || "normal",
+        textDecoration: element.style?.textDecoration || "none",
+        textAlign: element.style?.textAlign || "left",
+        backgroundColor: element.style?.backgroundColor || "transparent",
+        padding: element.style?.padding || "8px",
+        borderRadius: element.style?.borderRadius || "0px",
+        border: element.style?.border || "none",
+        opacity:
+            element.style?.opacity !== undefined ? element.style.opacity : 1,
     };
 
     return (
@@ -147,11 +171,37 @@ export default function TextElement({
                 isDragging ? "opacity-50" : "opacity-100"
             }`}
             style={combinedStyle}
+            /* onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+            }}*/
+            //    onDoubleClick={handleDoubleClick}
+            /* onClick={(e) => {
+                e.stopPropagation();
+                onSelect();
+                if (!isEditing && isSelected) {
+                    setIsEditing(true);
+                    setTimeout(() => {
+                        if (inputRef.current) {
+                            inputRef.current.focus();
+                            inputRef.current.select();
+                        }
+                    }, 0);
+                }
+            }}*/
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
+                if (!isEditing && isSelected) {
+                    setIsEditing(true);
+                    setTimeout(() => {
+                        if (inputRef.current) {
+                            inputRef.current.focus();
+                            inputRef.current.select();
+                        }
+                    }, 0);
+                }
             }}
-            onDoubleClick={handleDoubleClick}
             onMouseDown={handleMouseDown}
             onContextMenu={handleContextMenu}
         >

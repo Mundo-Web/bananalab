@@ -85,11 +85,21 @@ export default function ImageElement({
             window.addEventListener("mouseup", handleMouseUp);
         }
 
+        // Manejador de clic global mejorado
+        const handleGlobalClick = (e) => {
+            if (showContextMenu && !e.target.closest(".context-menu")) {
+                setShowContextMenu(false);
+            }
+        };
+
+        document.addEventListener("click", handleGlobalClick);
+
         return () => {
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
+            document.removeEventListener("click", handleGlobalClick);
         };
-    }, [isDraggingInside, startPos]);
+    }, [isDraggingInside, startPos, showContextMenu]);
 
     const ref = useCallback(
         (node) => {
@@ -138,6 +148,93 @@ export default function ImageElement({
         setShowContextMenu(false);
     };
 
+    // Estados para el redimensionamiento
+    const [isResizing, setIsResizing] = useState(false);
+    const [resizeDirection, setResizeDirection] = useState(null);
+    const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
+    const [initialMousePos, setInitialMousePos] = useState({ x: 0, y: 0 });
+
+    // Función para iniciar el redimensionamiento
+    const startResize = (e, direction) => {
+        e.stopPropagation();
+        setIsResizing(true);
+        setResizeDirection(direction);
+        setInitialMousePos({ x: e.clientX, y: e.clientY });
+        setInitialSize({
+            width:
+                element.size?.width || elementRef.current?.offsetWidth || 200,
+            height:
+                element.size?.height || elementRef.current?.offsetHeight || 200,
+        });
+    };
+
+    // Función para manejar el redimensionamiento
+    const handleResize = useCallback(
+        (e) => {
+            if (!isResizing || !elementRef.current) return;
+
+            const deltaX = e.clientX - initialMousePos.x;
+            const deltaY = e.clientY - initialMousePos.y;
+            const parentRect =
+                elementRef.current.parentElement.getBoundingClientRect();
+
+            let newWidth = initialSize.width;
+            let newHeight = initialSize.height;
+
+            switch (resizeDirection) {
+                case "right":
+                    newWidth = Math.max(50, initialSize.width + deltaX);
+                    break;
+                case "bottom":
+                    newHeight = Math.max(50, initialSize.height + deltaY);
+                    break;
+                case "bottomRight":
+                    newWidth = Math.max(50, initialSize.width + deltaX);
+                    newHeight = Math.max(50, initialSize.height + deltaY);
+                    break;
+            }
+
+            // Asegurar que no exceda los límites del contenedor
+            newWidth = Math.min(
+                newWidth,
+                parentRect.width - element.position.x
+            );
+            newHeight = Math.min(
+                newHeight,
+                parentRect.height - element.position.y
+            );
+
+            onUpdate({
+                size: { width: newWidth, height: newHeight },
+            });
+        },
+        [
+            isResizing,
+            initialMousePos,
+            initialSize,
+            resizeDirection,
+            element.position,
+        ]
+    );
+
+    // Función para terminar el redimensionamiento
+    const stopResize = useCallback(() => {
+        setIsResizing(false);
+        setResizeDirection(null);
+    }, []);
+
+    // Efecto para manejar el redimensionamiento
+    useEffect(() => {
+        if (isResizing) {
+            window.addEventListener("mousemove", handleResize);
+            window.addEventListener("mouseup", stopResize);
+        }
+        return () => {
+            window.removeEventListener("mousemove", handleResize);
+            window.removeEventListener("mouseup", stopResize);
+        };
+    }, [isResizing, handleResize, stopResize]);
+
     return (
         <div
             ref={ref}
@@ -148,24 +245,71 @@ export default function ImageElement({
                 position: "absolute",
                 left: `${element.position.x}px`,
                 top: `${element.position.y}px`,
-                //  width: "100%",
-                //height: "100%",
+                width: element.size?.width
+                    ? `${element.size.width}px`
+                    : "200px",
+                height: element.size?.height
+                    ? `${element.size.height}px`
+                    : "200px",
                 cursor: isSelected ? "move" : "pointer",
+                zIndex: isSelected ? 9999 : element.zIndex || 1,
+                pointerEvents: "all",
             }}
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
             }}
-            onMouseDown={handleMouseDown}
+            onMouseDown={(e) => {
+                e.stopPropagation();
+                handleMouseDown(e);
+                if (!isSelected) {
+                    onUpdate({
+                        zIndex:
+                            Math.max(...elements.map((el) => el.zIndex || 0)) +
+                            1,
+                    });
+                }
+            }}
             onContextMenu={handleContextMenu}
         >
-            <div className="w-full h-full overflow-hidden">
+            <div className="w-full h-full overflow-hidden relative">
                 <img
                     src={element.content}
                     alt="Imagen cargada"
                     className="w-full h-full object-cover"
-                    style={filterStyle}
+                    style={{
+                        ...filterStyle,
+                        mixBlendMode: element.filters?.blendMode || "normal",
+                        opacity: (element.filters?.opacity || 100) / 100,
+                    }}
                 />
+
+                {/* Controles de redimensionamiento */}
+                {isSelected && (
+                    <>
+                        <div
+                            className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full cursor-se-resize"
+                            style={{ transform: "translate(50%, 50%)" }}
+                            onMouseDown={(e) => startResize(e, "bottomRight")}
+                        />
+                        <div
+                            className="absolute bottom-0 w-3 h-3 bg-purple-500 rounded-full cursor-s-resize"
+                            style={{
+                                left: "50%",
+                                transform: "translateX(-50%) translateY(50%)",
+                            }}
+                            onMouseDown={(e) => startResize(e, "bottom")}
+                        />
+                        <div
+                            className="absolute right-0 w-3 h-3 bg-purple-500 rounded-full cursor-e-resize"
+                            style={{
+                                top: "50%",
+                                transform: "translateY(-50%) translateX(50%)",
+                            }}
+                            onMouseDown={(e) => startResize(e, "right")}
+                        />
+                    </>
+                )}
             </div>
 
             {isSelected && (
@@ -197,57 +341,87 @@ export default function ImageElement({
             )}
 
             {showContextMenu && (
-                <div
-                    className="fixed bg-white shadow-lg rounded-md z-50 py-1 w-48"
-                    style={{
-                        left: `${contextMenuPos.x}px`,
-                        top: `${contextMenuPos.y}px`,
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                        onClick={replaceImage}
-                    >
-                        <Replace className="h-4 w-4" />
-                        Reemplazar imagen
-                    </button>
-                    <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                        onClick={duplicateElement}
-                    >
-                        <Copy className="h-4 w-4" />
-                        Duplicar
-                    </button>
-                    <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                        onClick={() => {
-                            onUpdate({
-                                filters: {
-                                    ...element.filters,
-                                    opacity: Math.max(
-                                        0,
-                                        (element.filters?.opacity || 100) - 10
-                                    ),
-                                },
-                            });
-                            setShowContextMenu(false);
+                <>
+                    {/* Overlay para cerrar el menú al hacer clic en cualquier parte */}
+                    <div
+                        className="fixed inset-0 z-40"
+                        onClick={() => setShowContextMenu(false)}
+                    />
+
+                    {/* Menú contextual con botón de cerrar */}
+                    <div
+                        className="fixed bg-white shadow-lg rounded-md z-50 py-1 w-48 context-menu"
+                        style={{
+                            left: `${contextMenuPos.x}px`,
+                            top: `${contextMenuPos.y}px`,
                         }}
+                        onClick={(e) => e.stopPropagation()}
                     >
-                        <CircleDot className="h-4 w-4" />
-                        Reducir opacidad
-                    </button>
-                    <button
-                        className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
-                        onClick={() => {
-                            onDelete();
-                            setShowContextMenu(false);
-                        }}
-                    >
-                        <Trash2 className="h-4 w-4" />
-                        Eliminar
-                    </button>
-                </div>
+                        {/* Botón de cerrar */}
+                        <button
+                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100 text-gray-500"
+                            onClick={() => setShowContextMenu(false)}
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-4 w-4"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                            >
+                                <path
+                                    fillRule="evenodd"
+                                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                    clipRule="evenodd"
+                                />
+                            </svg>
+                        </button>
+
+                        {/* Opciones del menú */}
+                        <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            onClick={replaceImage}
+                        >
+                            <Replace className="h-4 w-4" />
+                            Reemplazar imagen
+                        </button>
+                        <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            onClick={duplicateElement}
+                        >
+                            <Copy className="h-4 w-4" />
+                            Duplicar
+                        </button>
+                        <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            onClick={() => {
+                                onUpdate({
+                                    filters: {
+                                        ...element.filters,
+                                        opacity: Math.max(
+                                            0,
+                                            (element.filters?.opacity || 100) -
+                                                10
+                                        ),
+                                    },
+                                });
+                                setShowContextMenu(false);
+                            }}
+                        >
+                            <CircleDot className="h-4 w-4" />
+                            Reducir opacidad
+                        </button>
+                        <button
+                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            onClick={() => {
+                                onDelete();
+                                setShowContextMenu(false);
+                            }}
+                        >
+                            <Trash2 className="h-4 w-4" />
+                            Eliminar
+                        </button>
+                    </div>
+                </>
             )}
         </div>
     );

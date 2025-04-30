@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function Slider({
+const Slider = ({
     value = [50],
     min = 0,
     max = 100,
@@ -8,7 +8,7 @@ export default function Slider({
     onValueChange,
     label,
     unit = "%",
-}) {
+}) => {
     const [currentValue, setCurrentValue] = useState(value[0]);
 
     const handleChange = (e) => {
@@ -43,4 +43,5 @@ export default function Slider({
             </div>
         </div>
     );
-}
+};
+export default Slider;

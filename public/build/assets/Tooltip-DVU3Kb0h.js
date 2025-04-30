@@ -1,0 +1,1 @@
+import"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import{P as t}from"./index-duZ_MKqr.js";import"./index-yBjzXJbu.js";import"./index-Chjiymov.js";t.element.isRequired,t.oneOfType([t.string,t.node]).isRequired,t.oneOf(["top","bottom","left","right","top-start","top-end","bottom-start","bottom-end"]),t.number,t.string,t.bool,t.bool,t.number;
