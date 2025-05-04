@@ -23,6 +23,9 @@ const Header = ({
     generals = [],
     cart,
     setCart,
+    favorites,
+    setFavorites,
+
     pages,
     isUser,
 }) => {
@@ -77,6 +80,8 @@ const Header = ({
                         items={items}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
                         pages={pages}
                         isUser={isUser}
                         generals={generals}

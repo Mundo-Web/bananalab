@@ -9,10 +9,10 @@ import CartItemRowBananaLab from "./CartItemRowBananaLab";
 
 ReactModal.setAppElement("#app");
 
-const CartModalBananaLab = ({
+const FavoritesModalBananaLab = ({
     data,
-    cart,
-    setCart,
+    favorites,
+    setFavorites,
     modalOpen,
     setModalOpen,
 }) => {
@@ -37,11 +37,11 @@ const CartModalBananaLab = ({
         }, 300);
     };
 
-    const totalPrice = cart.reduce((acc, item) => {
+    const totalPrice = favorites.reduce((acc, item) => {
         return acc + item.final_price * item.quantity;
     }, 0);
 
-    const itemCount = cart.reduce((acc, item) => {
+    const itemCount = favorites.reduce((acc, item) => {
         return acc + item.quantity;
     }, 0);
 
@@ -98,7 +98,7 @@ const CartModalBananaLab = ({
                     isOpen={modalOpen}
                     onRequestClose={handleClose}
                     closeTimeoutMS={300}
-                    contentLabel="Carrito de compras"
+                    contentLabel="Favoritos"
                     className="absolute right-0 top-0 bottom-0 bg-white p-6 rounded-l-2xl shadow-2xl w-full max-w-md outline-none h-screen flex flex-col"
                     overlayClassName="fixed inset-0 z-50"
                 >
@@ -122,7 +122,7 @@ const CartModalBananaLab = ({
                                     size={24}
                                 />
                                 <h2 className="text-2xl font-bold text-gray-900">
-                                    Tu Carrito
+                                    Tus Favoritos
                                 </h2>
                                 <motion.span
                                     className="bg-primary text-white text-sm font-medium px-2 py-1 rounded-full"
@@ -153,7 +153,7 @@ const CartModalBananaLab = ({
                         </div>
 
                         {/* Lista de productos */}
-                        {cart.length > 0 ? (
+                        {favorites.length > 0 ? (
                             <motion.div
                                 className="flex-1 overflow-y-auto pr-2 scroll__carrito"
                                 initial={{ opacity: 0 }}
@@ -161,7 +161,7 @@ const CartModalBananaLab = ({
                                 transition={{ delay: 0.3 }}
                             >
                                 <AnimatePresence>
-                                    {cart.map((item, index) => (
+                                    {favorites.map((item, index) => (
                                         <motion.table
                                             key={`${item.id}-${index}`}
                                             custom={index}
@@ -174,7 +174,7 @@ const CartModalBananaLab = ({
                                         >
                                             <CartItemRowBananaLab
                                                 {...item}
-                                                setCart={setCart}
+                                                setFavorites={setFavorites}
                                                 triggerShake={triggerShake}
                                             />
                                         </motion.table>
@@ -207,24 +207,24 @@ const CartModalBananaLab = ({
                         )}
 
                         {/* Resumen y checkout */}
-                        {cart.length > 0 && (
+                        {favorites.length > 0 && (
                             <motion.div
                                 className="pt-4 border-t border-gray-100"
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.4 }}
                             >
-                                <div className="flex justify-between items-center mb-6">
+                                {/*   <div className="flex justify-between items-center mb-6">
                                     <span className="text-gray-700 font-medium">
                                         Subtotal
                                     </span>
                                     <span className="text-gray-900 font-bold text-xl">
                                         S/. {Number2Currency(totalPrice)}
                                     </span>
-                                </div>
+                                </div>*/}
 
-                                <motion.a
-                                    href="/cart"
+                                {/*  <motion.a
+                                    href="/favorites"
                                     whileHover={{
                                         scale: 1.02,
                                         boxShadow: "0 5px 15px rgba(0,0,0,0.1)",
@@ -234,7 +234,7 @@ const CartModalBananaLab = ({
                                 >
                                     Proceder al pago
                                     <ArrowRight size={20} />
-                                </motion.a>
+                                </motion.a>*/}
 
                                 <motion.button
                                     onClick={handleClose}
@@ -242,7 +242,7 @@ const CartModalBananaLab = ({
                                     whileTap={{ scale: 0.98 }}
                                     className="w-full mt-3 bg-white text-primary border border-primary py-3 px-6 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
                                 >
-                                    Seguir comprando
+                                    Agregar más
                                 </motion.button>
                             </motion.div>
                         )}
@@ -253,4 +253,4 @@ const CartModalBananaLab = ({
     );
 };
 
-export default CartModalBananaLab;
+export default FavoritesModalBananaLab;

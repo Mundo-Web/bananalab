@@ -68,6 +68,14 @@ const System = ({
         Local.set(`${Global.APP_CORRELATIVE}_cart`, cart);
     }, [cart]);
 
+    const [favorites, setFavorites] = useState(
+        Local.get(`${Global.APP_CORRELATIVE}_favorites`) ?? []
+    );
+
+    useEffect(() => {
+        Local.set(`${Global.APP_CORRELATIVE}_favorites`, favorites);
+    }, [favorites]);
+
     useEffect(() => {
         itemsRest.verifyStock(cart.map((x) => x.id)).then((items) => {
             const newCart = items.map((item) => {
@@ -105,6 +113,8 @@ const System = ({
                         items={getItems(itemsId)}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
                         pages={pages}
                         isUser={isUser}
                         generals={generals}
@@ -158,6 +168,8 @@ const System = ({
                         filteredData={filteredData}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
                         pages={pages}
                     />
                 );
@@ -304,8 +316,8 @@ const System = ({
 
     return (
         <main className="font-paragraph">
-            {systemsSorted.map((system) => getSystem(system))} 
-            <Toaster  />
+            {systemsSorted.map((system) => getSystem(system))}
+            <Toaster />
         </main>
     );
 };

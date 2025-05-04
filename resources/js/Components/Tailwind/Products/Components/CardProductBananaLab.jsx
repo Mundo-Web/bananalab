@@ -13,6 +13,8 @@ const CardProductBananaLab = ({
     widthClass = "lg:w-1/4",
     setCart,
     cart,
+    setFavorites,
+    favorites,
 }) => {
     const [modalOpen, setModalOpen] = useState(false);
     const [isHovered, setIsHovered] = useState(false);
@@ -34,6 +36,29 @@ const CardProductBananaLab = ({
 
         toast.success("Producto agregado", {
             description: `${product.name} se ha añadido al carrito.`,
+            icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+            duration: 3000,
+            position: "bottom-center",
+        });
+    };
+
+    const onAddFavoritesClicked = (e, product) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const newFavorites = structuredClone(favorites);
+        const index = newFavorites.findIndex((x) => x.id == product.id);
+
+        if (index == -1) {
+            newFavorites.push({ ...product, quantity: 1 });
+        } else {
+            newFavorites[index].quantity++;
+        }
+
+        setFavorites(newFavorites);
+
+        toast.success("Producto agregado", {
+            description: `${product.name} se ha añadido a los favoritos.`,
             icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
             duration: 3000,
             position: "bottom-center",
@@ -94,7 +119,12 @@ const CardProductBananaLab = ({
                             <h3 className="w-11/12 lg:w-10/12 customtext-neutral-dark text-xs lg:text-[15px] leading-4 font-semibold mb-2 line-clamp-3">
                                 {product.name}
                             </h3>
-                            <button className="customtext-primary brightness-125 hover:brightness-100 hover:customtext-primary transition-colors duration-200">
+                            <button
+                                onClick={(e) =>
+                                    onAddFavoritesClicked(e, product)
+                                }
+                                className="customtext-primary brightness-125 hover:brightness-100 hover:customtext-primary transition-colors duration-200"
+                            >
                                 <Heart width={18} strokeWidth={1.5} />
                             </button>
                         </div>
@@ -107,7 +137,7 @@ const CardProductBananaLab = ({
                                 Más vendidos (100)
                             </p>
                         </div>
-            
+
                         <div className="mt-3 overflow-hidden block lg:hidden">
                             <button
                                 onClick={(e) => onAddClicked(e, product)}

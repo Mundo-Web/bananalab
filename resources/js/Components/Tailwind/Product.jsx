@@ -18,6 +18,8 @@ const Product = ({
     items,
     cart,
     setCart,
+    favorites,
+    setFavorites,
     pages,
     filteredData,
 }) => {
@@ -75,6 +77,8 @@ const Product = ({
                         items={items}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
                     />
                 );
             case "Scraping":

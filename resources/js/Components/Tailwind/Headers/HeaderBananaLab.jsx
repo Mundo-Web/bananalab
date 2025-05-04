@@ -16,12 +16,16 @@ import CartModal from "../Components/CartModal";
 import AuthRest from "../../../Actions/AuthRest";
 import Logout from "../../../Actions/Logout";
 import CartModalBananaLab from "../Components/CartModalBananaLab";
+import FavoritesModalBananaLab from "../Components/FavoritesModalBananaLab";
 
 const HeaderBananaLab = ({
     items,
     data,
     cart,
     setCart,
+    favorites,
+    setFavorites,
+
     isUser,
     pages,
     generals = [],
@@ -49,6 +53,7 @@ const HeaderBananaLab = ({
         : null;
 
     const [modalOpen, setModalOpen] = useState(false);
+    const [modalOpenFavorites, setModalOpenFavorites] = useState(false);
     const [openMenu, setOpenMenu] = useState(false);
     const [searchMobile, setSearchMobile] = useState(false);
     const totalCount = cart.reduce((acc, item) => {
@@ -62,6 +67,10 @@ const HeaderBananaLab = ({
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const menuRef = useRef(null);
     const userMenuRef = useRef(null);
+
+    const totalCountFavorites = favorites.reduce((acc, item) => {
+        return Number(acc) + Number(item.quantity);
+    }, 0);
 
     // Cerrar menús al hacer click fuera
     useEffect(() => {
@@ -247,6 +256,7 @@ const HeaderBananaLab = ({
                         </div>
 
                         <motion.button
+                            onClick={() => setModalOpenFavorites(true)}
                             className="relative customtext-neutral-light hover:customtext-primary transition-colors duration-200"
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
@@ -254,9 +264,14 @@ const HeaderBananaLab = ({
                             <Heart className="h-5 w-5" />
                             <motion.span
                                 className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full"
-                                whileHover={{ scale: 1.2 }}
+                                animate={
+                                    totalCountFavorites > 0
+                                        ? { scale: [1, 1.2, 1] }
+                                        : {}
+                                }
+                                transition={{ repeat: Infinity, duration: 1.5 }}
                             >
-                                0
+                                {totalCountFavorites}
                             </motion.span>
                         </motion.button>
 
@@ -387,13 +402,22 @@ const HeaderBananaLab = ({
                         </div>
 
                         <motion.button
+                            onClick={() => setModalOpenFavorites(true)}
                             className="customtext-neutral-light hover:customtext-primary transition-colors duration-200 relative"
                             whileTap={{ scale: 0.9 }}
                         >
                             <Heart className="h-5 w-5" />
-                            <span className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full">
-                                0
-                            </span>
+                            <motion.span
+                                className="h-3 w-3 bg-secondary absolute -top-1 -right-2 text-[10px] flex items-center justify-center text-white rounded-full"
+                                animate={
+                                    totalCountFavorites > 0
+                                        ? { scale: [1, 1.2, 1] }
+                                        : {}
+                                }
+                                transition={{ repeat: Infinity, duration: 1.5 }}
+                            >
+                                {totalCountFavorites}
+                            </motion.span>
                         </motion.button>
 
                         <motion.button
@@ -422,6 +446,13 @@ const HeaderBananaLab = ({
                 setCart={setCart}
                 modalOpen={modalOpen}
                 setModalOpen={setModalOpen}
+            />
+            <FavoritesModalBananaLab
+                data={data}
+                favorites={favorites}
+                setFavorites={setFavorites}
+                modalOpen={modalOpenFavorites}
+                setModalOpen={setModalOpenFavorites}
             />
         </motion.nav>
     );
