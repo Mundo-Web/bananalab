@@ -60,13 +60,14 @@
                     "model": "Category",
                     "with": ["subcategories"]
                 }
-            }, {
+            },
+            {
                 "id": "MenuBananaLab",
                 "name": "MenuBananaLab",
                 "image": "top-bar-simple.png",
                 "using": {
-                    "model": "Category",
-                    "with": ["subcategories"]
+                    "model": "Collection",
+                    "with": ["categories.subcategories"]
                 }
             }
         ]
@@ -155,7 +156,7 @@
                 "name": "CarruselBananaLab",
                 "data": ["background"],
                 "using": {
-                    "model": "Indicator"
+                    "model": "Strength"
                 }
             }
         ]
@@ -388,7 +389,7 @@
                 "id": "FilterCategoryImage",
                 "name": "Categoría con Imagen",
                 "image": "filters-category-image.png",
-                "data": ["path", "title","card"],
+                "data": ["path", "title", "card"],
                 "options": [
                     {
                         "id": "default",
@@ -828,7 +829,12 @@
                         "specifications",
                         "features"
                     ],
-                    "relations": ["category", "brand", "subcategory"]
+                    "relations": [
+                        "collection",
+                        "category",
+                        "brand",
+                        "subcategory"
+                    ]
                 }
             },
             {
@@ -1016,7 +1022,8 @@
             {
                 "id": "LoginSimpleSF",
                 "name": "SimpleSF"
-            }, {
+            },
+            {
                 "id": "LoginBananaLab",
                 "name": "LoginBananaLab"
             }
@@ -1043,7 +1050,8 @@
             {
                 "id": "ForgotPasswordSimple",
                 "name": "Simple"
-            }, {
+            },
+            {
                 "id": "ForgotBananaLab",
                 "name": "ForgotBananaLab"
             }
@@ -1219,20 +1227,22 @@
                 "id": "Canva1",
                 "name": "Canva1",
                 "data": ["steps", "selected"]
-            }, {
+            },
+            {
                 "id": "Canva2",
                 "name": "Canva2",
                 "data": ["steps", "selected"]
-            },{
+            },
+            {
                 "id": "Canva3",
                 "name": "Canva3",
                 "data": ["steps", "selected"]
-            },{
+            },
+            {
                 "id": "Editor",
                 "name": "Editor",
                 "data": ["steps", "selected"]
             }
-            
         ]
     }
 ]

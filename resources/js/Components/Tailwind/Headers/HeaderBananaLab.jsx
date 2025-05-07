@@ -105,7 +105,7 @@ const HeaderBananaLab = ({
             transition={{ duration: 0.4 }}
         >
             {/* Desktop HeaderBananaLab */}
-            <div className="max-w-7xl mx-auto px-primary lg:px-0">
+            <div className="px-primary mx-auto py-2 font-paragraph relative 2xl:px-0 2xl:max-w-7xl">
                 <div className="flex items-center justify-between h-20 lg:h-16">
                     {/* Mobile menu button */}
                     <div className="flex md:hidden">
@@ -163,7 +163,7 @@ const HeaderBananaLab = ({
                                     onChange={(e) => setSearch(e.target.value)}
                                     className="w-full pr-14 py-3 pl-4 border-0 rounded-full focus:ring-0 focus:outline-none ring-0 bg-sections-color"
                                 />
-                                <motion.a
+                                <a
                                     href={
                                         search.trim()
                                             ? `/catalogo?search=${encodeURIComponent(
@@ -176,7 +176,7 @@ const HeaderBananaLab = ({
                                     whileTap={{ scale: 0.9 }}
                                 >
                                     <Search />
-                                </motion.a>
+                                </a>
                             </motion.div>
                         </div>
                     </div>

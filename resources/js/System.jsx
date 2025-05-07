@@ -42,6 +42,9 @@ const itemsRest = new ItemsRest();
 
 const System = ({
     session,
+    ads,
+    collections,
+    campaigns,
     page,
     isUser,
     pages,
@@ -129,6 +132,7 @@ const System = ({
                         cart={cart}
                         setCart={setCart}
                         pages={pages}
+                        campaigns={campaigns}
                     />
                 );
 
@@ -154,8 +158,12 @@ const System = ({
                         data={data}
                         items={getItems(itemsId)}
                         filteredData={filteredData}
+                        collections={collections}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
+                        campaigns={campaigns}
                     />
                 );
 
@@ -203,6 +211,7 @@ const System = ({
                         which={value}
                         data={data}
                         items={getItems(itemsId)}
+                        ads={ads}
                     />
                 );
 
@@ -227,6 +236,9 @@ const System = ({
                         item={filteredData.Item}
                         cart={cart}
                         setCart={setCart}
+                        favorites={favorites}
+                        setFavorites={setFavorites}
+                        generals={generals}
                     />
                 );
             case "cart":
@@ -265,6 +277,7 @@ const System = ({
                         headerPosts={headerPosts}
                         postsLatest={postsLatest}
                         filteredData={filteredData}
+                        ads={ads}
                     />
                 );
             case "post-detail":

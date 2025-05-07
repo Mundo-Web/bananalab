@@ -4,13 +4,13 @@ import Tippy from "@tippyjs/react";
 import Number2Currency from "../../../Utils/Number2Currency";
 import "tippy.js/dist/tippy.css";
 
-const CartItemRowBananaLab = ({ setCart, ...item }) => {
+const FavoriteItemRowBananaLab = ({ setFavorites, ...item }) => {
     const onDeleteClicked = (itemId) => {
-        setCart((old) => old.filter((x) => x.id !== itemId));
+        setFavorites((old) => old.filter((x) => x.id !== itemId));
     };
 
     const onPlusClicked = () => {
-        setCart((old) =>
+        setFavorites((old) =>
             old.map((x) =>
                 x.id === item.id ? { ...x, quantity: (x.quantity || 1) + 1 } : x
             )
@@ -18,7 +18,7 @@ const CartItemRowBananaLab = ({ setCart, ...item }) => {
     };
 
     const onMinusClicked = () => {
-        setCart((old) =>
+        setFavorites((old) =>
             old
                 .map((x) => {
                     if (x.id === item.id) {
@@ -78,39 +78,6 @@ const CartItemRowBananaLab = ({ setCart, ...item }) => {
                             {item.name}
                         </h3>
                     </div>
-
-                    <div className="flex items-center gap-4 mt-3">
-                        <motion.div
-                            className="flex items-center border border-gray-200 rounded-lg overflow-hidden"
-                            whileHover={{
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                            }}
-                        >
-                            <motion.button
-                                type="button"
-                                onClick={onMinusClicked}
-                                className="w-8 h-8 flex justify-center items-center bg-gray-50 hover:bg-gray-100 transition-colors"
-                                whileTap={{ scale: 0.9 }}
-                            >
-                                <Minus size={16} className="text-gray-600" />
-                            </motion.button>
-
-                            <div className="w-8 h-8 flex justify-center items-center bg-white">
-                                <span className="font-medium text-sm text-gray-800">
-                                    {item.quantity || 1}
-                                </span>
-                            </div>
-
-                            <motion.button
-                                type="button"
-                                onClick={onPlusClicked}
-                                className="w-8 h-8 flex justify-center items-center bg-gray-50 hover:bg-gray-100 transition-colors"
-                                whileTap={{ scale: 0.9 }}
-                            >
-                                <Plus size={16} className="text-gray-600" />
-                            </motion.button>
-                        </motion.div>
-                    </div>
                 </div>
             </td>
 
@@ -148,4 +115,4 @@ const CartItemRowBananaLab = ({ setCart, ...item }) => {
     );
 };
 
-export default CartItemRowBananaLab;
+export default FavoriteItemRowBananaLab;

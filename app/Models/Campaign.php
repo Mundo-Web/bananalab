@@ -5,8 +5,9 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Collection extends Model
+class Campaign extends Model
 {
     use HasFactory, HasUuids;
 
@@ -17,14 +18,16 @@ class Collection extends Model
         'slug',
         'name',
         'description',
+        'banner',
         'image',
         'featured',
         'visible',
         'status',
+
     ];
 
-    public function categories()
+    public function items()
     {
-        return $this->hasMany(Category::class)->where('status', true);
+        return $this->belongsToMany(Item::class);
     }
 }

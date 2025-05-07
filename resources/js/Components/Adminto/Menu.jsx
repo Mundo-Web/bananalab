@@ -136,6 +136,13 @@ const Menu = ({ session, hasRole }) => {
                                     Combos
                                 </MenuItem>*/}
 
+                                <MenuItem
+                                    href="/admin/campaigns"
+                                    icon="mdi mdi-bookshelf"
+                                >
+                                    Campañas
+                                </MenuItem>
+
                                 <MenuItemContainer
                                     title="Características"
                                     icon="mdi mdi-view-dashboard"
@@ -158,7 +165,7 @@ const Menu = ({ session, hasRole }) => {
                                     >
                                         SubCategorías
                                     </MenuItem>
-                                    <MenuItem
+                                    {/*<MenuItem
                                         href="/admin/brands"
                                         icon="mdi mdi-label"
                                     >
@@ -169,7 +176,7 @@ const Menu = ({ session, hasRole }) => {
                                         icon="mdi mdi-label-multiple"
                                     >
                                         Etiquetas
-                                    </MenuItem>
+                                    </MenuItem> */}
                                 </MenuItemContainer>
                                 <MenuItem
                                     href="/admin/prices"
@@ -210,9 +217,9 @@ const Menu = ({ session, hasRole }) => {
                                 </MenuItem>
                                 <MenuItem
                                     href="/admin/strengths"
-                                    icon="mdi mdi-arm-flex"
+                                    icon="mdi mdi-google-keep"
                                 >
-                                    Fortalezas
+                                    Pasos
                                 </MenuItem>
                                 <MenuItem
                                     href="/admin/banners"
@@ -225,6 +232,13 @@ const Menu = ({ session, hasRole }) => {
                                     icon="mdi mdi-page-layout-body"
                                 >
                                     Sliders
+                                </MenuItem>
+                                <MenuItem
+                                    href="/admin/ads"
+                                    icon="mdi mdi-heart-box
+"
+                                >
+                                    Anuncios
                                 </MenuItem>
 
                                 <MenuItem

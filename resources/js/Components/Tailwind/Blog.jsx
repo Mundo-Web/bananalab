@@ -12,6 +12,7 @@ const Blog = ({
     headerPosts,
     filteredData,
     postsLatest,
+    ads,
 }) => {
     const getBlog = () => {
         switch (which) {
@@ -28,7 +29,13 @@ const Blog = ({
             case "BlogCarousel":
                 return <BlogCarousel data={data} items={items} />;
             case "BlogCarruselBananaLab":
-                return <BlogCarruselBananaLab data={data} items={items} />;
+                return (
+                    <BlogCarruselBananaLab
+                        data={data}
+                        items={items}
+                        ads={ads}
+                    />
+                );
 
             default:
                 return <div>No hay componente {which}</div>;

@@ -6,6 +6,7 @@ import Number2Currency from "../../../Utils/Number2Currency";
 import { ShoppingBag, X, ArrowRight, ShoppingCart } from "lucide-react";
 import { Local } from "sode-extend-react";
 import CartItemRowBananaLab from "./CartItemRowBananaLab";
+import FavoriteItemRowBananaLab from "./FavoriteItemRowBananaLab";
 
 ReactModal.setAppElement("#app");
 
@@ -172,7 +173,7 @@ const FavoritesModalBananaLab = ({
                                             layout
                                             className="mb-4"
                                         >
-                                            <CartItemRowBananaLab
+                                            <FavoriteItemRowBananaLab
                                                 {...item}
                                                 setFavorites={setFavorites}
                                                 triggerShake={triggerShake}

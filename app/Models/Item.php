@@ -124,6 +124,11 @@ class Item extends Model
         return $this->hasMany(ItemFeature::class);
     }
 
+    public function campaigns()
+    {
+        return $this->belongsToMany(Campaign::class);
+    }
+
     protected static function booted()
     {
         static::creating(function ($item) {

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Brand;
 use App\Models\Category;
+use App\Models\Collection;
 use App\Models\Combo;
 use App\Models\Item;
 use App\Models\ItemTag;
@@ -79,15 +80,25 @@ class ItemController extends BasicController
     /*aqui agregar el codigo*/
     public function setPaginationInstance(Request $request, string $model)
     {
+        //  dump($request->all());
         // dump('Estamos aqui');
         $query = $model::select(['items.*'])
-            ->with(['category', 'subcategory', 'brand', 'tags'])
+            ->with(['collection', 'category', 'subcategory', 'brand', 'tags'])
+            ->leftJoin('collections AS collection', 'collection.id', 'items.collection_id')
             ->leftJoin('categories AS category', 'category.id', 'items.category_id')
             ->leftJoin('sub_categories AS subcategory', 'subcategory.id', 'items.subcategory_id')
             ->leftJoin('brands AS brand', 'brand.id', 'items.brand_id')
             ->leftJoin('item_tags AS item_tag', 'item_tag.item_id', 'items.id')
             ->where('items.status', true)
             ->where('items.visible', true)
+            ->where(function ($query) {
+                $query->where('collection.status', true)
+                    ->orWhereNull('collection.id');
+            })
+            ->where(function ($query) {
+                $query->where('collection.visible', true)
+                    ->orWhereNull('collection.id');
+            })
             ->where(function ($query) {
                 $query->where('category.status', true)
                     ->orWhereNull('category.id');
@@ -128,17 +139,48 @@ class ItemController extends BasicController
 
     public function setPaginationSummary(Request $request, Builder $builder)
     {
+        /* $minPrice = Item::min('price');
+        $maxPrice = Item::max('price');
+        $rangeSize = 50;  // Define el tamaño del rango
+
+        // Calcular rangos de precio
+        $ranges = [];
+        for ($i = $minPrice; $i <= $maxPrice; $i += $rangeSize) {
+            $ranges[] = [
+                'min' => $i,
+                'max' => $i + $rangeSize - 1
+            ];
+        }*/
+
+        $i4price = clone $builder;
+        $minPrice = 0;
+        $maxPrice = $i4price->max('final_price');
+        $rangeSize = 50;  // Define el tamaño del rango
+
+        // Calcular rangos de precio
+        $ranges = [];
+        for ($i = $minPrice; $i <= $maxPrice; $i += $rangeSize) {
+            $ranges[] = [
+                'min' => $i,
+                'max' => $i + $rangeSize - 1
+            ];
+        }
+        $i4collection = clone $builder;
         $i4category = clone $builder;
         $i4subcategory = clone $builder;
         $i4brand = clone $builder;
         $i4tag = clone $builder;
-
+        $collections = Item::getForeign($i4collection, Collection::class, 'collection_id');
         $categories = Item::getForeign($i4category, Category::class, 'category_id');
         $subcategories = Item::getForeign($i4subcategory, SubCategory::class, 'subcategory_id');
         $brands = Item::getForeign($i4brand, Brand::class, 'brand_id');
         $tags = Item::getForeignMany($i4tag, ItemTag::class, Tag::class);
 
+
+
         return [
+            'priceRanges' => $ranges,
+            'collections' => $collections,
             'categories' => $categories,
             'subcategories' => $subcategories,
             'brands' => $brands,

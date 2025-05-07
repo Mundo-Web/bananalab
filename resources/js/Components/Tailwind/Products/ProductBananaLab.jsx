@@ -47,13 +47,20 @@ const ProductBananaLab = ({
         <section className=" pt-6 pb-0 font-paragraph lg:py-4 2xl:py-8">
             <div className=" mx-auto px-primary 2xl:px-0 2xl:max-w-7xl ">
                 {/* Header */}
-                <div className="md:flex justify-between items-center    customborder-neutral-dark">
+                <div className="md:flex justify-between items-center    customborder-neutral-dark ">
                     <h2 className="text-[32px] leading-9 font-semibold   mb-2 md:mb-0">
                         {data?.title}
                     </h2>
                     <a
                         href={data?.link_catalog}
-                        className="bg-white customtext-primary border border-primary transition-all duration-300   flex justify-center flex-row items-center gap-3   px-10  py-3 text-base rounded-full  tracking-wide font-bold cursor-pointer hover:opacity-90 lg:bg-primary "
+                        className="lg:hidden bg-white customtext-primary border border-primary transition-all duration-300   flex justify-center flex-row items-center gap-3   px-10  py-3 text-base rounded-full  tracking-wide font-bold cursor-pointer hover:opacity-90 lg:bg-primary  "
+                    >
+                        {data?.text_button || "Ver más recomendaciones"}
+                    </a>
+
+                    <a
+                        href={data?.link_catalog}
+                        className="hidden lg:flex bg-primary text-white border border-primary transition-all duration-300    justify-center flex-row items-center gap-3   px-10  py-3 text-base rounded-full  tracking-wide font-bold cursor-pointer hover:opacity-90 lg:bg-primary  "
                     >
                         {data?.text_button || "Ver más recomendaciones"}
                     </a>
@@ -66,7 +73,7 @@ const ProductBananaLab = ({
                     {/* Products container */}
                     <div className="hidden md:block overflow-hidden py-0">
                         <div
-                            className="flex  items-center transition-all duration-300   ease-in-out lg:h-[460px] lg:max-h-[460px]  xl:h-[400px] xl:max-h-[420px] 2xl:h-[460px] 2xl:max-h-[460px] lg:mt-4 lg:mb-10 lg:gap-0"
+                            className="flex   items-center transition-all duration-300   ease-in-out lg:h-[460px] lg:max-h-[460px]  xl:h-[450px] xl:max-h-[450px] 2xl:h-[460px] 2xl:max-h-[460px] lg:mt-4 lg:mb-10 lg:gap-0"
                             style={{
                                 transform: `translateX(-${
                                     currentSlide * (100 / slidesPerView)

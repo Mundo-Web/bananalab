@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, ChevronRight, Tag } from "lucide-react";
 import React, { useState, useRef, useEffect } from "react";
 import { adjustTextColor } from "../../../Functions/adjustTextColor";
@@ -16,52 +16,51 @@ const SliderBananaLab = ({ items, data }) => {
     // Animation variants
     const slideVariants = {
         enter: (direction) => ({
-            x: direction > 0 ? '100%' : '-100%',
-            opacity: 0
+            x: direction > 0 ? "100%" : "-100%",
+            opacity: 0,
         }),
         center: {
             x: 0,
             opacity: 1,
             transition: {
-                type: 'spring',
+                type: "spring",
                 stiffness: 300,
                 damping: 30,
-                duration: 0.5
-            }
+                duration: 0.5,
+            },
         },
         exit: (direction) => ({
-            x: direction < 0 ? '100%' : '-100%',
+            x: direction < 0 ? "100%" : "-100%",
             opacity: 0,
             transition: {
-                type: 'spring',
+                type: "spring",
                 stiffness: 300,
                 damping: 30,
-                duration: 0.5
-            }
-        })
+                duration: 0.5,
+            },
+        }),
     };
 
     const buttonVariants = {
         hover: {
             scale: 1.1,
-            boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.2)',
-            transition: { duration: 0.3 }
+            boxShadow: "0px 5px 15px rgba(0, 0, 0, 0.2)",
+            transition: { duration: 0.3 },
         },
         tap: {
-            scale: 0.95
-        }
+            scale: 0.95,
+        },
     };
 
     const paginationDotVariants = {
         inactive: {
             scale: 0.8,
-            opacity: 0.6
+            opacity: 0.6,
         },
         active: {
             scale: 1.2,
             opacity: 1,
-          
-        }
+        },
     };
 
     useEffect(() => {
@@ -76,7 +75,7 @@ const SliderBananaLab = ({ items, data }) => {
     };
 
     return (
-        <motion.div 
+        <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
@@ -119,7 +118,7 @@ const SliderBananaLab = ({ items, data }) => {
                                 transition={{ delay: 0.3, duration: 0.8 }}
                             />
 
-                            <motion.div 
+                            <motion.div
                                 className="p-5 py-8 lg:max-w-2xl lg:px-16 lg:flex lg:items-center lg:h-full z-10"
                                 initial={{ opacity: 0 }}
                                 animate={{ opacity: 1 }}
@@ -128,34 +127,51 @@ const SliderBananaLab = ({ items, data }) => {
                                 <div className="flex flex-col gap-5 lg:gap-5 items-start">
                                     <motion.h2
                                         className="w-[95%] text-[32px] font-semibold leading-9 lg:text-4xl"
-                                        style={{ textShadow: "0 0 20px rgba(0, 0, 0, .25)" }}
+                                        style={{
+                                            textShadow:
+                                                "0 0 20px rgba(0, 0, 0, .25)",
+                                        }}
                                         initial={{ y: 30, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.6, duration: 0.5 }}
+                                        transition={{
+                                            delay: 0.6,
+                                            duration: 0.5,
+                                        }}
                                     >
                                         {item.name}
                                     </motion.h2>
 
                                     <motion.p
                                         className="my-2 w-10/12 customtext-neutral-light text-sm leading-tight"
-                                        style={{ textShadow: "0 0 20px rgba(0, 0, 0, .25)" }}
+                                        style={{
+                                            textShadow:
+                                                "0 0 20px rgba(0, 0, 0, .25)",
+                                        }}
                                         initial={{ y: 20, opacity: 0 }}
                                         animate={{ y: 0, opacity: 1 }}
-                                        transition={{ delay: 0.7, duration: 0.5 }}
+                                        transition={{
+                                            delay: 0.7,
+                                            duration: 0.5,
+                                        }}
                                     >
                                         {item.description}
                                     </motion.p>
 
                                     <motion.a
                                         href={item.button_link}
-                                        ref={(el) => (buttonsRef.current[index] = el)}
+                                        ref={(el) =>
+                                            (buttonsRef.current[index] = el)
+                                        }
                                         className="bg-primary z-50 my-1 w-7/12 h-11 flex items-center justify-center rounded-full text-white text-sm font-semibold lg:w-max lg:px-10"
                                         variants={buttonVariants}
                                         whileHover="hover"
                                         whileTap="tap"
                                         initial={{ scale: 0.9, opacity: 0 }}
                                         animate={{ scale: 1, opacity: 1 }}
-                                        transition={{ delay: 0.8, duration: 0.3 }}
+                                        transition={{
+                                            delay: 0.8,
+                                            duration: 0.3,
+                                        }}
                                     >
                                         {item.button_text}
                                     </motion.a>
@@ -163,7 +179,9 @@ const SliderBananaLab = ({ items, data }) => {
                             </motion.div>
 
                             <motion.img
-                                src={`/storage/images/slider/${item.bg_image || "undefined"}`}
+                                src={`/storage/images/slider/${
+                                    item.bg_image || "undefined"
+                                }`}
                                 alt={item.name}
                                 loading="lazy"
                                 className="absolute -bottom-40 w-auto h-[600px] object-cover lg:right-0 lg:h-[700px]"
@@ -177,7 +195,7 @@ const SliderBananaLab = ({ items, data }) => {
             </Swiper>
 
             {/* Paginacion personalizada */}
-            <motion.div 
+            <motion.div
                 className="absolute bottom-4 z-50 left-1/2 -translate-x-1/2 flex justify-center gap-2 mt-10 lg:hidden"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -186,18 +204,24 @@ const SliderBananaLab = ({ items, data }) => {
                 {items.map((_, index) => (
                     <motion.button
                         key={index}
-                        className={`rounded-full ${index === activeIndex ? "bg-primary" : "bg-white"} w-[16px] h-[16px]`}
+                        className={`rounded-full ${
+                            index === activeIndex ? "bg-primary" : "bg-white"
+                        } w-[16px] h-[16px]`}
                         variants={paginationDotVariants}
-                        animate={index === activeIndex ? "active bg-primary" : "inactive"}
+                        animate={
+                            index === activeIndex
+                                ? "active bg-primary"
+                                : "inactive"
+                        }
                         whileHover={{ scale: 1.3 }}
-                        transition={{ type: 'spring', stiffness: 500 }}
+                        transition={{ type: "spring", stiffness: 500 }}
                     />
                 ))}
             </motion.div>
 
             {/* Botones de navegación personalizados */}
-            <motion.div 
-                className="hidden lg:flex absolute bottom-10 right-10 z-50 gap-4"
+            <motion.div
+                className="hidden  absolute lg:flex bottom-10  right-24 2xl:right-10 z-50 gap-4"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 1.1 }}
@@ -208,7 +232,7 @@ const SliderBananaLab = ({ items, data }) => {
                     whileHover="hover"
                     whileTap="tap"
                 >
-                    <ChevronLeft/>
+                    <ChevronLeft />
                 </motion.div>
 
                 <motion.div
@@ -217,7 +241,7 @@ const SliderBananaLab = ({ items, data }) => {
                     whileHover="hover"
                     whileTap="tap"
                 >
-                    <ChevronRight/>
+                    <ChevronRight />
                 </motion.div>
             </motion.div>
         </motion.div>

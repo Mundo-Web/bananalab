@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 const DynamicField = ({ label, structure, onChange, typeOptions = [] }) => {
     const [fields, setFields] = useState([]);
@@ -29,63 +29,130 @@ const DynamicField = ({ label, structure, onChange, typeOptions = [] }) => {
     };
 
     return (
-        <div className="mb-3">
+        <div className="dynamic-field-container">
             <label className="form-label">{label}</label>
 
-            {fields.map((field, index) => {
-                const isLastOdd = fields.length % 2 !== 0 && index === fields.length - 1;
-                return (
-                    <div key={index} className="row g-2 mb-2">
+            <div className="fields-list">
+                {fields.map((field, index) => (
+                    <div key={index} className="field-row">
                         {typeof field === "object" ? (
                             Object.keys(structure).map((key) => (
-                                <div key={key} className={isLastOdd ? "col-9" : "col-6"}>
+                                <div key={key} className="field-input">
                                     {key === "type" ? (
                                         <select
-                                            className="form-select"
+                                            className="form-select select-type"
                                             value={field[key]}
-                                            onChange={(e) => handleFieldChange(index, key, e.target.value)}
+                                            onChange={(e) =>
+                                                handleFieldChange(
+                                                    index,
+                                                    key,
+                                                    e.target.value
+                                                )
+                                            }
                                         >
-                                            <option value="">Seleccionar...</option>
+                                            <option value="">
+                                                Seleccionar...
+                                            </option>
                                             {typeOptions.map((option) => (
-                                                <option key={option} value={option}>{option}</option>
+                                                <option
+                                                    key={option}
+                                                    value={option}
+                                                >
+                                                    {option}
+                                                </option>
                                             ))}
                                         </select>
                                     ) : (
                                         <input
                                             type="text"
-                                            className="form-control"
+                                            className="form-control "
                                             value={field[key]}
-                                            onChange={(e) => handleFieldChange(index, key, e.target.value)}
-                                            placeholder={key}
+                                            onChange={(e) =>
+                                                handleFieldChange(
+                                                    index,
+                                                    key,
+                                                    e.target.value
+                                                )
+                                            }
+                                            placeholder={
+                                                key.charAt(0).toUpperCase() +
+                                                key.slice(1)
+                                            }
                                         />
                                     )}
                                 </div>
                             ))
                         ) : (
-                            <div className={isLastOdd ? "col-9" : "col-6"}>
+                            <div className="field-input">
                                 <input
                                     type="text"
-                                    className="form-control"
+                                    className="form-control "
                                     value={field}
-                                    onChange={(e) => handleFieldChange(index, null, e.target.value)}
-                                    placeholder="Característica"
+                                    onChange={(e) =>
+                                        handleFieldChange(
+                                            index,
+                                            null,
+                                            e.target.value
+                                        )
+                                    }
+                                    placeholder="Nueva característica"
                                 />
                             </div>
                         )}
-                        <div className="col-3">
-                            <button type="button" className="btn btn-danger w-100" onClick={() => handleRemove(index)}>
-                                X
-                            </button>
-                        </div>
-                    </div>
-                );
-            })}
 
-            <button type="button" className="btn btn-primary" onClick={handleAdd}>
-                + Agregar
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-outline-danger remove-btn"
+                            onClick={() => handleRemove(index)}
+                        >
+                            <i className="fas fa-times"></i>
+                        </button>
+                    </div>
+                ))}
+            </div>
+
+            <button
+                type="button"
+                className="btn btn-sm btn-outline-primary add-btn"
+                onClick={handleAdd}
+            >
+                <i className="fas fa-plus me-1"></i> Agregar
             </button>
+
+            <style jsx>{`
+                .dynamic-field-container {
+                    margin-bottom: 1rem;
+                }
+
+                .fields-list {
+                    margin-bottom: 0.5rem;
+                }
+
+                .field-row {
+                    display: flex;
+                    gap: 0.5rem;
+                    margin-bottom: 0.5rem;
+                    align-items: center;
+                }
+
+                .field-input {
+                    flex: 1;
+                }
+
+                .remove-btn {
+                    width: 32px;
+                    height: 32px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    padding: 0;
+                }
+
+                .add-btn {
+                    width: 100%;
+                }
+            `}</style>
         </div>
     );
 };
-
 export default DynamicField;

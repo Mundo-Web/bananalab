@@ -10,9 +10,11 @@ use App\Http\Controllers\Admin\SliderController as AdminSliderController;
 use App\Http\Controllers\Admin\TestimonyController as AdminTestimonyController;
 use App\Http\Controllers\Admin\SubscriptionController as AdminSubscriptionController;
 use App\Http\Controllers\Admin\CategoryController as AdminCategoryController;
+use App\Http\Controllers\Admin\CampaignController as AdminCampaignController;
 use App\Http\Controllers\Admin\CollectionController as AdminCollectionController;
 use App\Http\Controllers\Admin\PostController as AdminPostController;
 use App\Http\Controllers\Admin\SocialController as AdminSocialController;
+use App\Http\Controllers\Admin\AdController as AdminAdController;
 use App\Http\Controllers\Admin\StrengthController as AdminStrengthController;
 use App\Http\Controllers\Admin\GeneralController as AdminGeneralController;
 use App\Http\Controllers\Admin\ProfileController as AdminProfileController;
@@ -230,6 +232,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/categories/{field}', [AdminCategoryController::class, 'boolean']);
     Route::delete('/categories/{id}', [AdminCategoryController::class, 'delete']);
 
+    Route::post('/campaigns', [AdminCampaignController::class, 'save']);
+    Route::post('/campaigns/paginate', [AdminCampaignController::class, 'paginate']);
+    Route::patch('/campaigns/status', [AdminCampaignController::class, 'status']);
+    Route::patch('/campaigns/{field}', [AdminCampaignController::class, 'boolean']);
+    Route::delete('/campaigns/{id}', [AdminCampaignController::class, 'delete']);
+
     Route::post('/collections', [AdminCollectionController::class, 'save']);
     Route::post('/collections/paginate', [AdminCollectionController::class, 'paginate']);
     Route::patch('/collections/status', [AdminCollectionController::class, 'status']);
@@ -272,6 +280,12 @@ Route::middleware('auth')->group(function () {
     Route::patch('/socials/status', [AdminSocialController::class, 'status']);
     Route::patch('/socials/{field}', [AdminSocialController::class, 'boolean']);
     Route::delete('/socials/{id}', [AdminSocialController::class, 'delete']);
+
+    Route::post('/ads', [AdminAdController::class, 'save']);
+    Route::post('/ads/paginate', [AdminAdController::class, 'paginate']);
+    Route::patch('/ads/status', [AdminAdController::class, 'status']);
+    Route::patch('/ads/{field}', [AdminAdController::class, 'boolean']);
+    Route::delete('/ads/{id}', [AdminAdController::class, 'delete']);
 
     Route::middleware(['can:Root'])->group(function () {
       Route::post('/system', [AdminSystemController::class, 'save']);

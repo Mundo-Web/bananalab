@@ -25,15 +25,11 @@ import ModalImportItem from "./Components/ModalImportItem";
 const itemsRest = new ItemsRest();
 
 const Items = ({ categories, brands, collections }) => {
-    //!FALTA EDIT AND DELETEDE GALERIA
-
     const [itemData, setItemData] = useState([]);
-
     const gridRef = useRef();
     const modalRef = useRef();
 
     // Form elements ref
-
     const idRef = useRef();
     const categoryRef = useRef();
     const collectionRef = useRef();
@@ -44,27 +40,26 @@ const Items = ({ categories, brands, collections }) => {
     const summaryRef = useRef();
     const priceRef = useRef();
     const discountRef = useRef();
-    const tagsRef = useRef();
-    const bannerRef = useRef();
+    // const tagsRef = useRef();
+    //const bannerRef = useRef();
     const imageRef = useRef();
     const textureRef = useRef();
     const descriptionRef = useRef();
-    // Nuevos campos
-
     const stockRef = useRef();
-
-    const featuresRef = useRef([]);
-
+    // const featuresRef = useRef([]);
     const specificationsRef = useRef([]);
 
     const [isEditing, setIsEditing] = useState(false);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [selectedCollection, setSelectedCollection] = useState(null);
-    /*ADD NEW LINES GALLERY */
-
     const [gallery, setGallery] = useState([]);
     const galleryRef = useRef();
+    const [features, setFeatures] = useState([]);
+    const [specifications, setSpecifications] = useState([]);
+    const [showImportModal, setShowImportModal] = useState(false);
+    const modalImportRef = useRef();
 
+    // Gallery handlers
     const handleGalleryChange = (e) => {
         const files = Array.from(e.target.files);
         const newImages = files.map((file) => ({
@@ -84,44 +79,37 @@ const Items = ({ categories, brands, collections }) => {
         setGallery((prev) => [...prev, ...newImages]);
     };
 
-    const handleDragOver = (e) => {
-        e.preventDefault();
-    };
+    const handleDragOver = (e) => e.preventDefault();
 
     const removeGalleryImage = (e, index) => {
         e.preventDefault();
         const image = gallery[index];
         if (image.id) {
-            // Si la imagen tiene ID, significa que está guardada en la base de datos.
             setGallery((prev) =>
                 prev.map((img, i) =>
                     i === index ? { ...img, toDelete: true } : img
                 )
             );
         } else {
-            // Si es una imagen nueva, simplemente la eliminamos.
             setGallery((prev) => prev.filter((_, i) => i !== index));
         }
     };
 
-    /*************************/
-
     useEffect(() => {
         if (itemData && itemData.images) {
             const existingImages = itemData.images.map((img) => ({
-                id: img.id, // ID de la imagen en la BD
-                url: `/storage/images/item_image/${img.url}`, // Ruta de la imagen almacenada
+                id: img.id,
+                url: `/storage/images/item_image/${img.url}`,
             }));
             setGallery(existingImages);
         }
     }, [itemData]);
 
     const onModalOpen = (data) => {
-        console.log(data);
-        setItemData(data || null); // Guardamos los datos en el estado
-        if (data?.id) setIsEditing(true);
-        else setIsEditing(false);
+        setItemData(data || null);
+        setIsEditing(!!data?.id);
 
+        // Reset form values
         idRef.current.value = data?.id || "";
         $(categoryRef.current)
             .val(data?.category_id || null)
@@ -142,14 +130,15 @@ const Items = ({ categories, brands, collections }) => {
         summaryRef.current.value = data?.summary || "";
         priceRef.current.value = data?.price || 0;
         discountRef.current.value = data?.discount || 0;
+        stockRef.current.value = data?.stock || 0;
 
-        SetSelectValue(tagsRef.current, data?.tags ?? [], "id", "name");
+        //SetSelectValue(tagsRef.current, data?.tags ?? [], "id", "name");
 
-        bannerRef.current.value = null;
+        // bannerRef.current.value = null;
         imageRef.current.value = null;
-        bannerRef.image.src = `/storage/images/item/${
+        /* bannerRef.image.src = `/storage/images/item/${
             data?.banner ?? "undefined"
-        }`;
+        }`;*/
         imageRef.image.src = `/storage/images/item/${
             data?.image ?? "undefined"
         }`;
@@ -159,22 +148,9 @@ const Items = ({ categories, brands, collections }) => {
 
         descriptionRef.editor.root.innerHTML = data?.description ?? "";
 
-        //TODO: Cargar las imágenes existentes de la galería
-
-        // Cargar las imágenes de la galería
-        if (data?.images) {
-            const existingImages = data.images.map((img) => ({
-                id: img.id, // ID de la imagen en la base de datos
-                url: `/api/items/gallery/media/${img.url}`, // Ruta de la imagen almacenada
-            }));
-            setGallery(existingImages);
-        } else {
-            setGallery([]); // Limpiar la galería si no hay imágenes
-        }
-
-        // Nuevos campos
-
-        stockRef.current.value = data?.stock;
+        // Set features and specifications
+        setFeatures(data?.features || []);
+        setSpecifications(data?.specifications || []);
 
         $(modalRef.current).modal("show");
     };
@@ -193,52 +169,44 @@ const Items = ({ categories, brands, collections }) => {
             summary: summaryRef.current.value,
             price: priceRef.current.value,
             discount: discountRef.current.value,
-            tags: $(tagsRef.current).val(),
+            //  tags: $(tagsRef.current).val(),
             description: descriptionRef.current.value,
-            sotck: stockRef.current.value,
+            stock: stockRef.current.value,
         };
 
         const formData = new FormData();
         for (const key in request) {
             formData.append(key, request[key]);
         }
-        formData.append("features", JSON.stringify(features)); // Características (array de strings)
-        formData.append("specifications", JSON.stringify(specifications)); // Especificaciones (array de objetos)
+        formData.append("features", JSON.stringify(features));
+        formData.append("specifications", JSON.stringify(specifications));
 
         const image = imageRef.current.files[0];
-        if (image) {
-            formData.append("image", image);
-        }
+        if (image) formData.append("image", image);
+
         const texture = textureRef.current.files[0];
-        if (texture) {
-            formData.append("texture", texture);
-        }
-        const banner = bannerRef.current.files[0];
-        if (banner) {
-            formData.append("banner", banner);
-        }
+        if (texture) formData.append("texture", texture);
 
-        //TODO: Preparar los datos de la galería
+        //  const banner = bannerRef.current.files[0];
+        // if (banner) formData.append("banner", banner);
 
-        // Galería
+        // Handle gallery
         gallery.forEach((img, index) => {
             if (!img.toDelete) {
                 if (img.file) {
-                    formData.append(`gallery[${index}]`, img.file); // Imágenes nuevas
+                    formData.append(`gallery[${index}]`, img.file);
                 } else {
-                    formData.append(`gallery_ids[${index}]`, img.id); // IDs de imágenes existentes
+                    formData.append(`gallery_ids[${index}]`, img.id);
                 }
             }
         });
 
         const deletedImages = gallery
             .filter((img) => img.toDelete)
-            .map((img) => parseInt(img.id, 10)); // Asegurar que sean enteros
+            .map((img) => parseInt(img.id, 10));
         if (deletedImages.length > 0) {
-            formData.append("deleted_images", JSON.stringify(deletedImages)); // Imágenes eliminadas
+            formData.append("deleted_images", JSON.stringify(deletedImages));
         }
-
-        console.log(formData);
 
         const result = await itemsRest.save(formData);
         if (!result) return;
@@ -262,8 +230,8 @@ const Items = ({ categories, brands, collections }) => {
 
     const onDeleteClicked = async (id) => {
         const { isConfirmed } = await Swal.fire({
-            title: "Eliminar curso",
-            text: "¿Estás seguro de eliminar este curso?",
+            title: "Eliminar Item",
+            text: "¿Estás seguro de eliminar este Item?",
             icon: "warning",
             showCancelButton: true,
             confirmButtonText: "Sí, eliminar",
@@ -274,16 +242,11 @@ const Items = ({ categories, brands, collections }) => {
         if (!result) return;
         $(gridRef.current).dxDataGrid("instance").refresh();
     };
-    const [features, setFeatures] = useState([]); // Características
-    const [specifications, setSpecifications] = useState([]); // Especificaciones
 
-    // Opciones del campo "type"
-    const typeOptions = ["General", "Principal", "Otro"];
-    const [showImportModal, setShowImportModal] = useState(false);
-    const modalImportRef = useRef();
     const onModalImportOpen = () => {
         $(modalImportRef.current).modal("show");
     };
+
     return (
         <>
             <Table
@@ -571,234 +534,341 @@ const Items = ({ categories, brands, collections }) => {
                     },
                 ]}
             />
+
+            {/* Modal principal para crear/editar items */}
             <Modal
                 modalRef={modalRef}
-                title={isEditing ? "Editar curso" : "Agregar curso"}
+                title={isEditing ? "Editar Item" : "Agregar Item"}
                 onSubmit={onModalSubmit}
                 size="xl"
             >
-                <div className="row" id="principal-container">
-                    <input ref={idRef} type="hidden" />
-                    <div className="col-md-3">
-                        <SelectFormGroup
-                            eRef={categoryRef}
-                            label="Categoría"
-                            required
-                            dropdownParent="#principal-container"
-                            onChange={(e) =>
-                                setSelectedCategory(e.target.value)
-                            }
-                        >
-                            {categories.map((item, index) => (
-                                <option key={index} value={item.id}>
-                                    {item.name}
-                                </option>
-                            ))}
-                        </SelectFormGroup>
-                        <SelectFormGroup
-                            eRef={collectionRef}
-                            label="Colección"
-                            dropdownParent="#principal-container"
-                            onChange={(e) =>
-                                setSelectedCollection(e.target.value)
-                            }
-                        >
-                            {collections.map((item, index) => (
-                                <option key={index} value={item.id}>
-                                    {item.name}
-                                </option>
-                            ))}
-                        </SelectFormGroup>
-                        <SelectAPIFormGroup
-                            eRef={subcategoryRef}
-                            label="Subcategoría"
-                            searchAPI="/api/admin/subcategories/paginate"
-                            searchBy="name"
-                            filter={["category_id", "=", selectedCategory]}
-                            dropdownParent="#principal-container"
-                        />
+                <div className="row g-3">
+                    {/* Columna 1: Información básica */}
+                    <div className="col-md-4" id="principal-container">
+                        <div className="card">
+                            <div className="card-header bg-light">
+                                <h5 className="card-title mb-0">
+                                    Información Básica
+                                </h5>
+                            </div>
+                            <div className="card-body">
+                                <input ref={idRef} type="hidden" />
 
-                        <SelectFormGroup
-                            eRef={brandRef}
-                            label="Marca"
-                            required
-                            dropdownParent="#principal-container"
-                        >
-                            {brands.map((item, index) => (
-                                <option key={index} value={item.id}>
-                                    {item.name}
-                                </option>
-                            ))}
-                        </SelectFormGroup>
-
-                        <InputFormGroup
-                            label="Stock"
-                            eRef={stockRef}
-                            type="number"
-                        />
-
-                        <InputFormGroup
-                            eRef={priceRef}
-                            label="Precio"
-                            type="number"
-                            step="0.01"
-                            required
-                        />
-                        <InputFormGroup
-                            eRef={discountRef}
-                            label="Descuento"
-                            type="number"
-                            step="0.01"
-                        />
-
-                        <SelectAPIFormGroup
-                            id="tags"
-                            eRef={tagsRef}
-                            searchAPI={"/api/admin/tags/paginate"}
-                            searchBy="name"
-                            label="Tags"
-                            dropdownParent="#principal-container"
-                            tags
-                            multiple
-                        />
-                    </div>
-                    <div className="col-md-4">
-                        {/*Agregar aqui lo que falta */}
-                        <InputFormGroup
-                            eRef={nameRef}
-                            label="Nombre"
-                            required
-                        />
-                        <InputFormGroup
-                            eRef={colorRef}
-                            label="Color"
-                            required
-                        />
-                        <ImageFormGroup
-                            eRef={textureRef}
-                            label="Imagen Textura"
-                            aspect={1}
-                            col="col-lg-6 col-md-12 col-sm-6"
-                        />
-                        <TextareaFormGroup
-                            eRef={summaryRef}
-                            label="Resumen"
-                            rows={3}
-                            required
-                        />
-                        {/* Sección de Características */}
-                        {/* Características (Lista de textos) */}
-                        <DynamicField
-                            ref={featuresRef}
-                            label="Características"
-                            structure=""
-                            onChange={setFeatures}
-                        />
-
-                        {/* Especificaciones (Objetos con campos, con "type" como <select>) */}
-                        <DynamicField
-                            ref={specificationsRef}
-                            label="Especificaciones"
-                            structure={{ type: "", title: "", description: "" }}
-                            onChange={setSpecifications}
-                            typeOptions={typeOptions}
-                        />
-                    </div>
-                    <div className="col-md-5">
-                        <div className="row">
-                            <ImageFormGroup
-                                eRef={bannerRef}
-                                label="Banner"
-                                aspect={2 / 1}
-                                col="col-12"
-                            />
-                            <ImageFormGroup
-                                eRef={imageRef}
-                                label="Imagen"
-                                aspect={1}
-                                col="col-lg-6 col-md-12 col-sm-6"
-                            />
-
-                            <div className="col-lg-6 col-md-12 col-sm-6">
-                                <label className="form-label">Galeria</label>
-                                <input
-                                    id="input-item-gallery"
-                                    ref={galleryRef}
-                                    type="file"
-                                    multiple
-                                    accept="image/*"
-                                    hidden
-                                    onChange={handleGalleryChange}
-                                />
-                                <div
-                                    style={{
-                                        border: "2px dashed #ccc",
-                                        padding: "20px",
-                                        textAlign: "center",
-                                        cursor: "pointer",
-                                        borderRadius: "4px",
-                                        boxShadow:
-                                            "2.5px 2.5px 5px rgba(0,0,0,.125)",
-                                        aspectRatio: "21/9",
-                                        height: "209px",
-                                        width: "100%",
-                                        display: "flex",
-                                        alignItems: "center",
-                                        justifyContent: "center",
-                                    }}
-                                    onClick={() => galleryRef.current.click()}
-                                    onDrop={handleDrop}
-                                    onDragOver={handleDragOver}
+                                <SelectFormGroup
+                                    eRef={collectionRef}
+                                    label="Colección"
+                                    dropdownParent="#principal-container"
+                                    onChange={(e) =>
+                                        setSelectedCollection(e.target.value)
+                                    }
                                 >
-                                    <span className="form-label d-block mb-1">
-                                        Arrastra y suelta imágenes aquí o haz
-                                        clic para agregar
-                                    </span>
+                                    {collections.map((item, index) => (
+                                        <option key={index} value={item.id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                                </SelectFormGroup>
+
+                                <SelectAPIFormGroup
+                                    onChange={(e) =>
+                                        setSelectedCategory(e.target.value)
+                                    }
+                                    eRef={categoryRef}
+                                    label="Categoría"
+                                    searchAPI="/api/admin/categories/paginate"
+                                    searchBy="name"
+                                    filter={[
+                                        "collection_id",
+                                        "=",
+                                        selectedCollection,
+                                    ]}
+                                    dropdownParent="#principal-container"
+                                />
+
+                                <SelectAPIFormGroup
+                                    eRef={subcategoryRef}
+                                    label="Subcategoría"
+                                    searchAPI="/api/admin/subcategories/paginate"
+                                    searchBy="name"
+                                    filter={[
+                                        "category_id",
+                                        "=",
+                                        selectedCategory,
+                                    ]}
+                                    dropdownParent="#principal-container"
+                                />
+
+                                <SelectFormGroup
+                                    eRef={brandRef}
+                                    label="Marca"
+                                    required
+                                    dropdownParent="#principal-container"
+                                >
+                                    {brands.map((item, index) => (
+                                        <option key={index} value={item.id}>
+                                            {item.name}
+                                        </option>
+                                    ))}
+                                </SelectFormGroup>
+
+                                <InputFormGroup
+                                    eRef={nameRef}
+                                    label="Nombre"
+                                    required
+                                />
+
+                                <InputFormGroup
+                                    eRef={colorRef}
+                                    label="Color"
+                                    required
+                                />
+
+                                <TextareaFormGroup
+                                    eRef={summaryRef}
+                                    label="Resumen"
+                                    rows={3}
+                                    required
+                                />
+
+                                {/*  <SelectAPIFormGroup
+                                    id="tags"
+                                    eRef={tagsRef}
+                                    searchAPI={"/api/admin/tags/paginate"}
+                                    searchBy="name"
+                                    label="Tags"
+                                    dropdownParent="#principal-container"
+                                    tags
+                                    multiple
+                                />*/}
+                            </div>
+                            <div className="card">
+                                <div className="card-header bg-light">
+                                    <h5 className="card-title mb-0">
+                                        Precios y Stock
+                                    </h5>
+                                </div>
+                                <div className="card-body">
+                                    <InputFormGroup
+                                        eRef={priceRef}
+                                        label="Precio"
+                                        type="number"
+                                        step="0.01"
+                                        required
+                                    />
+
+                                    <InputFormGroup
+                                        eRef={discountRef}
+                                        label="Descuento"
+                                        type="number"
+                                        step="0.01"
+                                    />
+
+                                    <InputFormGroup
+                                        label="Stock"
+                                        eRef={stockRef}
+                                        type="number"
+                                    />
                                 </div>
                             </div>
-                            <div className="col-md-12 col-sm-6">
-                                <div className="d-flex flex-wrap gap-1  mt-2">
-                                    {gallery.map((image, index) => (
-                                        <div
-                                            key={index}
-                                            className="position-relative"
-                                            style={{
-                                                width: "80px",
-                                                height: "80px",
-                                            }}
-                                        >
-                                            <img
-                                                src={`${image.url}`}
-                                                alt="preview"
-                                                style={{
-                                                    width: "100%",
-                                                    height: "100%",
-                                                    objectFit: "cover",
-                                                    borderRadius: "4px",
-                                                }}
-                                            />
-                                            <button
-                                                className="btn btn-xs btn-danger position-absolute"
-                                                style={{ top: 0, right: 0 }}
-                                                onClick={(e) =>
-                                                    removeGalleryImage(e, index)
-                                                }
+                        </div>
+                    </div>
+                    {/* Columna 2: Especificaciones */}
+                    <div className="col-md-8">
+                        {/*  <div className="card mt-3">
+                            <div className="card-header bg-light">
+                                <h5 className="card-title mb-0">
+                                    Características
+                                </h5>
+                            </div>
+                            <div className="card-body">
+                                <DynamicField
+                                    ref={featuresRef}
+                                    label="Características"
+                                    structure=""
+                                    onChange={setFeatures}
+                                />
+                            </div>
+                        </div>*/}
+                        <div className="card mt-3">
+                            <div className="card-header bg-light">
+                                <h5 className="card-title mb-0">
+                                    Especificaciones
+                                </h5>
+                            </div>
+                            <div className="card-body">
+                                <DynamicField
+                                    ref={specificationsRef}
+                                    label="Especificaciones"
+                                    structure={{
+                                        type: "",
+                                        title: "",
+                                        description: "",
+                                    }}
+                                    onChange={setSpecifications}
+                                    typeOptions={["General", "Principal"]}
+                                />
+                            </div>
+                        </div>
+                        <div className="card">
+                            <div className="card-header bg-light">
+                                <h5 className="card-title mb-0">Imágenes</h5>
+                            </div>
+                            <div className="card-body">
+                                {/*  <ImageFormGroup
+                                    eRef={bannerRef}
+                                    label="Banner"
+                                    aspect={2 / 1}
+                                    col="col-12"
+                                />*/}
+
+                                <div className="row">
+                                    <div className="col-md-6">
+                                        <ImageFormGroup
+                                            eRef={imageRef}
+                                            label="Imagen Principal"
+                                            aspect={1}
+                                        />
+                                    </div>
+                                    <div className="col-md-6">
+                                        <ImageFormGroup
+                                            eRef={textureRef}
+                                            label="Textura"
+                                            aspect={1}
+                                        />
+                                    </div>
+                                </div>
+
+                                <div className="mt-3">
+                                    <label className="form-label">
+                                        Galería de Imágenes
+                                    </label>
+                                    <input
+                                        id="input-item-gallery"
+                                        ref={galleryRef}
+                                        type="file"
+                                        multiple
+                                        accept="image/*"
+                                        hidden
+                                        onChange={handleGalleryChange}
+                                    />
+                                    <div
+                                        className="gallery-upload-area"
+                                        onClick={() =>
+                                            galleryRef.current.click()
+                                        }
+                                        onDrop={handleDrop}
+                                        onDragOver={handleDragOver}
+                                    >
+                                        <span className="form-label d-block mb-1">
+                                            Arrastra y suelta imágenes aquí o
+                                            haz clic para agregar
+                                        </span>
+                                    </div>
+
+                                    <div className="gallery-preview mt-2">
+                                        {gallery.map((image, index) => (
+                                            <div
+                                                key={index}
+                                                className="gallery-thumbnail"
                                             >
-                                                ×
-                                            </button>
-                                        </div>
-                                    ))}
+                                                <img
+                                                    src={`${image.url}`}
+                                                    alt="preview"
+                                                />
+                                                <button
+                                                    className="btn btn-xs btn-danger gallery-remove-btn"
+                                                    onClick={(e) =>
+                                                        removeGalleryImage(
+                                                            e,
+                                                            index
+                                                        )
+                                                    }
+                                                >
+                                                    ×
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                <hr className="my-1" />
-                <QuillFormGroup eRef={descriptionRef} label="Descripcion" />
+
+                <div className="card mt-3">
+                    <div className="card-header bg-light">
+                        <h5 className="card-title mb-0">
+                            Descripción Completa
+                        </h5>
+                    </div>
+                    <div className="card-body">
+                        <QuillFormGroup eRef={descriptionRef} label="" />
+                    </div>
+                </div>
             </Modal>
+
+            {/* Modal para importar datos */}
             <Modal modalRef={modalImportRef} title={"Importar Datos"} size="sm">
                 <ModalImportItem gridRef={gridRef} modalRef={modalImportRef} />
             </Modal>
+
+            {/* Estilos para la galería */}
+            <style jsx>{`
+                .gallery-upload-area {
+                    border: 2px dashed #ccc;
+                    padding: 0px;
+                    text-align: center;
+                    cursor: pointer;
+                    border-radius: 4px;
+                    box-shadow: 2.5px 2.5px 5px rgba(0, 0, 0, 0.125);
+
+                    height: 100px;
+                    width: 100%;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    background-color: #f8f9fa;
+                    transition: all 0.3s ease;
+                }
+
+                .gallery-upload-area:hover {
+                    border-color: #0d6efd;
+                    background-color: #e9f0ff;
+                }
+
+                .gallery-preview {
+                    display: flex;
+                    flex-wrap: wrap;
+                    gap: 8px;
+                }
+
+                .gallery-thumbnail {
+                    position: relative;
+                    width: 80px;
+                    height: 80px;
+                    border-radius: 4px;
+                    overflow: hidden;
+                }
+
+                .gallery-thumbnail img {
+                    width: 100%;
+                    height: 100%;
+                    object-fit: cover;
+                }
+
+                .gallery-remove-btn {
+                    position: absolute;
+                    top: 0;
+                    right: 0;
+                    padding: 0;
+                    width: 20px;
+                    height: 20px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 10px;
+                }
+            `}</style>
         </>
     );
 };

@@ -1,10 +1,10 @@
 import BaseAdminto from "@Adminto/Base";
 import SwitchFormGroup from "@Adminto/form/SwitchFormGroup";
 import TextareaFormGroup from "@Adminto/form/TextareaFormGroup";
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import Swal from "sweetalert2";
-import CategoriesRest from "../Actions/Admin/CategoriesRest";
+import CampaignsRest from "../Actions/Admin/CampaignsRest";
 import ImageFormGroup from "../Components/Adminto/form/ImageFormGroup";
 import InputFormGroup from "../Components/Adminto/form/InputFormGroup";
 import Modal from "../Components/Adminto/Modal";
@@ -14,12 +14,14 @@ import CreateReactScript from "../Utils/CreateReactScript";
 import ReactAppend from "../Utils/ReactAppend";
 import SetSelectValue from "../Utils/SetSelectValue";
 import SelectAPIFormGroup from "../Components/Adminto/form/SelectAPIFormGroup";
+import { Trash2 } from "lucide-react";
 
-const categoriesRest = new CategoriesRest();
+const campaignsRest = new CampaignsRest();
 
-const Categories = () => {
+const Campaigns = () => {
     const gridRef = useRef();
     const modalRef = useRef();
+    const itemsRef = useRef();
 
     // Form elements ref
     const idRef = useRef();
@@ -27,25 +29,29 @@ const Categories = () => {
     const descriptionRef = useRef();
     const bannerRef = useRef();
     const imageRef = useRef();
-    const collectionRef = useRef();
-    const [isEditing, setIsEditing] = useState(false);
 
+    const [isEditing, setIsEditing] = useState(false);
+    const [selectedProducts, setSelectedProducts] = useState([]);
     const onModalOpen = (data) => {
         if (data?.id) setIsEditing(true);
         else setIsEditing(false);
 
         idRef.current.value = data?.id ?? "";
-        console.log(data);
-        SetSelectValue(
-            collectionRef.current,
-            data?.collection?.id,
-            data?.collection?.name
-        );
+        const products = data.items || [];
+        console.log(products);
+        setSelectedProducts(products);
+
+        // Seleccionar los productos en el campo SelectAPIFormGroup
+        setTimeout(() => {
+            const productIds = products.map((product) => product.id.toString());
+
+            itemsRef.current.setValue(productIds); // Asegúrate de que `setValue` sea un método válido en `SelectAPIFormGroup`
+        }, 0);
         nameRef.current.value = data?.name ?? "";
         descriptionRef.current.value = data?.description ?? "";
-        bannerRef.image.src = `/storage/images/category/${data?.banner}`;
+        bannerRef.image.src = `/storage/images/campaign/${data?.banner}`;
         bannerRef.current.value = null;
-        imageRef.image.src = `/storage/images/category/${data?.image}`;
+        imageRef.image.src = `/storage/images/campaign/${data?.image}`;
         imageRef.current.value = null;
 
         $(modalRef.current).modal("show");
@@ -58,7 +64,6 @@ const Categories = () => {
             id: idRef.current.value || undefined,
             name: nameRef.current.value,
             description: descriptionRef.current.value,
-            collection_id: collectionRef.current.value,
         };
 
         const formData = new FormData();
@@ -74,7 +79,12 @@ const Categories = () => {
             formData.append("banner", file2);
         }
 
-        const result = await categoriesRest.save(formData);
+        const selectedProducts = $(itemsRef.current).val();
+        if (selectedProducts) {
+            selectedProducts.forEach((id) => formData.append("products[]", id));
+        }
+
+        const result = await campaignsRest.save(formData);
         if (!result) return;
 
         $(gridRef.current).dxDataGrid("instance").refresh();
@@ -82,7 +92,7 @@ const Categories = () => {
     };
 
     const onFeaturedChange = async ({ id, value }) => {
-        const result = await categoriesRest.boolean({
+        const result = await campaignsRest.boolean({
             id,
             field: "featured",
             value,
@@ -92,7 +102,7 @@ const Categories = () => {
     };
 
     const onVisibleChange = async ({ id, value }) => {
-        const result = await categoriesRest.boolean({
+        const result = await campaignsRest.boolean({
             id,
             field: "visible",
             value,
@@ -111,17 +121,45 @@ const Categories = () => {
             cancelButtonText: "Cancelar",
         });
         if (!isConfirmed) return;
-        const result = await categoriesRest.delete(id);
+        const result = await campaignsRest.delete(id);
         if (!result) return;
         $(gridRef.current).dxDataGrid("instance").refresh();
     };
 
+    // Manejador para cuando se selecciona un producto
+    const handleProductChange = (event) => {
+        const selectedData = $(event.target).select2("data"); // Obtiene los datos seleccionados
+        const newProducts = selectedData.map((item) => item.data); // Extrae los datos completos del producto
+
+        // Agregar los nuevos productos al estado existente sin duplicados
+        setSelectedProducts((prevProducts) => {
+            const existingIds = prevProducts.map((p) => p.id); // IDs de los productos ya seleccionados
+            const uniqueNewProducts = newProducts.filter(
+                (product) => !existingIds.includes(product.id)
+            ); // Filtra duplicados
+            return [...prevProducts, ...uniqueNewProducts]; // Combina los productos antiguos y nuevos
+        });
+    };
+
+    const removeProduct = (productId) => {
+        const updatedProducts = selectedProducts.filter(
+            (p) => p.id !== productId
+        );
+        setSelectedProducts(updatedProducts);
+
+        const selectedIds = updatedProducts.map((p) => p.id.toString());
+        $(itemsRef.current).val(selectedIds).trigger("change");
+
+        if (mainProduct?.id === productId) {
+            setMainProduct(null);
+        }
+    };
     return (
         <>
             <Table
                 gridRef={gridRef}
-                title="Categorías"
-                rest={categoriesRest}
+                title="Campañas"
+                rest={campaignsRest}
                 toolBar={(container) => {
                     container.unshift({
                         widget: "dxButton",
@@ -154,7 +192,7 @@ const Categories = () => {
                     },
                     {
                         dataField: "name",
-                        caption: "Categoría",
+                        caption: "Camapaña",
                         width: "30%",
                     },
                     {
@@ -171,7 +209,7 @@ const Categories = () => {
                             ReactAppend(
                                 container,
                                 <img
-                                    src={`/storage/images/category/${data.image}`}
+                                    src={`/storage/images/campaign/${data.image}`}
                                     style={{
                                         width: "80px",
                                         height: "48px",
@@ -255,11 +293,11 @@ const Categories = () => {
             />
             <Modal
                 modalRef={modalRef}
-                title={isEditing ? "Editar categoría" : "Agregar categoría"}
+                title={isEditing ? "Editar Camapaña" : "Agregar Camapaña"}
                 onSubmit={onModalSubmit}
             >
                 <input ref={idRef} type="hidden" />
-                <div className="row" id="categories-container">
+                <div className="row" id="campaign-container">
                     <div className="col-md-6">
                         <ImageFormGroup
                             eRef={bannerRef}
@@ -275,17 +313,9 @@ const Categories = () => {
                         />
                     </div>
                     <div className="col-md-6">
-                        <SelectAPIFormGroup
-                            eRef={collectionRef}
-                            label="Colleción"
-                            searchAPI="/api/admin/collections/paginate"
-                            searchBy="name"
-                            required
-                            dropdownParent="#categories-container"
-                        />
                         <TextareaFormGroup
                             eRef={nameRef}
-                            label="Categoría"
+                            label="Camapaña"
                             rows={2}
                             required
                         />
@@ -295,6 +325,71 @@ const Categories = () => {
                             rows={3}
                         />
                     </div>
+                    <SelectAPIFormGroup
+                        eRef={itemsRef}
+                        label="Productos asociados"
+                        multiple
+                        searchAPI="/api/admin/items/paginate"
+                        searchBy="name"
+                        id="items"
+                        dropdownParent="#campaign-container"
+                        onChange={handleProductChange}
+                    />
+                </div>
+                {/* Lista de productos seleccionados */}
+                <div className="row">
+                    <h4>Productos Seleccionados</h4>
+                    <ul className="list-unstyled col-md-12 row">
+                        {selectedProducts.map((product) => (
+                            <li key={product.id} className="col-md-4">
+                                <div>
+                                    <div class="card mb-3">
+                                        <div class="row g-0">
+                                            <div className="position-relative d-inline-block ratio ratio-1x1 border rounded overflow-hidden">
+                                                <img
+                                                    src={`/storage/images/item/${
+                                                        product?.image ??
+                                                        "undefined"
+                                                    }`}
+                                                    className="object-fit-cover w-100 h-100"
+                                                    alt={product.name}
+                                                    onError={(e) =>
+                                                        (e.target.src =
+                                                            "/api/cover/thumbnail/null")
+                                                    }
+                                                />
+                                                <button
+                                                    className="btn btn-sm btn-danger position-absolute top-0 end-0 m-1 d-inline-flex align-items-center justify-content-center"
+                                                    type="button"
+                                                    onClick={() =>
+                                                        removeProduct(
+                                                            product.id
+                                                        )
+                                                    }
+                                                    style={{
+                                                        width: "auto",
+                                                        height: "auto",
+                                                        padding:
+                                                            "0.25rem 0.5rem",
+                                                    }}
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+
+                                            <div class="">
+                                                <div class="card-body">
+                                                    <h5 class="card-title">
+                                                        {product?.name}{" "}
+                                                    </h5>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             </Modal>
         </>
@@ -303,8 +398,8 @@ const Categories = () => {
 
 CreateReactScript((el, properties) => {
     createRoot(el).render(
-        <BaseAdminto {...properties} title="Categorías">
-            <Categories {...properties} />
+        <BaseAdminto {...properties} title="Camapañas">
+            <Campaigns {...properties} />
         </BaseAdminto>
     );
 });

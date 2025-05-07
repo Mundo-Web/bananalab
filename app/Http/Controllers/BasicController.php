@@ -4,6 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Http\Classes\dxResponse;
 use App\Models\Aboutus;
+use App\Models\Ad;
+use App\Models\Campaign;
+use App\Models\Collection;
 use App\Models\dxDataGrid;
 use App\Models\General;
 use App\Models\Slider;
@@ -102,6 +105,15 @@ class BasicController extends Controller
 
     $properties = [
       'session' => $session,
+      'ads' => Ad::where('visible', true)
+        ->where('status', true)
+        ->where('start_date', '<=', now())
+        ->where('end_date', '>=', now())
+        ->latest('updated_at')
+        ->take(2)
+        ->get(),
+      'collections' => Collection::where('visible', true)->where('status', true)->get(),
+      'campaigns' => Campaign::with('items')->where('visible', true)->where('status', true)->get(),
       'global' => [
         'PUBLIC_RSA_KEY' => Controller::$PUBLIC_RSA_KEY,
         'APP_NAME' => env('APP_NAME', 'Trasciende'),

@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Category extends Model
 {
@@ -22,7 +23,13 @@ class Category extends Model
         'featured',
         'visible',
         'status',
+        'collection_id',
     ];
+
+    public function collection(): BelongsTo
+    {
+        return $this->belongsTo(Collection::class);
+    }
 
     public function subcategories()
     {

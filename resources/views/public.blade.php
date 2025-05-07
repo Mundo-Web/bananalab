@@ -117,10 +117,17 @@
             .before\:.bg-{{ $color->name }} {
                 background-color: {{ $color->description }};
             }
+
             .lg\:.bg-{{ $color->name }} {
                 background-color: {{ $color->description }};
             }
-          
+
+
+
+            .checked\:accent-{{ $color->name }}:checked {
+                accent-color: {{ $color->description }};
+            }
+
         @endforeach
     </style>
 </head>
