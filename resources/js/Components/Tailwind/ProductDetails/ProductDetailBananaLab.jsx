@@ -237,7 +237,7 @@ export default function ProductDetailBananaLab({
 
         setFavorites(newFavorites);
     };
-    console.log(item);
+    //console.log(item);
     return (
         <>
             <div className="bg-sections-color py-2 text-sm">

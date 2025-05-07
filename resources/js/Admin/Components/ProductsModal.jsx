@@ -8,7 +8,6 @@ import { createRoot } from "react-dom/client";
 import $ from "jquery";
 import Swal from "sweetalert2";
 
-import ReactAppend from "../../../Utils/ReactAppend";
 import Table from "../../Components/Adminto/Table";
 
 const ProductsModal = forwardRef((props, ref) => {
