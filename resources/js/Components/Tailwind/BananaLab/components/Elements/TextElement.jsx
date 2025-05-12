@@ -163,7 +163,13 @@ export default function TextElement({
         opacity:
             element.style?.opacity !== undefined ? element.style.opacity : 1,
     };
-
+    useEffect(() => {
+        const fontFamily = element.style?.fontFamily?.replace(/'/g, "");
+        if (fontFamily && !document.fonts.check(`12px ${fontFamily}`)) {
+            const font = new FontFace(fontFamily, `local(${fontFamily})`);
+            font.load().then(() => document.fonts.add(font));
+        }
+    }, [element.style?.fontFamily]);
     return (
         <div
             ref={ref}
@@ -235,6 +241,7 @@ export default function TextElement({
                         padding: element.style?.padding || "8px",
                         borderRadius: element.style?.borderRadius || "0px",
                         border: element.style?.border || "none",
+                        fontFamily: element.style?.fontFamily || "Arial",
                     }}
                 >
                     {element.content || "Editar texto"}

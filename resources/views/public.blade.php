@@ -27,9 +27,17 @@
     <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Añade esto en el <head> -->
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link
+        href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&family=Open+Sans:wght@400;700&family=Lato:wght@400;700&display=swap"
+        rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Pacifico&family=Lobster&family=Indie+Flower&family=Shadows+Into+Light&family=Dancing+Script:wght@700&family=Permanent+Marker&family=Amatic+SC:wght@700&family=Handlee&family=Caveat&family=Kalam&display=swap"
+        rel="stylesheet">
 
     @if ($data['fonts']['title']['url'] && !str_starts_with($data['fonts']['title']['url'], '/'))
         <link rel="stylesheet" href="{{ $data['fonts']['title']['url'] }}">

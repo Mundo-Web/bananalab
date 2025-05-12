@@ -38,15 +38,31 @@ import {
 
 const fontFamilies = [
     { name: "Arial", value: "Arial" },
-    { name: "Times New Roman", value: "Times New Roman" },
+    { name: "Times New Roman", value: "'Times New Roman'" },
     { name: "Helvetica", value: "Helvetica" },
-    { name: "Courier New", value: "Courier New" },
+    { name: "Courier New", value: "'Courier New'" },
     { name: "Georgia", value: "Georgia" },
     { name: "Verdana", value: "Verdana" },
     { name: "Impact", value: "Impact" },
-    { name: "Roboto", value: "Roboto" },
-    { name: "Open Sans", value: "Open Sans" },
-    { name: "Lato", value: "Lato" },
+    { name: "Roboto", value: "'Roboto', sans-serif" },
+    { name: "Open Sans", value: "'Open Sans', sans-serif" },
+    { name: "Lato", value: "'Lato', sans-serif" },
+    { name: "Pacifico (Cursiva)", value: "'Pacifico', cursive" },
+    { name: "Lobster (Estilo Poster)", value: "'Lobster', cursive" },
+    { name: "Indie Flower (Manuscrita)", value: "'Indie Flower', cursive" },
+    {
+        name: "Permanent Marker (Rotulador)",
+        value: "'Permanent Marker', cursive",
+    },
+    { name: "Dancing Script (Elegante)", value: "'Dancing Script', cursive" },
+    {
+        name: "Shadows Into Light (Dibujada)",
+        value: "'Shadows Into Light', cursive",
+    },
+    { name: "Amatic SC (Minimalista)", value: "'Amatic SC', cursive" },
+    { name: "Handlee (Natural)", value: "'Handlee', cursive" },
+    { name: "Caveat (Caligráfica)", value: "'Caveat', cursive" },
+    { name: "Kalam (Pincel)", value: "'Kalam', cursive" },
 ];
 
 const fontSizes = [

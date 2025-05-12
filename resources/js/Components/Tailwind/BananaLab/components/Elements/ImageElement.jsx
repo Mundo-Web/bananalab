@@ -58,7 +58,7 @@ export default function ImageElement({
         }
     };
 
-    const handleMouseMove = (e) => {
+    /*  const handleMouseMove = (e) => {
         if (isDraggingInside && elementRef.current) {
             const parentRect =
                 elementRef.current.parentElement.getBoundingClientRect();
@@ -72,6 +72,20 @@ export default function ImageElement({
             const boundedY = Math.max(0, Math.min(newY, maxY));
 
             onUpdate({ position: { x: boundedX, y: boundedY } });
+        }
+    };*/
+    const handleMouseMove = (e) => {
+        if (isDraggingInside && elementRef.current) {
+            const newX = e.clientX - startPos.x;
+            const newY = e.clientY - startPos.y;
+
+            // Elimina por completo los límites
+            onUpdate({
+                position: {
+                    x: newX,
+                    y: newY,
+                },
+            });
         }
     };
 
@@ -157,6 +171,8 @@ export default function ImageElement({
     // Función para iniciar el redimensionamiento
     const startResize = (e, direction) => {
         e.stopPropagation();
+        e.preventDefault();
+
         setIsResizing(true);
         setResizeDirection(direction);
         setInitialMousePos({ x: e.clientX, y: e.clientY });
@@ -181,6 +197,7 @@ export default function ImageElement({
             let newWidth = initialSize.width;
             let newHeight = initialSize.height;
 
+            // Calcula proporciones basadas en la dirección
             switch (resizeDirection) {
                 case "right":
                     newWidth = Math.max(50, initialSize.width + deltaX);
@@ -194,18 +211,15 @@ export default function ImageElement({
                     break;
             }
 
-            // Asegurar que no exceda los límites del contenedor
-            newWidth = Math.min(
-                newWidth,
-                parentRect.width - element.position.x
-            );
-            newHeight = Math.min(
-                newHeight,
-                parentRect.height - element.position.y
-            );
-
+            // Actualiza inmediatamente
             onUpdate({
-                size: { width: newWidth, height: newHeight },
+                size: {
+                    width: newWidth,
+                    height:
+                        resizeDirection === "right"
+                            ? initialSize.height
+                            : newHeight,
+                },
             });
         },
         [
@@ -216,7 +230,6 @@ export default function ImageElement({
             element.position,
         ]
     );
-
     // Función para terminar el redimensionamiento
     const stopResize = useCallback(() => {
         setIsResizing(false);
@@ -252,8 +265,12 @@ export default function ImageElement({
                     ? `${element.size.height}px`
                     : "200px",
                 cursor: isSelected ? "move" : "pointer",
-                zIndex: isSelected ? 9999 : element.zIndex || 1,
+                //zIndex: isSelected ? 9999 : element.zIndex || 1,
+                zIndex: isSelected ? 1 : 0,
+                opacity: isSelected ? 0.9 : 1, // Hacemos ligeramente transparente el elemento seleccionado
+                transition: "opacity 0.2s, z-index 0.2s",
                 pointerEvents: "all",
+                overflow: "visible",
             }}
             onClick={(e) => {
                 e.stopPropagation();
@@ -290,7 +307,10 @@ export default function ImageElement({
                         <div
                             className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full cursor-se-resize"
                             style={{ transform: "translate(50%, 50%)" }}
-                            onMouseDown={(e) => startResize(e, "bottomRight")}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                startResize(e, "bottomRight");
+                            }}
                         />
                         <div
                             className="absolute bottom-0 w-3 h-3 bg-purple-500 rounded-full cursor-s-resize"
@@ -298,7 +318,10 @@ export default function ImageElement({
                                 left: "50%",
                                 transform: "translateX(-50%) translateY(50%)",
                             }}
-                            onMouseDown={(e) => startResize(e, "bottom")}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                startResize(e, "bottom");
+                            }}
                         />
                         <div
                             className="absolute right-0 w-3 h-3 bg-purple-500 rounded-full cursor-e-resize"
@@ -306,7 +329,10 @@ export default function ImageElement({
                                 top: "50%",
                                 transform: "translateY(-50%) translateX(50%)",
                             }}
-                            onMouseDown={(e) => startResize(e, "right")}
+                            onMouseDown={(e) => {
+                                e.stopPropagation();
+                                startResize(e, "right");
+                            }}
                         />
                     </>
                 )}

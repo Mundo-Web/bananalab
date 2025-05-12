@@ -287,3 +287,29 @@
         height: 70vh !important;
     }
 }
+
+/*Aqui lo que es faces para los textos en bananalab*/
+
+/* Fuentes del sistema */
+@font-face {
+    font-family: "Arial";
+    src: local("Arial");
+}
+
+@font-face {
+    font-family: "Times New Roman";
+    src: local("Times New Roman");
+}
+
+/* Fuentes personalizadas */
+@font-face {
+    font-family: "Roboto";
+    src: url(https://fonts.gstatic.com/s/roboto/v30/KFOmCnqEu92Fr1Mu4mxK.woff2)
+        format("woff2");
+}
+
+@font-face {
+    font-family: "Open Sans";
+    src: url(https://fonts.gstatic.com/s/opensans/v35/memSYaGs126MiZpBA-UvWbX2vVnXBbObj2OVZyOOSr4dVJWUgsjZ0B4gaVQ.woff2)
+        format("woff2");
+}
