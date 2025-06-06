@@ -100,13 +100,19 @@ export default function EditableCell({
         custom: "h-[500px]", // tamaño personalizado
     };
 
+    // Determinar si la celda tiene contenido para aplicar el border correcto
+    const hasContent = elements.length > 0;
+
     return (
         <div
             ref={drop}
-            className={`relative ${
-                sizeClasses[size]
-            } bg-gray-50 rounded-lg overflow-hidden ${
-                isOver ? "ring-2 ring-purple-500 bg-purple-50" : ""
+            className={`relative ${sizeClasses[size]} rounded-lg overflow-hidden ${
+                isOver ? "ring-2 ring-purple-500 bg-transparent" : ""
+            } ${
+                // Border condicional: con contenido = sin border, sin contenido = con border
+                !hasContent 
+                    ? "border-2 border-dashed border-gray-300 bg-transparent hover:border-gray-400 hover:bg-gray-100" 
+                    : "bg-transparent"
             }`}
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
@@ -115,19 +121,19 @@ export default function EditableCell({
             }}
             style={{
                 isolation: "isolate", // Esto crea un nuevo contexto de apilamiento
-                background: "white", // Asegura un fondo para que los blend modes funcionen
+                background: hasContent ? "transparent" : undefined, // Fondo transparente cuando tiene contenido
             }}
         >
             {elements.length === 0 ? (
                 <div
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
                         openFileExplorer();
                     }}
                 >
-                    <Upload className="h-8 w-8 text-gray-400" />
-                    <p className="text-sm text-gray-500">
+                    <Upload className="h-8 w-8 text-gray-300" />
+                    <p className="text-sm text-gray-400">
                         Haz clic o arrastra una imagen
                     </p>
                 </div>
