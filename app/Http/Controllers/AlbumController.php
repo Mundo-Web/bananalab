@@ -134,7 +134,7 @@ class AlbumController extends Controller
 
             $user = Auth::user();
             $album = Album::with(['item', 'itemPreset'])
-                ->where('uuid', $uuid)
+                ->where('id', $uuid)
                 ->where('user_id', $user->id)
                 ->first();
 

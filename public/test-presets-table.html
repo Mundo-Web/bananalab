@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test - Items Presets Table</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn3.devexpress.com/jslib/22.1.6/js/dx.all.js"></script>
+    <link rel="stylesheet" href="https://cdn3.devexpress.com/jslib/22.1.6/css/dx.light.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test - Items Presets Table</h1>
+    
+    <div class="test-section">
+        <h3>📋 Tabla de Presets de Prueba</h3>
+        <div id="presetsTestGrid" style="height: 400px;"></div>
+    </div>
+
+    <script>
+        // Datos de prueba
+        const testData = [
+            {
+                id: 1,
+                name: "Preset Test 1",
+                description: "Descripción del preset 1",
+                price: 50.00,
+                discount: 0,
+                sort_order: 1,
+                is_active: true
+            },
+            {
+                id: 2,
+                name: "Preset Test 2",
+                description: "Descripción del preset 2",
+                price: 75.50,
+                discount: 10.00,
+                sort_order: 2,
+                is_active: false
+            }
+        ];
+
+        // Función para formatear precio
+        function Number2Currency(value) {
+            return parseFloat(value).toFixed(2);
+        }
+
+        // Función ReactAppend simulada
+        function ReactAppend(container, element) {
+            if (typeof element === 'string') {
+                container.html(element);
+            } else {
+                // Para botones simples
+                container.html(element);
+            }
+        }
+
+        // Funciones de prueba
+        function onPresetEdit(preset) {
+            alert(`Editar preset: ${preset.name} (ID: ${preset.id})`);
+        }
+
+        function onPresetDelete(id) {
+            if (confirm(`¿Eliminar preset ID ${id}?`)) {
+                alert(`Preset ${id} eliminado`);
+                // Aquí recargarías los datos
+            }
+        }
+
+        function onPresetToggleStatus(data) {
+            alert(`Cambiar estado del preset ${data.id} a ${data.value ? 'activo' : 'inactivo'}`);
+        }
+
+        $(document).ready(function() {
+            $("#presetsTestGrid").dxDataGrid({
+                dataSource: testData,
+                keyExpr: "id",
+                showBorders: true,
+                showRowLines: true,
+                allowColumnReordering: true,
+                allowColumnResizing: true,
+                columnAutoWidth: true,
+                paging: {
+                    pageSize: 10
+                },
+                columns: [
+                    {
+                        dataField: "name",
+                        caption: "Nombre",
+                        width: "200px"
+                    },
+                    {
+                        dataField: "description",
+                        caption: "Descripción",
+                        width: "250px"
+                    },
+                    {
+                        dataField: "price",
+                        caption: "Precio",
+                        width: "80px",
+                        cellTemplate: (container, options) => {
+                            container.text(`S/. ${Number2Currency(options.value)}`);
+                        }
+                    },
+                    {
+                        dataField: "discount",
+                        caption: "Descuento",
+                        width: "80px",
+                        cellTemplate: (container, options) => {
+                            if (options.value > 0) {
+                                container.text(`S/. ${Number2Currency(options.value)}`);
+                            } else {
+                                container.text("-");
+                            }
+                        }
+                    },
+                    {
+                        caption: "Precio Final",
+                        width: "100px",
+                        cellTemplate: (container, options) => {
+                            const finalPrice = options.data.discount > 0 
+                                ? options.data.price - options.data.discount 
+                                : options.data.price;
+                            container.html(
+                                `<span class="fw-bold text-success">S/. ${Number2Currency(finalPrice)}</span>`
+                            );
+                        }
+                    },
+                    {
+                        dataField: "sort_order",
+                        caption: "Orden",
+                        width: "70px"
+                    },
+                    {
+                        dataField: "is_active",
+                        caption: "Estado",
+                        width: "100px",
+                        cellTemplate: (container, options) => {
+                            container.html(`
+                                <div class="form-check form-switch">
+                                    <input 
+                                        class="form-check-input" 
+                                        type="checkbox" 
+                                        ${options.value ? 'checked' : ''}
+                                        onchange="onPresetToggleStatus({ id: ${options.data.id}, value: this.checked })"
+                                    />
+                                </div>
+                            `);
+                        }
+                    },
+                    {
+                        caption: "Acciones",
+                        width: "120px",
+                        allowFiltering: false,
+                        allowSorting: false,
+                        cellTemplate: (container, options) => {
+                            container.html(`
+                                <div class="d-flex gap-1">
+                                    <button 
+                                        class="btn btn-sm btn-outline-primary"
+                                        onclick="onPresetEdit(${JSON.stringify(options.data).replace(/"/g, '&quot;')})"
+                                        title="Editar"
+                                    >
+                                        <i class="fas fa-edit"></i>
+                                    </button>
+                                    <button 
+                                        class="btn btn-sm btn-outline-danger"
+                                        onclick="onPresetDelete(${options.data.id})"
+                                        title="Eliminar"
+                                    >
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            `);
+                        }
+                    }
+                ]
+            });
+        });
+    </script>
+
+    <!-- Font Awesome para los iconos -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</body>
+</html>

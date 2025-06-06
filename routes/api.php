@@ -74,6 +74,9 @@ Route::post('/albums', [App\Http\Controllers\AlbumController::class, 'store']);
 Route::get('/albums', [App\Http\Controllers\AlbumController::class, 'index']);
 Route::get('/albums/{uuid}', [App\Http\Controllers\AlbumController::class, 'show']);
 
+// Item Preset routes (public)
+Route::get('/item-presets/{preset}', [App\Http\Controllers\Admin\ItemPresetReactController::class, 'getByIdPublic']);
+
 // Authentication check endpoint
 Route::get('/auth/check', [App\Http\Controllers\AlbumController::class, 'checkAuth']);
 

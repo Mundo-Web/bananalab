@@ -428,12 +428,22 @@ const Items = ({ categories, brands, collections }) => {
         presetSortOrderRef.current.value = preset?.sort_order || 0;
         presetConfigurationRef.current.value = preset?.configuration ? JSON.stringify(preset.configuration, null, 2) : "";
         presetIsActiveRef.current.checked = preset?.is_active !== false;
-        presetImageRef.current.value = "";
+        presetImageRef.image.src = `/storage/images/item_preset/${
+            preset?.image ?? "undefined"
+        }`;
         // Reset design layer images
-        if (presetCoverImageRef.current) presetCoverImageRef.current.value = "";
-        if (presetContentLayerImageRef.current) presetContentLayerImageRef.current.value = "";
-        if (presetFinalLayerImageRef.current) presetFinalLayerImageRef.current.value = "";
-        if (presetPreviewImageRef.current) presetPreviewImageRef.current.value = "";
+        if (presetCoverImageRef.current)   presetCoverImageRef.image.src = `/storage/images/item_preset/${
+            preset?.cover_image ?? "undefined"
+        }`;;
+        if (presetContentLayerImageRef.current)   presetContentLayerImageRef.image.src = `/storage/images/item_preset/${
+            preset?.content_layer_image ?? "undefined"
+        }`;;
+        if (presetFinalLayerImageRef.current)  presetFinalLayerImageRef.image.src = `/storage/images/item_preset/${
+            preset?.final_layer_image ?? "undefined"
+        }`;
+        if (presetPreviewImageRef.current)  presetPreviewImageRef.image.src = `/storage/images/item_preset/${
+            preset?.preview_image ?? "undefined"
+        }`;
         // Canvas config
         canvasWidthRef.current.value = preset?.canvas_config?.width || 1000;
         canvasHeightRef.current.value = preset?.canvas_config?.height || 1000;
@@ -579,20 +589,20 @@ const Items = ({ categories, brands, collections }) => {
                     caption: "Estado",
                     width: "100px",
                     cellTemplate: (container, options) => {
-                        ReactAppend(
-                            container,
-                            <div className="form-check form-switch">
-                                <input 
-                                    className="form-check-input" 
-                                    type="checkbox" 
-                                    checked={options.value}
-                                    onChange={(e) => onPresetToggleStatus({ 
-                                        id: options.data.id, 
-                                        value: e.target.checked
-                                    })}
-                                />
-                            </div>
-                        );
+                        const switchContainer = document.createElement('div');
+                        switchContainer.className = 'form-check form-switch';
+                        
+                        const checkbox = document.createElement('input');
+                        checkbox.className = 'form-check-input';
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = options.value;
+                        checkbox.onchange = (e) => onPresetToggleStatus({ 
+                            id: options.data.id, 
+                            value: e.target.checked
+                        });
+                        
+                        switchContainer.appendChild(checkbox);
+                        container.append(switchContainer);
                     }
                 },
                 {
@@ -601,31 +611,30 @@ const Items = ({ categories, brands, collections }) => {
                     allowFiltering: false,
                     allowSorting: false,
                     cellTemplate: (container, options) => {
-                        ReactAppend(
-                            container,
-                            <div className="d-flex gap-1">
-                                <DxButton
-                                    text=""
-                                    icon="edit"
-                                    type="default"
-                                    stylingMode="text"
-                                    onClick={() => {
-                                        const itemForEdit = selectedItemForPresets || currentItemForPresetsRef.current;
-                                        console.log("Edit preset clicked - item:", itemForEdit, "preset:", options.data);
-                                        onPresetModalOpen(options.data, itemForEdit);
-                                    }}
-                                    hint="Editar"
-                                />
-                                <DxButton
-                                    text=""
-                                    icon="trash"
-                                    type="danger"
-                                    stylingMode="text"
-                                    onClick={() => onPresetDelete(options.data.id)}
-                                    hint="Eliminar"
-                                />
-                            </div>
-                        );
+                        const buttonContainer = document.createElement('div');
+                        buttonContainer.className = 'd-flex gap-1';
+                        
+                        // Botón Editar
+                        const editButton = document.createElement('button');
+                        editButton.className = 'btn btn-sm btn-outline-primary';
+                        editButton.innerHTML = '<i class="fas fa-edit"></i>';
+                        editButton.title = 'Editar preset';
+                        editButton.onclick = () => {
+                            const itemForEdit = selectedItemForPresets || currentItemForPresetsRef.current;
+                            console.log("Edit preset clicked - item:", itemForEdit, "preset:", options.data);
+                            onPresetModalOpen(options.data, itemForEdit);
+                        };
+                        
+                        // Botón Eliminar
+                        const deleteButton = document.createElement('button');
+                        deleteButton.className = 'btn btn-sm btn-outline-danger';
+                        deleteButton.innerHTML = '<i class="fas fa-trash"></i>';
+                        deleteButton.title = 'Eliminar preset';
+                        deleteButton.onclick = () => onPresetDelete(options.data.id);
+                        
+                        buttonContainer.appendChild(editButton);
+                        buttonContainer.appendChild(deleteButton);
+                        container.append(buttonContainer);
                     }
                 }
             ]
@@ -774,11 +783,24 @@ const Items = ({ categories, brands, collections }) => {
     };
 
     const onPresetToggleStatus = async ({ id, value }) => {
+        // Obtener la referencia correcta del item
+        const targetItem = selectedItemForPresets || currentItemForPresetsRef.current;
+        
+        if (!targetItem || !targetItem.id) {
+            Swal.fire({
+                title: "Error",
+                text: "No hay item seleccionado. Por favor, selecciona un item válido.",
+                icon: "error"
+            });
+            return;
+        }
+
         try {
-            await itemPresetsRest.toggleStatusForItem(selectedItemForPresets.id, id);
+            console.log('Cambiando estado del preset:', id, 'del item:', targetItem.id, 'a:', value);
+            await itemPresetsRest.toggleStatusForItem(targetItem.id, id);
             
             // Actualizar los datos y refrescar el grid
-            const result = await itemPresetsRest.getByItem(selectedItemForPresets.id);
+            const result = await itemPresetsRest.getByItem(targetItem.id);
             setPresetsData(result.data || []);
             updatePresetsGrid(result.data || []);
             
@@ -786,18 +808,32 @@ const Items = ({ categories, brands, collections }) => {
                 title: "¡Éxito!",
                 text: `Preset ${value ? 'activado' : 'desactivado'} correctamente`,
                 icon: "success",
-                timer: 2000
+                timer: 2000,
+                showConfirmButton: false
             });
         } catch (error) {
+            console.error('Error al cambiar estado del preset:', error);
             Swal.fire({
                 title: "Error",
-                text: "Error al cambiar el estado del preset",
+                text: "Error al cambiar el estado del preset: " + error.message,
                 icon: "error"
             });
         }
     };
 
     const onPresetDelete = async (id) => {
+        // Obtener la referencia correcta del item
+        const targetItem = selectedItemForPresets || currentItemForPresetsRef.current;
+        
+        if (!targetItem || !targetItem.id) {
+            Swal.fire({
+                title: "Error",
+                text: "No hay item seleccionado. Por favor, selecciona un item válido.",
+                icon: "error"
+            });
+            return;
+        }
+
         const result = await Swal.fire({
             title: "¿Estás seguro?",
             text: "Esta acción eliminará permanentemente el preset",
@@ -811,10 +847,11 @@ const Items = ({ categories, brands, collections }) => {
 
         if (result.isConfirmed) {
             try {
-                await itemPresetsRest.deleteForItem(selectedItemForPresets.id, id);
+                console.log('Eliminando preset:', id, 'del item:', targetItem.id);
+                await itemPresetsRest.deleteForItem(targetItem.id, id);
                 
                 // Recargar y actualizar la tabla
-                const result = await itemPresetsRest.getByItem(selectedItemForPresets.id);
+                const result = await itemPresetsRest.getByItem(targetItem.id);
                 setPresetsData(result.data || []);
                 updatePresetsGrid(result.data || []);
                 
@@ -825,9 +862,10 @@ const Items = ({ categories, brands, collections }) => {
                     timer: 2000
                 });
             } catch (error) {
+                console.error('Error al eliminar preset:', error);
                 Swal.fire({
                     title: "Error",
-                    text: "Error al eliminar el preset",
+                    text: "Error al eliminar el preset: " + error.message,
                     icon: "error"
                 });
             }

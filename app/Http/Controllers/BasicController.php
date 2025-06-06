@@ -241,6 +241,10 @@ class BasicController extends Controller
 
       $body = $this->beforeSave($request);
 
+      \Log::info('BasicController::save - Datos a guardar', [
+        'body' => $body,
+        'id' => isset($body['id']) ? $body['id'] : null
+      ]);
 
       $snake_case = Text::camelToSnakeCase(str_replace('App\\Models\\', '', $this->model));
       if ($snake_case === "item_image") {
@@ -265,6 +269,10 @@ class BasicController extends Controller
         $jpa = $this->model::create($body);
         $isNew = true;
       } else {
+        \Log::info('BasicController::save - Ejecutando update', [
+          'id' => $jpa->id,
+          'body' => $body
+        ]);
         $jpa->update($body);
         $isNew = false;
       }

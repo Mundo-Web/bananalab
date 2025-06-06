@@ -96,26 +96,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 throw new Error('Faltan parámetros requeridos: albumId y presetId');
             }
 
-            // Detectar si estamos en modo de desarrollo/testing
-            const isTestMode = window.location.hostname === 'localhost' || 
-                              window.location.hostname === '127.0.0.1' || 
-                              params.albumId === '1' ||
-                              !isNaN(params.albumId);
 
             // Determinar la URL base correcta
             const baseUrl = window.location.origin.includes('bananalab') 
                 ? '/projects/bananalab/public' 
                 : '';
 
-            const albumEndpoint = isTestMode ? 
-                `${baseUrl}/api/test/albums/${params.albumId}` : 
-                `${baseUrl}/api/albums/${params.albumId}`;
-                
-            const presetEndpoint = isTestMode ? 
-                `${baseUrl}/api/test/item-presets/${params.presetId}` : 
-                `${baseUrl}/api/item-presets/${params.presetId}`;
+            // Siempre usar los endpoints REALES para traer datos de la base de datos
+            const albumEndpoint = `${baseUrl}/api/albums/${params.albumId}`;
+            const presetEndpoint = `${baseUrl}/api/item-presets/${params.presetId}`;
 
-            console.log('🌐 Using endpoints:', { albumEndpoint, presetEndpoint, isTestMode, baseUrl });
+            console.log('🌐 Using endpoints:', { albumEndpoint, presetEndpoint, baseUrl });
 
             // Cargar datos del álbum
             console.log('📚 Cargando álbum...');
@@ -204,7 +195,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 }
                 return imagePath.startsWith('/storage/') ? imagePath : `/storage/${imagePath}`;
             };
-            
+            console.log(preset)
             // 1. PÁGINA DE PORTADA (cover_image)
             const coverPage = {
                 id: "page-cover",
@@ -217,7 +208,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         {
                             id: "cover-base",
                             type: "image",
-                            content: getImageUrl(preset.cover_image),
+                            content: `/storage/images/item_preset/${preset.cover_image}`,
                             position: { x: 0, y: 0 },
                             size: { width: 100, height: 100 },
                             filters: {},
@@ -229,7 +220,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         ...(album.cover_image_path ? [{
                             id: "cover-custom",
                             type: "image", 
-                            content: getImageUrl(album.cover_image_path),
+                            content: `/storage/images/album/${album.cover_image_path}`,
                             position: { x: 10, y: 10 },
                             size: { width: 80, height: 80 },
                             filters: {},
@@ -256,7 +247,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             {
                                 id: `content-base-${i}`,
                                 type: "image",
-                                content: getImageUrl(preset.content_layer_image),
+                                content: `/storage/images/item_preset/${preset.content_layer_image}`,
                                 position: { x: 0, y: 0 },
                                 size: { width: 100, height: 100 },
                                 filters: {},
@@ -284,7 +275,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         {
                             id: "final-base",
                             type: "image",
-                            content: getImageUrl(preset.final_layer_image),
+                            content: `/storage/images/item_preset/${preset.final_layer_image}`,
                             position: { x: 0, y: 0 },
                             size: { width: 100, height: 100 },
                             filters: {},
@@ -1769,91 +1760,75 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             style={{
                                                 width: workspaceSize.width,
                                                 height: workspaceSize.height,
+                                                position: 'relative',
                                             }}
                                         >
+                                            {/* Background layer fijo */}
+                                            {(() => {
+                                                const page = pages[currentPage];
+                                                let bgUrl = null;
+                                                if (page.type === 'cover' && presetData?.cover_image) {
+                                                    bgUrl = presetData.cover_image.startsWith('http')
+                                                        ? presetData.cover_image
+                                                        : `/storage/images/item_preset/${presetData.cover_image}`;
+                                                } else if (page.type === 'content' && presetData?.content_layer_image) {
+                                                    bgUrl = presetData.content_layer_image.startsWith('http')
+                                                        ? presetData.content_layer_image
+                                                        : `/storage/images/item_preset/${presetData.content_layer_image}`;
+                                                } else if (page.type === 'final' && presetData?.final_layer_image) {
+                                                    bgUrl = presetData.final_layer_image.startsWith('http')
+                                                        ? presetData.final_layer_image
+                                                        : `/storage/images/item_preset/${presetData.final_layer_image}`;
+                                                }
+                                                return bgUrl ? (
+                                                    <img
+                                                        src={bgUrl}
+                                                        alt="background"
+                                                        style={{
+                                                            position: 'absolute',
+                                                            top: 0,
+                                                            left: 0,
+                                                            width: '100%',
+                                                            height: '100%',
+                                                            objectFit: 'cover',
+                                                            zIndex: 0,
+                                                            pointerEvents: 'none',
+                                                        }}
+                                                    />
+                                                ) : null;
+                                            })()}
+                                            {/* Celdas editables por encima del background */}
                                             <div
-                                                className={`grid ${
-                                                    getCurrentLayout().template
-                                                } gap-4   p-4 max-h-full`}
+                                                className={`grid ${getCurrentLayout().template} gap-4   p-4 max-h-full`}
+                                                style={{ position: 'relative', zIndex: 1 }}
                                             >
                                                 {pages[currentPage].cells.map(
                                                     (cell) => (
                                                         <EditableCell
                                                             key={cell.id}
                                                             id={cell.id}
-                                                            elements={
-                                                                cell.elements
-                                                            }
+                                                            elements={cell.elements.filter(el => !el.locked)}
                                                             size={workspaceSize}
                                                             selectedElement={
-                                                                selectedCell ===
-                                                                cell.id
-                                                                    ? selectedElement
-                                                                    : null
+                                                                selectedCell === cell.id ? selectedElement : null
                                                             }
-                                                            /*   onSelectElement={(
-                                                                elementId
-                                                            ) => {
-                                                                setSelectedElement(
-                                                                    elementId
-                                                                );
-                                                                setSelectedCell(
-                                                                    cell.id
-                                                                );
-                                                            }}*/
-                                                            onSelectElement={
-                                                                handleSelectElement
-                                                            }
-                                                            onAddElement={(
-                                                                element
-                                                            ) => {
-                                                                const updatedPages =
-                                                                    [...pages];
-                                                                const cellIndex =
-                                                                    updatedPages[
-                                                                        currentPage
-                                                                    ].cells.findIndex(
-                                                                        (c) =>
-                                                                            c.id ===
-                                                                            cell.id
-                                                                    );
+                                                            onSelectElement={handleSelectElement}
+                                                            onAddElement={(element) => {
+                                                                const updatedPages = [...pages];
+                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
                                                                 if (
                                                                     cellIndex !==
                                                                     -1
                                                                 ) {
-                                                                    updatedPages[
-                                                                        currentPage
-                                                                    ].cells[
-                                                                        cellIndex
-                                                                    ].elements.push(
-                                                                        element
-                                                                    );
-                                                                    updatePages(
-                                                                        updatedPages
-                                                                    );
-                                                                    setSelectedElement(
-                                                                        element.id
-                                                                    );
-                                                                    setSelectedCell(
-                                                                        cell.id
-                                                                    );
+                                                                    updatedPages[currentPage].cells[cellIndex].elements.push(element);
+                                                                    updatePages(updatedPages);
+                                                                    setSelectedElement(element.id);
+                                                                    setSelectedCell(cell.id);
                                                                 }
                                                             }}
-                                                            onUpdateElement={(
-                                                                elementId,
-                                                                updates,
-                                                                isDuplicate
-                                                            ) => {
-                                                                const updatedPages =
-                                                                    [...pages];
-                                                                const cellIndex =
-                                                                    updatedPages[
-                                                                        currentPage
-                                                                    ].cells.findIndex(
-                                                                        (c) =>
-                                                                            c.id ===
-                                                                            cell.id
-                                                                    );
+                                                            onUpdateElement={(elementId, updates, isDuplicate) => {
+                                                                const updatedPages = [...pages];
+                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
                                                                 if (
                                                                     cellIndex !==
                                                                     -1
@@ -1861,105 +1836,34 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                     if (
                                                                         isDuplicate
                                                                     ) {
-                                                                        updatedPages[
-                                                                            currentPage
-                                                                        ].cells[
-                                                                            cellIndex
-                                                                        ].elements.push(
-                                                                            {
-                                                                                ...updatedPages[
-                                                                                    currentPage
-                                                                                ].cells[
-                                                                                    cellIndex
-                                                                                ].elements.find(
-                                                                                    (
-                                                                                        el
-                                                                                    ) =>
-                                                                                        el.id ===
-                                                                                        elementId
-                                                                                ),
-                                                                                ...updates,
-                                                                            }
-                                                                        );
+                                                                        updatedPages[currentPage].cells[cellIndex].elements.push({
+                                                                            ...updatedPages[currentPage].cells[cellIndex].elements.find((el) => el.id === elementId),
+                                                                            ...updates,
+                                                                        });
                                                                     } else {
-                                                                        const elementIndex =
-                                                                            updatedPages[
-                                                                                currentPage
-                                                                            ].cells[
-                                                                                cellIndex
-                                                                            ].elements.findIndex(
-                                                                                (
-                                                                                    el
-                                                                                ) =>
-                                                                                    el.id ===
-                                                                                    elementId
-                                                                            );
+                                                                        const elementIndex = updatedPages[currentPage].cells[cellIndex].elements.findIndex((el) => el.id === elementId);
                                                                         if (
                                                                             elementIndex !==
                                                                             -1
                                                                         ) {
-                                                                            updatedPages[
-                                                                                currentPage
-                                                                            ].cells[
-                                                                                cellIndex
-                                                                            ].elements[
-                                                                                elementIndex
-                                                                            ] =
-                                                                                {
-                                                                                    ...updatedPages[
-                                                                                        currentPage
-                                                                                    ]
-                                                                                        .cells[
-                                                                                        cellIndex
-                                                                                    ]
-                                                                                        .elements[
-                                                                                        elementIndex
-                                                                                    ],
-                                                                                    ...updates,
-                                                                                };
+                                                                            updatedPages[currentPage].cells[cellIndex].elements[elementIndex] = {
+                                                                                ...updatedPages[currentPage].cells[cellIndex].elements[elementIndex],
+                                                                                ...updates,
+                                                                            };
                                                                         }
                                                                     }
-                                                                    updatePages(
-                                                                        updatedPages
-                                                                    );
+                                                                    updatePages(updatedPages);
                                                                 }
                                                             }}
-                                                            onDeleteElement={(
-                                                                elementId
-                                                            ) => {
-                                                                const updatedPages =
-                                                                    [...pages];
-                                                                const cellIndex =
-                                                                    updatedPages[
-                                                                        currentPage
-                                                                    ].cells.findIndex(
-                                                                        (c) =>
-                                                                            c.id ===
-                                                                            cell.id
-                                                                    );
+                                                            onDeleteElement={(elementId) => {
+                                                                const updatedPages = [...pages];
+                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
                                                                 if (
                                                                     cellIndex !==
                                                                     -1
                                                                 ) {
-                                                                    updatedPages[
-                                                                        currentPage
-                                                                    ].cells[
-                                                                        cellIndex
-                                                                    ].elements =
-                                                                        updatedPages[
-                                                                            currentPage
-                                                                        ].cells[
-                                                                            cellIndex
-                                                                        ].elements.filter(
-                                                                            (
-                                                                                el
-                                                                            ) =>
-                                                                                el.id !==
-                                                                                elementId
-                                                                        );
-                                                                    updatePages(
-                                                                        updatedPages
-                                                                    );
+                                                                    updatedPages[currentPage].cells[cellIndex].elements = updatedPages[currentPage].cells[cellIndex].elements.filter((el) => el.id !== elementId);
+                                                                    updatePages(updatedPages);
                                                                     if (
                                                                         selectedElement ===
                                                                         elementId
@@ -1970,10 +1874,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                     }
                                                                 }
                                                             }}
-                                                            availableMasks={getCurrentLayout().maskCategories.flatMap(
-                                                                (cat) =>
-                                                                    cat.masks
-                                                            )}
+                                                            availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
                                                         />
                                                     )
                                                 )}

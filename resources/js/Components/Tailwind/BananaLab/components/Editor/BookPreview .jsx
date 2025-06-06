@@ -29,6 +29,31 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages }) => {
     const [currentPage, setCurrentPage] = useState(0);
     const flipBook = useRef();
 
+    // Safety check for pages
+    if (!pages || !Array.isArray(pages) || pages.length === 0) {
+        return (
+            <Modal
+                isOpen={isOpen}
+                onRequestClose={onRequestClose}
+                style={customStyles}
+                contentLabel="Vista previa del álbum"
+            >
+                <div className="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
+                    <div className="flex justify-between items-center mb-4">
+                        <h2 className="text-xl font-bold">Vista previa del álbum</h2>
+                        <button
+                            onClick={onRequestClose}
+                            className="text-gray-500 hover:text-gray-700"
+                        >
+                            <X size={24} />
+                        </button>
+                    </div>
+                    <p className="text-gray-600">No hay páginas disponibles para mostrar.</p>
+                </div>
+            </Modal>
+        );
+    }
+
     const goToPrevPage = () => {
         if (flipBook.current) {
             flipBook.current.pageFlip().flipPrev();
@@ -96,17 +121,17 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages }) => {
                     onFlip={(e) => setCurrentPage(e.data)}
                     className="shadow-2xl bg-gray-100"
                 >
-                    {pages.map((page, index) => (
+                    {pages?.map((page, index) => (
                         <div key={page.id} className="bg-white h-full w-full">
                             <div
-                                className={`grid ${page.layout.template} gap-4 h-full p-4`}
+                                className={`grid ${page.layout?.template || 'grid-cols-1'} gap-4 h-full p-4`}
                             >
-                                {page.cells.map((cell) => (
+                                {page.cells?.map((cell) => (
                                     <div
                                         key={cell.id}
                                         className="relative bg-gray-50 rounded-lg overflow-hidden"
                                     >
-                                        {cell.elements.map((element) =>
+                                        {cell.elements?.map((element) =>
                                             element.type === "image" ? (
                                                 <img
                                                     key={element.id}
