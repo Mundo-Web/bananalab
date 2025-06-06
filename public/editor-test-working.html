@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Álbum Test - BananaLab</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+        .loading { 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            min-height: 100vh; 
+            flex-direction: column;
+        }
+        .spinner {
+            border: 4px solid #f3f4f6;
+            border-top: 4px solid #3b82f6;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Componente de prueba simple del Editor
+        function EditorTest() {
+            const [albumData, setAlbumData] = useState(null);
+            const [presetData, setPresetData] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const [error, setError] = useState(null);
+            const [pages, setPages] = useState([]);
+
+            // Función para cargar datos de prueba
+            const loadTestData = async () => {
+                try {
+                    setIsLoading(true);
+                    setError(null);
+
+                    console.log('🔄 Cargando datos de prueba...');
+
+                    // Cargar álbum de prueba
+                    const albumResponse = await fetch('/projects/bananalab/public/api/test/albums/1', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!albumResponse.ok) {
+                        throw new Error(`Error al cargar álbum: ${albumResponse.status}`);
+                    }
+
+                    const albumData = await albumResponse.json();
+                    console.log('📚 Album cargado:', albumData);
+                    setAlbumData(albumData.data);
+
+                    // Cargar preset de prueba
+                    const presetResponse = await fetch('/projects/bananalab/public/api/test/item-presets/1', {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        }
+                    });
+
+                    if (!presetResponse.ok) {
+                        throw new Error(`Error al cargar preset: ${presetResponse.status}`);
+                    }
+
+                    const presetData = await presetResponse.json();
+                    console.log('🎨 Preset cargado:', presetData);
+                    setPresetData(presetData.data);
+
+                    // Crear páginas de ejemplo
+                    createTestPages(presetData.data, albumData.data);
+
+                } catch (err) {
+                    console.error('❌ Error:', err);
+                    setError(err.message);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Función para crear páginas de prueba
+            const createTestPages = (preset, album) => {
+                const testPages = [
+                    // Página de portada
+                    {
+                        id: 'page-cover',
+                        type: 'cover',
+                        title: 'Portada',
+                        backgroundImage: preset.cover_image
+                    },
+                    // Páginas de contenido
+                    {
+                        id: 'page-content-1',
+                        type: 'content',
+                        title: 'Página 1',
+                        backgroundImage: preset.content_layer_image
+                    },
+                    {
+                        id: 'page-content-2',
+                        type: 'content',
+                        title: 'Página 2',
+                        backgroundImage: preset.content_layer_image
+                    },
+                    // Página final
+                    {
+                        id: 'page-final',
+                        type: 'final',
+                        title: 'Contraportada',
+                        backgroundImage: preset.final_layer_image
+                    }
+                ];
+
+                console.log('📄 Páginas creadas:', testPages);
+                setPages(testPages);
+            };
+
+            useEffect(() => {
+                loadTestData();
+            }, []);
+
+            if (isLoading) {
+                return (
+                    <div className="loading">
+                        <div className="spinner"></div>
+                        <p className="mt-4 text-gray-600">Cargando editor...</p>
+                    </div>
+                );
+            }
+
+            if (error) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-red-50">
+                        <div className="text-center p-8">
+                            <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+                            <p className="text-red-800 mb-4">{error}</p>
+                            <button 
+                                onClick={loadTestData}
+                                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+                            >
+                                Reintentar
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    {/* Header */}
+                    <div className="bg-white shadow-sm border-b px-6 py-4">
+                        <h1 className="text-xl font-semibold text-gray-800">
+                            Editor de Álbum - Prueba
+                        </h1>
+                        <p className="text-sm text-gray-600 mt-1">
+                            {albumData?.title} • {pages.length} páginas
+                        </p>
+                    </div>
+
+                    <div className="flex h-screen">
+                        {/* Sidebar izquierdo - Lista de páginas */}
+                        <div className="w-64 bg-white shadow-sm border-r p-4">
+                            <h3 className="font-medium text-gray-800 mb-4">Páginas</h3>
+                            <div className="space-y-2">
+                                {pages.map((page, index) => (
+                                    <div key={page.id} className="p-3 border rounded-lg hover:bg-gray-50">
+                                        <div className="flex items-center space-x-3">
+                                            <div className="w-12 h-16 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
+                                                {page.backgroundImage && (
+                                                    <img 
+                                                        src={page.backgroundImage} 
+                                                        alt={page.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                )}
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{page.title}</p>
+                                                <p className="text-xs text-gray-500">{page.type}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Área principal */}
+                        <div className="flex-1 p-6">
+                            <div className="max-w-4xl mx-auto">
+                                <div className="bg-white rounded-lg shadow-lg p-6">
+                                    <h2 className="text-lg font-semibold mb-4">Vista previa del álbum</h2>
+                                    
+                                    <div className="grid grid-cols-2 gap-6">
+                                        {pages.map((page) => (
+                                            <div key={page.id} className="border rounded-lg overflow-hidden">
+                                                <div className="aspect-[3/4] bg-gray-100 relative">
+                                                    {page.backgroundImage && (
+                                                        <img 
+                                                            src={page.backgroundImage} 
+                                                            alt={page.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    )}
+                                                    <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                                                        <div className="text-white text-center">
+                                                            <h3 className="font-semibold">{page.title}</h3>
+                                                            <p className="text-sm opacity-80">{page.type}</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Info de datos cargados */}
+                                    <div className="mt-6 p-4 bg-green-50 rounded-lg">
+                                        <h3 className="font-medium text-green-800 mb-2">✅ Datos cargados correctamente</h3>
+                                        <div className="text-sm text-green-700 space-y-1">
+                                            <p><strong>Álbum:</strong> {albumData?.title}</p>
+                                            <p><strong>Preset:</strong> {presetData?.name}</p>
+                                            <p><strong>Páginas:</strong> {pages.length}</p>
+                                            <p><strong>API funcionando:</strong> ✅</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Renderizar la aplicación
+        ReactDOM.render(<EditorTest />, document.getElementById('root'));
+    </script>
+</body>
+</html>

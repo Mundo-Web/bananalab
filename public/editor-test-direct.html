@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Editor Directo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 p-8">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-2xl font-bold mb-4">Test Editor BananaLab</h1>
+        <p class="mb-4">Prueba directa del Editor con datos simulados:</p>
+        
+        <div class="space-y-4">
+            <a href="#" id="test-editor" class="inline-block bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600">
+                Abrir Editor con Datos de Test
+            </a>
+            
+            <div class="bg-white p-4 rounded-lg">
+                <h3 class="font-semibold mb-2">Parámetros de prueba:</h3>
+                <ul class="text-sm text-gray-600">
+                    <li>Album ID: test-album-123</li>
+                    <li>Item ID: test-item-456</li>
+                    <li>Preset ID: test-preset-789</li>
+                    <li>Pages: 5</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configurar URL del editor con parámetros de prueba
+        document.getElementById('test-editor').href = 
+            '/projects/bananalab/resources/js/Components/Tailwind/BananaLab/Editor.jsx' +
+            '?albumId=test-album-123&itemId=test-item-456&presetId=test-preset-789&pages=5';
+            
+        // Alternativamente, abre en una nueva ventana
+        document.getElementById('test-editor').onclick = function(e) {
+            e.preventDefault();
+            
+            // Como no podemos ejecutar directamente el JSX, creamos un enlace a la ruta del proyecto
+            const baseUrl = window.location.origin;
+            const editorUrl = baseUrl + '/projects/bananalab/' + 
+                '?albumId=test-album-123&itemId=test-item-456&presetId=test-preset-789&pages=5';
+                
+            window.open(editorUrl, '_blank');
+        };
+    </script>
+</body>
+</html>

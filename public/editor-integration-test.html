@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Editor Integration</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div id="app" class="min-h-screen">
+        <div class="container mx-auto p-8">
+            <h1 class="text-3xl font-bold text-center mb-8">Editor BananaLab - Test de Integración</h1>
+            
+            <!-- Test de carga de datos -->
+            <div class="bg-white rounded-lg shadow-lg p-6 mb-6">
+                <h2 class="text-xl font-semibold mb-4">Prueba de Carga de Datos</h2>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Album ID:</label>
+                        <input type="text" id="albumId" value="test-album-123" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Item ID:</label>
+                        <input type="text" id="itemId" value="test-item-456" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Preset ID:</label>
+                        <input type="text" id="presetId" value="test-preset-789" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium mb-2">Número de páginas:</label>
+                        <input type="number" id="pages" value="5" min="1" max="20"
+                               class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                    </div>
+                    <button id="testAPI" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600">
+                        Probar APIs
+                    </button>
+                    <button id="loadEditor" class="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600">
+                        Cargar Editor
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Resultados -->
+            <div class="bg-white rounded-lg shadow-lg p-6">
+                <h2 class="text-xl font-semibold mb-4">Resultados</h2>
+                <div id="results" class="space-y-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Funciones de utilidad
+        function addResult(message, type = 'info') {
+            const results = document.getElementById('results');
+            const div = document.createElement('div');
+            div.className = `p-3 rounded-md ${
+                type === 'success' ? 'bg-green-100 text-green-800' :
+                type === 'error' ? 'bg-red-100 text-red-800' :
+                'bg-blue-100 text-blue-800'
+            }`;
+            div.textContent = message;
+            results.appendChild(div);
+            results.scrollTop = results.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        // Test de APIs
+        async function testAPIs() {
+            clearResults();
+            addResult('Iniciando pruebas de API...');
+            
+            const albumId = document.getElementById('albumId').value;
+            const presetId = document.getElementById('presetId').value;
+            
+            try {
+                // Test 1: Album API
+                addResult('Probando API de álbum...');
+                const albumResponse = await fetch(`/api/albums/${albumId}`);
+                if (albumResponse.ok) {
+                    const albumData = await albumResponse.json();
+                    addResult(`✓ API de álbum funciona: ${JSON.stringify(albumData).substring(0, 100)}...`, 'success');
+                } else {
+                    addResult(`✗ Error en API de álbum: ${albumResponse.status} ${albumResponse.statusText}`, 'error');
+                }
+                
+                // Test 2: Preset API
+                addResult('Probando API de preset...');
+                const presetResponse = await fetch(`/api/item-presets/${presetId}`);
+                if (presetResponse.ok) {
+                    const presetData = await presetResponse.json();
+                    addResult(`✓ API de preset funciona: ${JSON.stringify(presetData).substring(0, 100)}...`, 'success');
+                } else {
+                    addResult(`✗ Error en API de preset: ${presetResponse.status} ${presetResponse.statusText}`, 'error');
+                }
+                
+            } catch (error) {
+                addResult(`✗ Error general: ${error.message}`, 'error');
+            }
+        }
+
+        // Cargar editor con parámetros
+        function loadEditor() {
+            const albumId = document.getElementById('albumId').value;
+            const itemId = document.getElementById('itemId').value;
+            const presetId = document.getElementById('presetId').value;
+            const pages = document.getElementById('pages').value;
+            
+            const params = new URLSearchParams({
+                albumId: albumId,
+                itemId: itemId,
+                presetId: presetId,
+                pages: pages
+            });
+            
+            // Construir URL del editor
+            const baseUrl = window.location.origin + window.location.pathname.replace('editor-integration-test.html', '');
+            const editorUrl = `${baseUrl}editor-test.html?${params.toString()}`;
+            
+            addResult(`Abriendo editor: ${editorUrl}`);
+            window.open(editorUrl, '_blank');
+        }
+
+        // Event listeners
+        document.getElementById('testAPI').addEventListener('click', testAPIs);
+        document.getElementById('loadEditor').addEventListener('click', loadEditor);
+        
+        // Auto-ejecutar test de APIs al cargar
+        window.addEventListener('load', () => {
+            addResult('Página cargada. Listo para probar.');
+        });
+    </script>
+</body>
+</html>

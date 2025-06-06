@@ -17,7 +17,9 @@ const DataGrid = ({ gridRef: dataGridRef, rest, columns, toolBar, masterDetail, 
       },
       onToolbarPreparing: (e) => {
         const { items } = e.toolbarOptions;
-        toolBar(items)
+        if (toolBar && typeof toolBar === 'function') {
+          toolBar(items);
+        }
 
         // items.unshift({
         //   widget: 'dxButton',

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso al Editor - BananaLab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+    <div class="bg-white p-8 rounded-lg shadow-lg max-w-md w-full">
+        <h1 class="text-2xl font-bold text-center mb-6">Editor de Álbumes</h1>
+        
+        <form id="editorForm" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium mb-1" for="albumId">Album ID:</label>
+                <input id="albumId" type="text" value="demo-album-123" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-1" for="itemId">Item ID:</label>
+                <input id="itemId" type="text" value="demo-item-456" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-1" for="presetId">Preset ID:</label>
+                <input id="presetId" type="text" value="demo-preset-789" 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium mb-1" for="pages">Páginas:</label>
+                <input id="pages" type="number" value="5" min="1" max="20"
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md">
+            </div>
+            
+            <button type="submit" 
+                    class="w-full bg-purple-600 text-white py-2 px-4 rounded-md hover:bg-purple-700">
+                Abrir Editor
+            </button>
+        </form>
+        
+        <div class="mt-4 text-center text-sm text-gray-500">
+            Esta página te redirige al editor compilado con Inertia.js
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('editorForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Obtener valores
+            const albumId = document.getElementById('albumId').value;
+            const itemId = document.getElementById('itemId').value;
+            const presetId = document.getElementById('presetId').value;
+            const pages = document.getElementById('pages').value;
+            
+            if (!albumId || !itemId || !presetId || !pages) {
+                alert('Por favor completa todos los campos');
+                return;
+            }
+            
+            // Construir URL
+            const url = `/editor-app?albumId=${albumId}&itemId=${itemId}&presetId=${presetId}&pages=${pages}`;
+            
+            // Redirigir
+            window.location.href = url;
+        });
+    </script>
+</body>
+</html>

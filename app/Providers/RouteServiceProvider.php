@@ -40,6 +40,12 @@ class RouteServiceProvider extends ServiceProvider
             // Rutas de la web
             Route::prefix('free')
                 ->group(base_path('routes/free.php'));
+                
+            // Rutas del editor (testing)
+            if (env('APP_ENV') === 'local') {
+                Route::middleware('web')
+                    ->group(base_path('routes/editor.php'));
+            }
         });
     }
 }

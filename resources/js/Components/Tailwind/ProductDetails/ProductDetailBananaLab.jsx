@@ -590,7 +590,7 @@ export default function ProductDetailBananaLab({
                                 className="flex flex-col mt-4"
                             >
                                 <motion.a
-                                    href="/canva1"
+                                    href={`/canva1?item=${item?.id}`}
                                     className="w-full flex gap-4 items-center justify-center font-paragraph text-base 2xl:text-lg bg-primary text-white py-3 font-semibold rounded-3xl hover:opacity-90 transition-all duration-300 mt-3"
                                     whileHover={{ scale: 1.02 }}
                                     whileTap={{ scale: 0.98 }}

@@ -1,6 +1,8 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+// use Illuminate\Support\Facades\Auth; // Solo una vez
+use Illuminate\Support\Facades\Auth;
 
 // Admin
 use App\Http\Controllers\Admin\AboutusController as AdminAboutusController;
@@ -25,6 +27,7 @@ use App\Http\Controllers\Admin\BrandController as AdminBrandController;
 use App\Http\Controllers\Admin\DeliveryPriceController as AdminDeliveryPriceController;
 use App\Http\Controllers\Admin\GalleryController as AdminGalleryController;
 use App\Http\Controllers\Admin\ItemController as AdminItemController;
+use App\Http\Controllers\Admin\ItemPresetReactController as AdminItemPresetReactController;
 use App\Http\Controllers\Admin\SaleController as AdminSaleController;
 use App\Http\Controllers\Admin\SubCategoryController as AdminSubCategoryController;
 use App\Http\Controllers\Admin\SystemColorController as AdminSystemColorController;
@@ -66,10 +69,32 @@ use App\Http\Controllers\ScrapController;
 
 /**Editor */
 // routes/api.php
-Route::post('/albums', 'AlbumController@store');
-Route::get('/albums/{id}', 'AlbumController@show');
-Route::post('/pages', 'PageController@store');
-Route::post('/upload-image', 'ImageController@upload');
+// Album routes
+Route::post('/albums', [App\Http\Controllers\AlbumController::class, 'store']);
+Route::get('/albums', [App\Http\Controllers\AlbumController::class, 'index']);
+Route::get('/albums/{uuid}', [App\Http\Controllers\AlbumController::class, 'show']);
+
+// Authentication check endpoint
+Route::get('/auth/check', [App\Http\Controllers\AlbumController::class, 'checkAuth']);
+
+// Test login temporal para depuración (REMOVER EN PRODUCCIÓN)
+Route::post('/auth/test-login', function() {
+    $user = \App\Models\User::first();
+    if ($user) {
+        Auth::login($user);
+        return response()->json([
+            'success' => true,
+            'message' => 'Login de prueba exitoso',
+            'user' => $user
+        ]);
+    }
+    return response()->json([
+        'success' => false,
+        'message' => 'No hay usuarios disponibles'
+    ]);
+});
+// Route::post('/pages', 'PageController@store');
+// Route::post('/upload-image', 'ImageController@upload');
 /**FIN EDITOR */
 
 
@@ -122,6 +147,9 @@ Route::post('/items/combo-items', [ItemController::class, 'verifyCombo']);
 Route::post('/items/update-items', [ItemController::class, 'updateViews']);
 Route::post('/items/relations-items', [ItemController::class, 'relationsItems']);
 Route::post('/items/variations-items', [ItemController::class, 'variationsItems']);
+// Rutas públicas para presets
+Route::get('/items/{item}/presets', [AdminItemPresetReactController::class, 'getByItemPublic']);
+Route::get('/presets/{preset}', [AdminItemPresetReactController::class, 'getByIdPublic']);
 
 Route::post('/pago', [PaymentController::class, 'charge']);
 Route::get('/pago/{sale_id}', [PaymentController::class, 'getPaymentStatus']);
@@ -135,6 +163,9 @@ Route::get('/mercadopago/pending', [MercadoPagoController::class, 'handlePending
 //pedido
 Route::post('/orders', [MercadoPagoController::class, 'getOrder']);
 
+// TEST ROUTES FOR EDITOR (REMOVE IN PRODUCTION)
+Route::get('/test/albums/{id}', [App\Http\Controllers\AlbumController::class, 'showForTesting']);
+Route::get('/test/item-presets/{id}', [App\Http\Controllers\AlbumController::class, 'getPresetForTestingSimple']);
 
 Route::middleware('auth')->group(function () {
   Route::delete('logout', [AuthController::class, 'destroy'])
@@ -160,6 +191,20 @@ Route::middleware('auth')->group(function () {
     Route::patch('/items/status', [AdminItemController::class, 'status']);
     Route::patch('/items/{field}', [AdminItemController::class, 'boolean']);
     Route::delete('/items/{id}', [AdminItemController::class, 'delete']);
+
+    // Item Presets
+    Route::post('/item-presets', [AdminItemPresetReactController::class, 'save']);
+    Route::post('/item-presets/paginate', [AdminItemPresetReactController::class, 'paginate']);
+    Route::patch('/item-presets/status', [AdminItemPresetReactController::class, 'status']);
+    Route::patch('/item-presets/{field}', [AdminItemPresetReactController::class, 'boolean']);
+    Route::delete('/item-presets/{id}', [AdminItemPresetReactController::class, 'delete']);
+
+    // Nested Item Presets Routes
+    Route::get('/items/{item}/presets', [AdminItemPresetReactController::class, 'getItemPresets']);
+    Route::post('/items/{item}/presets', [AdminItemPresetReactController::class, 'save']);
+    Route::put('/items/{item}/presets/{preset}', [AdminItemPresetReactController::class, 'save']);
+    Route::delete('/items/{item}/presets/{preset}', [AdminItemPresetReactController::class, 'delete']);
+    Route::patch('/items/{item}/presets/{preset}/toggle', [AdminItemPresetReactController::class, 'toggleStatus']);
 
 
     //Route::get('/items/filters', [AdminItemController::class, 'getFilters']);

@@ -55,8 +55,8 @@ const FooterBananaLab = ({ socials = [], pages, generals, contacts }) => {
         emailRef.current.value = null;
     };
     return (
-        <footer className="bg-accent text-white py-12 font-paragraph  text-sm px-primary 2xl:max-w-7xl 2xl:px-0">
-            <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-5">
+        <footer className="bg-accent text-white py-12 font-paragraph  text-sm ">
+            <div className="grid md:grid-cols-3 lg:grid-cols-6 gap-5 px-primary 2xl:max-w-7xl 2xl:px-0 mx-auto">
                 {/* Logo Column */}
                 <div className="max-w-xs lg:col-span-2">
                     <div className="h-28 flex items-center justify-center ">

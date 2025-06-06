@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>Debug - Test Álbum Save</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .results { background: #f5f5f5; padding: 10px; margin: 10px 0; white-space: pre-wrap; }
+        button { padding: 10px 15px; margin: 5px; background: #007cba; color: white; border: none; border-radius: 3px; cursor: pointer; }
+        button:hover { background: #005a87; }
+        .error { background: #ffebee; border-color: #f44336; }
+        .success { background: #e8f5e8; border-color: #4caf50; }
+        .form-group { margin: 10px 0; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { padding: 8px; border: 1px solid #ccc; border-radius: 3px; width: 100%; max-width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Debug - Test Álbum Save</h1>
+          <div class="test-section">
+            <h2>1. Test API Endpoints</h2>
+            <button onclick="testPreset()">Test Preset API</button>
+            <button onclick="testAuth()">Test Auth API</button>
+            <button onclick="testLogin()">Test Login (Temporal)</button>
+            <div id="api-results" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>2. Datos del Preset</h2>
+            <div class="form-group">
+                <label>Item ID:</label>
+                <input type="text" id="itemId" value="9f15b4b9-211e-42a8-a883-16768f1f7315">
+            </div>
+            <div class="form-group">
+                <label>Preset ID:</label>
+                <input type="text" id="presetId" value="3425bcb2-146a-4c6d-910d-e08eabebfeec">
+            </div>
+            <button onclick="loadPresetData()">Cargar Datos del Preset</button>
+            <div id="preset-results" class="results"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>3. Test Guardado de Álbum</h2>
+            <div class="form-group">
+                <label>Título:</label>
+                <input type="text" id="titulo" value="Mi Álbum de Prueba">
+            </div>
+            <div class="form-group">
+                <label>Páginas:</label>
+                <select id="paginas">
+                    <option value="20">20 páginas</option>
+                    <option value="40">40 páginas</option>
+                    <option value="60">60 páginas</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Tapa:</label>
+                <select id="tapa">
+                    <option value="dura">Tapa Dura</option>
+                    <option value="blanda">Tapa Blanda</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Acabado:</label>
+                <select id="acabado">
+                    <option value="mate">Mate</option>
+                    <option value="brillante">Brillante</option>
+                </select>
+            </div>
+            <button onclick="testAlbumSave()">Probar Guardado de Álbum</button>
+            <div id="album-results" class="results"></div>
+        </div>
+    </div>
+
+    <script>
+        const log = (message, elementId = 'api-results') => {
+            const element = document.getElementById(elementId);
+            const timestamp = new Date().toLocaleTimeString();
+            element.textContent += `[${timestamp}] ${message}\n`;
+        };
+
+        const clearLog = (elementId = 'api-results') => {
+            document.getElementById(elementId).textContent = '';
+        };
+
+        async function testPreset() {
+            clearLog('api-results');
+            const presetId = document.getElementById('presetId').value;
+            
+            try {
+                log('Probando endpoint de preset...', 'api-results');
+                const response = await fetch(`/api/presets/${presetId}`);
+                const data = await response.json();
+                
+                log(`Status: ${response.status}`, 'api-results');
+                log(`Respuesta: ${JSON.stringify(data, null, 2)}`, 'api-results');
+            } catch (error) {
+                log(`Error: ${error.message}`, 'api-results');
+            }
+        }        async function testAuth() {
+            clearLog('api-results');
+            
+            try {
+                log('Probando endpoint de autenticación...', 'api-results');
+                const response = await fetch('/api/auth/check');
+                const data = await response.json();
+                
+                log(`Status: ${response.status}`, 'api-results');
+                log(`Respuesta: ${JSON.stringify(data, null, 2)}`, 'api-results');
+            } catch (error) {
+                log(`Error: ${error.message}`, 'api-results');
+            }
+        }
+
+        async function testLogin() {
+            clearLog('api-results');
+            
+            try {
+                log('Probando login temporal...', 'api-results');
+                const response = await fetch('/api/auth/test-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    }
+                });
+                const data = await response.json();
+                
+                log(`Status: ${response.status}`, 'api-results');
+                log(`Respuesta: ${JSON.stringify(data, null, 2)}`, 'api-results');
+                
+                if (data.success) {
+                    log('✅ Login exitoso! Ahora puedes probar guardar el álbum.', 'api-results');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'api-results');
+            }
+        }
+
+        async function loadPresetData() {
+            clearLog('preset-results');
+            const presetId = document.getElementById('presetId').value;
+            
+            try {
+                log('Cargando datos del preset...', 'preset-results');
+                const response = await fetch(`/api/presets/${presetId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const preset = data.data;
+                    log(`Preset cargado exitosamente:`, 'preset-results');
+                    log(`- ID: ${preset.id}`, 'preset-results');
+                    log(`- Nombre: ${preset.name}`, 'preset-results');
+                    log(`- Item ID: ${preset.item_id}`, 'preset-results');
+                    log(`- Descripción: ${preset.description || 'N/A'}`, 'preset-results');
+                    log(`- Páginas opciones: ${JSON.stringify(preset.pages_options)}`, 'preset-results');
+                    log(`- Cover opciones: ${JSON.stringify(preset.cover_options)}`, 'preset-results');
+                    log(`- Finish opciones: ${JSON.stringify(preset.finish_options)}`, 'preset-results');
+                    
+                    // Actualizar los campos del formulario
+                    if (preset.item_id) {
+                        document.getElementById('itemId').value = preset.item_id;
+                    }
+                } else {
+                    log(`Error al cargar preset: ${data.message}`, 'preset-results');
+                }
+            } catch (error) {
+                log(`Error: ${error.message}`, 'preset-results');
+            }
+        }
+
+        async function testAlbumSave() {
+            clearLog('album-results');
+            
+            try {
+                log('Preparando datos del álbum...', 'album-results');
+                
+                const itemId = document.getElementById('itemId').value;
+                const presetId = document.getElementById('presetId').value;
+                const titulo = document.getElementById('titulo').value;
+                const paginas = document.getElementById('paginas').value;
+                const tapa = document.getElementById('tapa').value;
+                const acabado = document.getElementById('acabado').value;
+
+                log(`Item ID: ${itemId}`, 'album-results');
+                log(`Preset ID: ${presetId}`, 'album-results');
+                log(`Título: ${titulo}`, 'album-results');
+                log(`Páginas: ${paginas}`, 'album-results');
+                log(`Tapa: ${tapa}`, 'album-results');
+                log(`Acabado: ${acabado}`, 'album-results');
+
+                if (!itemId || !presetId) {
+                    log('Error: Item ID y Preset ID son requeridos', 'album-results');
+                    return;
+                }
+
+                const formData = new FormData();
+                formData.append('item_id', itemId);
+                formData.append('item_preset_id', presetId);
+                formData.append('title', titulo);
+                formData.append('description', `Álbum personalizado con ${paginas} páginas, tapa ${tapa}, acabado ${acabado}`);
+                formData.append('pages', paginas);
+                formData.append('cover_type', tapa);
+                formData.append('finish_type', acabado);
+
+                log('Enviando datos al servidor...', 'album-results');
+                
+                const response = await fetch('/api/albums', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                    }
+                });
+
+                const result = await response.json();
+                
+                log(`Status de respuesta: ${response.status}`, 'album-results');
+                log(`Respuesta del servidor:`, 'album-results');
+                log(JSON.stringify(result, null, 2), 'album-results');
+
+                if (result.success) {
+                    log('✅ Álbum guardado exitosamente!', 'album-results');
+                    log(`ID del álbum: ${result.data.id}`, 'album-results');
+                    
+                    // Simular la redirección al editor
+                    const editorParams = new URLSearchParams({
+                        album: result.data.id,
+                        item: itemId,
+                        preset: presetId,
+                        pages: paginas,
+                        cover: tapa,
+                        finish: acabado
+                    });
+                    
+                    log(`URL del editor: /editor?${editorParams.toString()}`, 'album-results');
+                } else {
+                    log(`❌ Error al guardar álbum: ${result.message}`, 'album-results');
+                }
+
+            } catch (error) {
+                log(`❌ Error de conexión: ${error.message}`, 'album-results');
+            }
+        }
+
+        // Cargar datos iniciales
+        window.addEventListener('load', () => {
+            log('Página de debug cargada');
+            
+            // Si hay parámetros en la URL, usarlos
+            const urlParams = new URLSearchParams(window.location.search);
+            const itemParam = urlParams.get('item');
+            const presetParam = urlParams.get('preset');
+            
+            if (itemParam) {
+                document.getElementById('itemId').value = itemParam;
+                log(`Item ID desde URL: ${itemParam}`);
+            }
+            
+            if (presetParam) {
+                document.getElementById('presetId').value = presetParam;
+                log(`Preset ID desde URL: ${presetParam}`);
+            }
+        });
+    </script>
+</body>
+</html>

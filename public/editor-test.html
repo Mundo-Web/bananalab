@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Álbum - BananaLab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        .custom-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #c7d2fe #f5f3ff;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f5f3ff;
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #c7d2fe;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Todo el contenido se generará mediante JavaScript -->
+    
+    <div class="container mx-auto p-6">
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+            <h1 class="text-2xl font-bold mb-4">Editor de Álbumes - Test</h1>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Parámetros del editor -->
+                <div class="space-y-4">
+                    <h2 class="text-lg font-semibold">Parámetros del Editor</h2>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Album ID:</label>
+                        <input id="albumId" type="text" value="demo-album-123" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Item ID:</label>
+                        <input id="itemId" type="text" value="demo-item-456" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Preset ID:</label>
+                        <input id="presetId" type="text" value="demo-preset-789" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Páginas:</label>
+                        <input id="pages" type="number" value="5" min="1" max="20" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <button id="loadEditorBtn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700">
+                        Cargar Editor
+                    </button>
+                </div>
+                
+                <!-- Estado del Editor -->
+                <div class="border p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-2">Estado</h2>
+                    <div id="editor-status" class="bg-gray-100 p-4 rounded-lg h-48 overflow-auto text-sm font-mono"></div>
+                </div>
+            </div>
+        </div>
+        </div>
+    </div>
+
+    <script>
+        let currentUser = null;
+
+        async function testLogin() {
+            const statusDiv = document.getElementById('login-status');
+            try {
+                statusDiv.innerHTML = 'Iniciando sesión...';
+                
+                const response = await fetch('/api/test-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email: 'admin@admin.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    currentUser = data;
+                    statusDiv.innerHTML = '<div class="status success">✓ Sesión iniciada correctamente</div>';
+                    loadAlbums(); // Cargar álbumes automáticamente
+                } else {
+                    const errorData = await response.json();
+                    statusDiv.innerHTML = `<div class="status error">✗ Error: ${errorData.message}</div>`;
+                }
+            } catch (error) {
+                statusDiv.innerHTML = `<div class="status error">✗ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function loadAlbums() {
+            const container = document.getElementById('albums-container');
+            try {
+                container.innerHTML = 'Cargando álbumes...';
+                
+                const response = await fetch('/api/albums', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    const albums = data.data || data;
+                    
+                    if (!albums || albums.length === 0) {
+                        container.innerHTML = '<p>No tienes álbumes guardados. <a href="/canva2-demo.html">Crear uno nuevo</a></p>';
+                        return;
+                    }
+
+                    let albumsHtml = '<div class="album-list">';
+                    albums.forEach(album => {
+                        albumsHtml += `
+                            <div class="album-item">
+                                <h3>${album.title}</h3>
+                                <p><strong>Descripción:</strong> ${album.description || 'Sin descripción'}</p>
+                                <p><strong>Páginas:</strong> ${album.selected_pages}</p>
+                                <p><strong>Tipo:</strong> ${album.selected_cover_type}</p>
+                                <p><strong>Acabado:</strong> ${album.selected_finish}</p>
+                                <p><strong>Estado:</strong> <span style="color: ${album.status === 'saved' ? 'green' : 'orange'}">${album.status}</span></p>
+                                <a href="javascript:void(0)" onclick="openEditor('${album.uuid}', '${album.item_id}', '${album.item_preset_id}', ${album.selected_pages})" class="btn">
+                                    Abrir en Editor
+                                </a>
+                            </div>
+                        `;
+                    });
+                    albumsHtml += '</div>';
+                    
+                    container.innerHTML = albumsHtml;
+                } else {
+                    const errorData = await response.json();
+                    container.innerHTML = `<div class="status error">Error al cargar álbumes: ${errorData.message}</div>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<div class="status error">Error: ${error.message}</div>`;
+            }
+        }
+
+        function openEditor(albumId, itemId, presetId, pages) {
+            // Construir URL del editor con parámetros
+            const editorUrl = `/editor?albumId=${albumId}&itemId=${itemId}&presetId=${presetId}&pages=${pages}`;
+            
+            // Abrir en nueva ventana para pruebas (en producción sería window.location.href)
+            window.open(editorUrl, '_blank');
+        }
+
+        // Cargar álbumes al cargar la página si ya está autenticado
+        window.addEventListener('load', () => {
+            // Verificar si ya hay sesión activa
+            fetch('/api/user', { credentials: 'include' })
+                .then(response => {
+                    if (response.ok) {
+                        return response.json();
+                    }
+                    throw new Error('No hay sesión activa');
+                })
+                .then(user => {
+                    currentUser = user;
+                    document.getElementById('login-status').innerHTML = '<div class="status success">✓ Sesión activa</div>';
+                    loadAlbums();
+                })
+                .catch(() => {
+                    // No hay sesión activa, no hacer nada
+                });
+        });
+    </script>
+</body>
+</html>

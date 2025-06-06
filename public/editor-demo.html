@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor de Álbum Demo - BananaLab</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin {
+            animation: spin 1s linear infinite;
+        }
+        .custom-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: #c7d2fe #f5f3ff;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            height: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: #f5f3ff;
+            border-radius: 3px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background-color: #c7d2fe;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <!-- Todo el contenido se generará mediante JavaScript -->
+    
+    <div class="container mx-auto p-6">
+        <div class="bg-white shadow-lg rounded-lg p-6 mb-8">
+            <h1 class="text-2xl font-bold mb-4">Editor de Álbumes - Demo</h1>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Parámetros del editor -->
+                <div class="space-y-4">
+                    <h2 class="text-lg font-semibold">Parámetros del Editor</h2>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Album ID:</label>
+                        <input id="albumId" type="text" value="demo-album-123" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Item ID:</label>
+                        <input id="itemId" type="text" value="demo-item-456" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Preset ID:</label>
+                        <input id="presetId" type="text" value="demo-preset-789" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium mb-1">Páginas:</label>
+                        <input id="pages" type="number" value="5" min="1" max="20" class="w-full px-3 py-2 border rounded-lg">
+                    </div>
+                    
+                    <button id="loadEditorBtn" class="w-full bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700">
+                        Cargar Editor
+                    </button>
+                </div>
+                
+                <!-- Estado del Editor -->
+                <div class="border p-4 rounded-lg">
+                    <h2 class="text-lg font-semibold mb-2">Estado</h2>
+                    <div id="editor-status" class="bg-gray-100 p-4 rounded-lg h-48 overflow-auto text-sm font-mono"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Container para el editor -->
+        <div id="editor-container" class="min-h-screen"></div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        // URL base de la API
+        const API_URL = '/projects/bananalab/public/api';
+        
+        // Función para simular respuestas de API para entradas demo
+        function setupApiMocks() {
+            // Sobrescribir fetch para interceptar llamadas a rutas demo
+            const originalFetch = window.fetch;
+            window.fetch = async function(url, options) {
+                console.log('Interceptando fetch:', url);
+                
+                // Comprobar si es una ruta de demo
+                if (url.includes('/albums/demo-album-123')) {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            id: 'demo-album-123',
+                            title: 'Álbum Demo',
+                            item_id: 'demo-item-456',
+                            item_preset_id: 'demo-preset-789',
+                            cover_image_path: 'demo/album-cover.jpg',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        })
+                    };
+                }
+                
+                if (url.includes('/item-presets/demo-preset-789')) {
+                    return {
+                        ok: true,
+                        json: async () => ({
+                            id: 'demo-preset-789',
+                            name: 'Preset Demo',
+                            item_id: 'demo-item-456',
+                            cover_image: 'demo/preset-cover.jpg',
+                            content_layer_image: 'demo/preset-content.jpg',
+                            final_layer_image: 'demo/preset-final.jpg',
+                            created_at: new Date().toISOString(),
+                            updated_at: new Date().toISOString()
+                        })
+                    };
+                }
+                
+                // Para todas las demás llamadas, usar fetch original
+                return originalFetch(url, options);
+            };
+        }
+        
+        // Función para actualizar el status
+        function updateStatus(message, type = 'info') {
+            const status = document.getElementById('editor-status');
+            const timestamp = new Date().toLocaleTimeString();
+            const typeClass = type === 'error' ? 'text-red-600' : 
+                              type === 'success' ? 'text-green-600' : 'text-blue-600';
+            
+            status.innerHTML += `<div class="${typeClass}">[${timestamp}] ${message}</div>`;
+            status.scrollTop = status.scrollHeight;
+        }
+        
+        // Cargar el editor
+        function loadEditor() {
+            const albumId = document.getElementById('albumId').value;
+            const itemId = document.getElementById('itemId').value;
+            const presetId = document.getElementById('presetId').value;
+            const pages = document.getElementById('pages').value;
+            
+            if (!albumId || !itemId || !presetId || !pages) {
+                updateStatus('Completa todos los campos', 'error');
+                return;
+            }
+            
+            // Actualizar URL con parámetros
+            const params = new URLSearchParams(window.location.search);
+            params.set('albumId', albumId);
+            params.set('itemId', itemId);
+            params.set('presetId', presetId);
+            params.set('pages', pages);
+            
+            const newUrl = window.location.pathname + '?' + params.toString();
+            window.history.pushState({}, '', newUrl);
+            
+            updateStatus('Cargando editor...', 'info');
+            
+            // Configurar interceptors para mock API
+            setupApiMocks();
+            
+            // Cargar el script del editor
+            const script = document.createElement('script');
+            script.src = '/projects/bananalab/public/js/editor-test.js';
+            script.onload = () => updateStatus('Editor cargado correctamente', 'success');
+            script.onerror = () => updateStatus('Error al cargar el editor', 'error');
+            document.body.appendChild(script);
+        }
+        
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            // Configurar botón de carga
+            document.getElementById('loadEditorBtn').addEventListener('click', loadEditor);
+            
+            // Si hay parámetros en la URL, cargar el editor automáticamente
+            const params = new URLSearchParams(window.location.search);
+            if (params.has('albumId')) {
+                document.getElementById('albumId').value = params.get('albumId');
+                document.getElementById('itemId').value = params.get('itemId');
+                document.getElementById('presetId').value = params.get('presetId');
+                document.getElementById('pages').value = params.get('pages') || 5;
+                
+                updateStatus('Auto-cargando editor con parámetros de URL');
+                setTimeout(loadEditor, 500);
+            }
+        });
+    </script>
+</body>
+</html>

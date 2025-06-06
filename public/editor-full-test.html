@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor Integrado - Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; font-family: system-ui, -apple-system, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Simulación del componente Editor principal con los mismos parámetros
+        function EditorSimulado({ albumId = "1", itemId = "test-item", presetId = "1", pages = 20 }) {
+            const [albumData, setAlbumData] = useState(null);
+            const [presetData, setPresetData] = useState(null);
+            const [isLoading, setIsLoading] = useState(true);
+            const [loadError, setLoadError] = useState(null);
+            const [pagesData, setPagesData] = useState([]);
+            const [currentPage, setCurrentPage] = useState(0);
+
+            // Función para obtener parámetros (igual que en Editor.jsx)
+            const getParams = () => {
+                if (albumId && itemId && presetId) {
+                    return { albumId, itemId, presetId, pages: pages || 20 };
+                }
+                
+                const params = new URLSearchParams(window.location.search);
+                return {
+                    albumId: params.get('albumId') || albumId,
+                    itemId: params.get('itemId') || itemId,
+                    presetId: params.get('presetId') || presetId,
+                    pages: parseInt(params.get('pages')) || pages
+                };
+            };
+
+            // Función para cargar datos (igual que en Editor.jsx)
+            const loadAlbumData = async () => {
+                try {
+                    setIsLoading(true);
+                    setLoadError(null);
+                    const params = getParams();
+                    
+                    console.log('🔍 Editor params:', params);
+                    
+                    if (!params.albumId || !params.presetId) {
+                        throw new Error('Faltan parámetros requeridos: albumId y presetId');
+                    }
+
+                    // Detectar modo de prueba y URL base
+                    const isTestMode = window.location.hostname === 'localhost' || 
+                                      window.location.hostname === '127.0.0.1' || 
+                                      params.albumId === '1' ||
+                                      !isNaN(params.albumId);
+
+                    const baseUrl = window.location.origin.includes('bananalab') 
+                        ? '/projects/bananalab/public' 
+                        : '';
+
+                    const albumEndpoint = isTestMode ? 
+                        `${baseUrl}/api/test/albums/${params.albumId}` : 
+                        `${baseUrl}/api/albums/${params.albumId}`;
+                        
+                    const presetEndpoint = isTestMode ? 
+                        `${baseUrl}/api/test/item-presets/${params.presetId}` : 
+                        `${baseUrl}/api/item-presets/${params.presetId}`;
+
+                    console.log('🌐 Using endpoints:', { albumEndpoint, presetEndpoint, isTestMode, baseUrl });
+
+                    // Cargar álbum
+                    console.log('📚 Cargando álbum...');
+                    const albumResponse = await fetch(albumEndpoint, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('📚 Album response status:', albumResponse.status);
+                    
+                    if (!albumResponse.ok) {
+                        throw new Error(`Error al cargar álbum: ${albumResponse.status}`);
+                    }
+
+                    const albumResponseData = await albumResponse.json();
+                    const album = albumResponseData.data || albumResponseData;
+                    console.log('✅ Album loaded:', album);
+                    setAlbumData(album);
+
+                    // Cargar preset
+                    console.log('🎨 Cargando preset...');
+                    const presetResponse = await fetch(presetEndpoint, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        credentials: 'include'
+                    });
+
+                    console.log('🎨 Preset response status:', presetResponse.status);
+
+                    if (!presetResponse.ok) {
+                        throw new Error(`Error al cargar preset: ${presetResponse.status}`);
+                    }
+
+                    const presetResponseData = await presetResponse.json();
+                    const preset = presetResponseData.data || presetResponseData;
+                    console.log('✅ Preset loaded:', preset);
+                    setPresetData(preset);
+
+                    // Crear páginas
+                    createPagesFromPreset(preset, album, params.pages);
+
+                } catch (error) {
+                    console.error('💥 Error loading album data:', error);
+                    setLoadError(error.message);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+
+            // Función para crear páginas (simplificada de Editor.jsx)
+            const createPagesFromPreset = (preset, album, totalPages) => {
+                try {
+                    console.log('📄 Creando páginas...');
+                    
+                    const newPages = [];
+                    
+                    // Helper para URLs de imágenes
+                    const getImageUrl = (imagePath) => {
+                        if (imagePath.startsWith('http')) {
+                            return imagePath;
+                        }
+                        return imagePath.startsWith('/storage/') ? imagePath : `/storage/${imagePath}`;
+                    };
+                    
+                    // Página de portada
+                    newPages.push({
+                        id: "page-cover",
+                        type: "cover",
+                        title: "Portada",
+                        backgroundImage: getImageUrl(preset.cover_image)
+                    });
+
+                    // Páginas de contenido
+                    for (let i = 1; i <= totalPages; i++) {
+                        newPages.push({
+                            id: `page-content-${i}`,
+                            type: "content",
+                            title: `Página ${i}`,
+                            pageNumber: i,
+                            backgroundImage: getImageUrl(preset.content_layer_image)
+                        });
+                    }
+
+                    // Página final
+                    newPages.push({
+                        id: "page-final",
+                        type: "final",
+                        title: "Contraportada",
+                        backgroundImage: getImageUrl(preset.final_layer_image)
+                    });
+
+                    console.log('✅ Created pages:', newPages);
+                    setPagesData(newPages);
+                    setCurrentPage(0);
+                    
+                } catch (error) {
+                    console.error('❌ Error creating pages:', error);
+                    throw error;
+                }
+            };
+
+            useEffect(() => {
+                loadAlbumData();
+            }, []);
+
+            if (isLoading) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600">Cargando editor...</p>
+                        </div>
+                    </div>
+                );
+            }
+
+            if (loadError) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-red-50">
+                        <div className="text-center p-8">
+                            <h2 className="text-2xl font-bold text-red-600 mb-4">Error</h2>
+                            <p className="text-red-800 mb-6">{loadError}</p>
+                            <button 
+                                onClick={loadAlbumData}
+                                className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700"
+                            >
+                                Reintentar
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+
+            const currentPageData = pagesData[currentPage];
+
+            return (
+                <div className="min-h-screen bg-gray-100">
+                    {/* Header */}
+                    <div className="bg-white shadow-sm border-b">
+                        <div className="px-6 py-4">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h1 className="text-xl font-semibold text-gray-800">
+                                        Editor de Álbum
+                                    </h1>
+                                    <p className="text-sm text-gray-600">
+                                        {albumData?.title} • {pagesData.length} páginas
+                                    </p>
+                                </div>
+                                <div className="text-sm text-gray-500">
+                                    Página {currentPage + 1} de {pagesData.length}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex h-screen">
+                        {/* Sidebar - Miniaturas de páginas */}
+                        <div className="w-64 bg-white shadow-sm border-r overflow-y-auto">
+                            <div className="p-4">
+                                <h3 className="font-medium text-gray-800 mb-4">Páginas</h3>
+                                <div className="space-y-2">
+                                    {pagesData.map((page, index) => (
+                                        <div 
+                                            key={page.id} 
+                                            className={`p-2 border rounded-lg cursor-pointer transition-colors ${
+                                                currentPage === index 
+                                                    ? 'border-blue-500 bg-blue-50' 
+                                                    : 'border-gray-200 hover:bg-gray-50'
+                                            }`}
+                                            onClick={() => setCurrentPage(index)}
+                                        >
+                                            <div className="flex items-center space-x-3">
+                                                <div className="w-10 h-14 bg-gray-200 rounded flex-shrink-0 overflow-hidden">
+                                                    {page.backgroundImage && (
+                                                        <img 
+                                                            src={page.backgroundImage} 
+                                                            alt={page.title}
+                                                            className="w-full h-full object-cover"
+                                                        />
+                                                    )}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-medium truncate">{page.title}</p>
+                                                    <p className="text-xs text-gray-500">{page.type}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Área principal del editor */}
+                        <div className="flex-1 flex flex-col">
+                            {/* Navegación de páginas */}
+                            <div className="bg-white border-b px-6 py-3 flex items-center justify-between">
+                                <button 
+                                    onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
+                                    disabled={currentPage === 0}
+                                    className="px-4 py-2 bg-gray-100 rounded-lg disabled:opacity-50 hover:bg-gray-200"
+                                >
+                                    ← Anterior
+                                </button>
+                                
+                                <div className="text-center">
+                                    <h2 className="font-semibold">{currentPageData?.title}</h2>
+                                    <p className="text-sm text-gray-500">{currentPageData?.type}</p>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => setCurrentPage(Math.min(pagesData.length - 1, currentPage + 1))}
+                                    disabled={currentPage === pagesData.length - 1}
+                                    className="px-4 py-2 bg-gray-100 rounded-lg disabled:opacity-50 hover:bg-gray-200"
+                                >
+                                    Siguiente →
+                                </button>
+                            </div>
+
+                            {/* Canvas del editor */}
+                            <div className="flex-1 p-6 bg-gray-50">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+                                        <div className="aspect-[3/4] bg-gray-100 relative">
+                                            {currentPageData?.backgroundImage && (
+                                                <img 
+                                                    src={currentPageData.backgroundImage} 
+                                                    alt={currentPageData.title}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                            )}
+                                            
+                                            {/* Overlay con información */}
+                                            <div className="absolute bottom-4 left-4 bg-black bg-opacity-75 text-white px-3 py-2 rounded">
+                                                <p className="text-sm">
+                                                    {currentPageData?.title} ({currentPageData?.type})
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Panel de información */}
+                            <div className="bg-white border-t p-4">
+                                <div className="max-w-4xl mx-auto">
+                                    <div className="grid grid-cols-3 gap-4 text-sm">
+                                        <div>
+                                            <span className="font-medium">Álbum:</span> {albumData?.title}
+                                        </div>
+                                        <div>
+                                            <span className="font-medium">Preset:</span> {presetData?.name}
+                                        </div>
+                                        <div>
+                                            <span className="font-medium">Estado:</span> 
+                                            <span className="text-green-600 ml-1">✅ Cargado</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        // Renderizar el editor simulado
+        ReactDOM.render(
+            <EditorSimulado 
+                albumId="1" 
+                itemId="test-item" 
+                presetId="1" 
+                pages={5} 
+            />, 
+            document.getElementById('root')
+        );
+    </script>
+</body>
+</html>

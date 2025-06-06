@@ -168,4 +168,20 @@ class Item extends Model
             ->where('id', '!=', $this->id)
             ->get(['id', 'color', 'texture', 'slug', 'image']);
     }
+
+    /**
+     * Relación con ItemPreset (uno a muchos)
+     */
+    public function presets()
+    {
+        return $this->hasMany(ItemPreset::class)->ordered();
+    }
+
+    /**
+     * Relación con presets activos
+     */
+    public function activePresets()
+    {
+        return $this->hasMany(ItemPreset::class)->active()->ordered();
+    }
 }

@@ -202,10 +202,10 @@ const CarruselBananaLab = ({ items, ads }) => {
                     className="h-[330px] w-full pr-[5%] relative lg:w-4/12"
                     variants={imageVariants}
                 >
-                    <a href={ads[0].target_url}>
+                    <a href={ads[0]?.target_url}>
                         <motion.img
-                            src={`/storage/images/ad/${ads[0].image}`}
-                            alt={ads[0].alt_text || ads[0].name}
+                            src={`/storage/images/ad/${ads[0]?.image}`}
+                            alt={ads[0]?.alt_text || ads[0]?.name}
                             className="absolute h-[350px] object-cover object-left lg:w-auto lg:h-full lg:bottom-0 lg:right-0"
                             whileHover={{ scale: 1.02 }}
                         />

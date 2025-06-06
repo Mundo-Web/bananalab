@@ -29,6 +29,8 @@ use App\Http\Controllers\Admin\ComboController as AdminComboController;
 use App\Http\Controllers\Admin\DeliveryPriceController as AdminDeliveryPriceController;
 use App\Http\Controllers\Admin\SaleController as AdminSaleController;
 use App\Http\Controllers\Admin\SubCategoryController as AdminSubCategoryController;
+use App\Http\Controllers\Admin\ItemPresetController as AdminItemPresetController;
+use App\Http\Controllers\Admin\ItemPresetReactController as AdminItemPresetReactController;
 
 use App\Http\Controllers\Admin\FaqController as AdminFaqController;
 use App\Http\Controllers\Admin\RepositoryController as AdminRepositoryController;
@@ -75,6 +77,16 @@ Route::middleware(['can:Admin', 'auth'])->prefix('admin')->group(function () {
     Route::get('/home', [AdminHomeController::class, 'reactView'])->name('Admin/Home.jsx');
     Route::get('/sales', [AdminSaleController::class, 'reactView'])->name('Admin/Sales.jsx');
     Route::get('/items', [AdminItemController::class, 'reactView'])->name('Admin/Items.jsx');
+    Route::get('/item-presets', [AdminItemPresetReactController::class, 'reactView'])->name('Admin/ItemPresets.jsx');
+    
+    // Rutas para Item Presets
+    Route::resource('/item-presets', AdminItemPresetController::class, [
+        'as' => 'admin'
+    ]);
+    Route::patch('/item-presets/{itemPreset}/toggle-status', [AdminItemPresetController::class, 'toggleStatus'])
+        ->name('admin.item-presets.toggle-status');
+    Route::get('/api/items/{item}/presets', [AdminItemPresetController::class, 'getByItem'])
+        ->name('admin.item-presets.by-item');
 
     Route::get('/combos', [AdminComboController::class, 'reactView'])->name('Admin/Combos.jsx');
 

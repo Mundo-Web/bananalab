@@ -33,17 +33,15 @@ import WorkspaceControls from "./components/Elements/WorkspaceControls";
 import BookPreviewModal from "./components/Editor/BookPreview ";
 
 // Componente principal del editor
-export default function EditorLibro() {
-    const [pages, setPages] = useState([
-        {
-            id: "page-1",
-            layout: "layout-1",
-            cells: Array.from({ length: 4 }).map((_, i) => ({
-                id: `cell-1-${i + 1}`,
-                elements: [],
-            })),
-        },
-    ]);
+export default function EditorLibro({ albumId, itemId, presetId, pages: initialPages }) {
+    // Estados para el álbum y preset
+    const [albumData, setAlbumData] = useState(null);
+    const [presetData, setPresetData] = useState(null);
+    const [isLoading, setIsLoading] = useState(true);
+    const [loadError, setLoadError] = useState(null);
+    
+    // Estado inicial de páginas - se actualizará cuando carguemos el preset
+    const [pages, setPages] = useState([]);
 
     const [currentPage, setCurrentPage] = useState(0);
     const [selectedElement, setSelectedElement] = useState(null);
@@ -62,10 +60,294 @@ export default function EditorLibro() {
         cellId: null,
     });
     const [isBookPreviewOpen, setIsBookPreviewOpen] = useState(false);
+
+    // Función para obtener parámetros del componente o de la URL como fallback
+    const getParams = () => {
+        // Si se proporcionaron props, usarlos
+        if (albumId && itemId && presetId) {
+            return {
+                albumId,
+                itemId,
+                presetId,
+                pages: initialPages || 20
+            };
+        }
+        
+        // Fallback: obtener de la URL
+        const params = new URLSearchParams(window.location.search);
+        return {
+            albumId: params.get('albumId'),
+            itemId: params.get('itemId'),
+            presetId: params.get('presetId'),
+            pages: parseInt(params.get('pages')) || 20
+        };
+    };
+
+    // Función para cargar datos del álbum y preset
+    const loadAlbumData = async () => {
+        try {
+            setIsLoading(true);
+            setLoadError(null);
+            const params = getParams();
+            
+            console.log('🔍 Editor params:', params);
+            
+            if (!params.albumId || !params.presetId) {
+                throw new Error('Faltan parámetros requeridos: albumId y presetId');
+            }
+
+            // Detectar si estamos en modo de desarrollo/testing
+            const isTestMode = window.location.hostname === 'localhost' || 
+                              window.location.hostname === '127.0.0.1' || 
+                              params.albumId === '1' ||
+                              !isNaN(params.albumId);
+
+            // Determinar la URL base correcta
+            const baseUrl = window.location.origin.includes('bananalab') 
+                ? '/projects/bananalab/public' 
+                : '';
+
+            const albumEndpoint = isTestMode ? 
+                `${baseUrl}/api/test/albums/${params.albumId}` : 
+                `${baseUrl}/api/albums/${params.albumId}`;
+                
+            const presetEndpoint = isTestMode ? 
+                `${baseUrl}/api/test/item-presets/${params.presetId}` : 
+                `${baseUrl}/api/item-presets/${params.presetId}`;
+
+            console.log('🌐 Using endpoints:', { albumEndpoint, presetEndpoint, isTestMode, baseUrl });
+
+            // Cargar datos del álbum
+            console.log('📚 Cargando álbum...');
+            const albumResponse = await fetch(albumEndpoint, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
+
+            console.log('📚 Album response status:', albumResponse.status);
+            
+            if (!albumResponse.ok) {
+                const errorText = await albumResponse.text();
+                console.error('❌ Album response error:', errorText);
+                throw new Error(`Error al cargar álbum: ${albumResponse.status} ${albumResponse.statusText}`);
+            }
+
+            const albumResponseData = await albumResponse.json();
+            console.log('✅ Album response data:', albumResponseData);
+            
+            // Extraer datos del álbum (puede estar en .data o directamente en la respuesta)
+            const album = albumResponseData.data || albumResponseData;
+            console.log('📚 Album loaded:', album);
+            setAlbumData(album);
+
+            // Cargar datos del preset
+            console.log('🎨 Cargando preset...');
+            const presetResponse = await fetch(presetEndpoint, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
+
+            console.log('🎨 Preset response status:', presetResponse.status);
+
+            if (!presetResponse.ok) {
+                const errorText = await presetResponse.text();
+                console.error('❌ Preset response error:', errorText);
+                throw new Error(`Error al cargar preset: ${presetResponse.status} ${presetResponse.statusText}`);
+            }
+
+            const presetResponseData = await presetResponse.json();
+            console.log('✅ Preset response data:', presetResponseData);
+            
+            // Extraer datos del preset (puede estar en .data o directamente en la respuesta)
+            const preset = presetResponseData.data || presetResponseData;
+            console.log('🎨 Preset loaded:', preset);
+            setPresetData(preset);
+
+            // Crear páginas basadas en el preset y álbum
+            console.log('📄 Creando páginas...');
+            await createPagesFromPreset(preset, album, params.pages);
+
+        } catch (error) {
+            console.error('💥 Error loading album data:', error);
+            setLoadError(error.message);
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    // Función para crear páginas basadas en el preset
+    const createPagesFromPreset = (preset, album, totalPages) => {
+        try {
+            console.log('Creating pages from preset:', preset);
+            console.log('Album data:', album);
+            console.log('Total pages requested:', totalPages);
+            
+            const newPages = [];
+            
+            // Validar que el preset tenga las imágenes necesarias
+            if (!preset.cover_image || !preset.content_layer_image || !preset.final_layer_image) {
+                throw new Error('El preset no tiene todas las imágenes requeridas');
+            }
+            
+            // Función helper para obtener la URL correcta de la imagen
+            const getImageUrl = (imagePath) => {
+                if (imagePath.startsWith('http')) {
+                    return imagePath; // URL externa (datos de prueba)
+                }
+                return imagePath.startsWith('/storage/') ? imagePath : `/storage/${imagePath}`;
+            };
+            
+            // 1. PÁGINA DE PORTADA (cover_image)
+            const coverPage = {
+                id: "page-cover",
+                type: "cover",
+                layout: "layout-1",
+                cells: [{
+                    id: "cell-cover-1",
+                    elements: [
+                        // Imagen base del preset
+                        {
+                            id: "cover-base",
+                            type: "image",
+                            content: getImageUrl(preset.cover_image),
+                            position: { x: 0, y: 0 },
+                            size: { width: 100, height: 100 },
+                            filters: {},
+                            mask: "none",
+                            zIndex: 1,
+                            locked: true // No editable
+                        },
+                        // Imagen personalizada del álbum (si existe)
+                        ...(album.cover_image_path ? [{
+                            id: "cover-custom",
+                            type: "image", 
+                            content: getImageUrl(album.cover_image_path),
+                            position: { x: 10, y: 10 },
+                            size: { width: 80, height: 80 },
+                            filters: {},
+                            mask: "none",
+                            zIndex: 2
+                        }] : [])
+                    ]
+                }]
+            };
+            
+            newPages.push(coverPage);
+
+            // 2. PÁGINAS DE CONTENIDO (content_layer_image)
+            for (let i = 1; i <= totalPages; i++) {
+                const contentPage = {
+                    id: `page-content-${i}`,
+                    type: "content",
+                    pageNumber: i,
+                    layout: "layout-1",
+                    cells: [{
+                        id: `cell-content-${i}-1`,
+                        elements: [
+                            // Imagen base de contenido del preset
+                            {
+                                id: `content-base-${i}`,
+                                type: "image",
+                                content: getImageUrl(preset.content_layer_image),
+                                position: { x: 0, y: 0 },
+                                size: { width: 100, height: 100 },
+                                filters: {},
+                                mask: "none",
+                                zIndex: 1,
+                                locked: true // Base no editable
+                            }
+                            // Aquí el usuario podrá agregar más elementos
+                        ]
+                    }]
+                };
+                
+                newPages.push(contentPage);
+            }
+
+            // 3. PÁGINA FINAL/CONTRAPORTADA (final_layer_image)
+            const finalPage = {
+                id: "page-final",
+                type: "final",
+                layout: "layout-1", 
+                cells: [{
+                    id: "cell-final-1",
+                    elements: [
+                        // Imagen final del preset
+                        {
+                            id: "final-base",
+                            type: "image",
+                            content: getImageUrl(preset.final_layer_image),
+                            position: { x: 0, y: 0 },
+                            size: { width: 100, height: 100 },
+                            filters: {},
+                            mask: "none",
+                            zIndex: 1,
+                            locked: true // No editable
+                        }
+                    ]
+                }]
+            };
+            
+            newPages.push(finalPage);
+
+            console.log('✅ Created pages:', newPages);
+            setPages(newPages);
+            setCurrentPage(0); // Empezar en la portada
+            
+        } catch (error) {
+            console.error('❌ Error creating pages:', error);
+            throw error;
+        }
+    };
+
+    // Efecto para cargar datos al montar el componente
+    useEffect(() => {
+        loadAlbumData();
+    }, []);
+
+    // Función para obtener el título de la página actual
+    const getCurrentPageTitle = () => {
+        if (pages.length === 0) return "Cargando...";
+        
+        const page = pages[currentPage];
+        if (!page) return "Página";
+        
+        switch (page.type) {
+            case "cover":
+                return "Portada";
+            case "content":
+                return `Página ${page.pageNumber}`;
+            case "final":
+                return "Contraportada";
+            default:
+                return `Página ${currentPage + 1}`;
+        }
+    };
+
+    // Función para verificar si la página actual es editable
+    const isCurrentPageEditable = () => {
+        if (pages.length === 0) return false;
+        const page = pages[currentPage];
+        // La portada y contraportada tienen elementos bloqueados, pero se pueden agregar elementos
+        return page?.type === "content";
+    };
+
     // Modifica la función getSelectedElement para que use useCallback
     const getSelectedElement = useCallback(() => {
-        if (!selectedElement || !selectedCell) return null;
-        const cell = pages[currentPage].cells.find(
+        if (!selectedElement || !selectedCell || pages.length === 0) return null;
+        
+        const currentPageData = pages[currentPage];
+        if (!currentPageData) return null;
+        
+        const cell = currentPageData.cells.find(
             (cell) => cell.id === selectedCell
         );
         if (!cell) return null;
@@ -74,6 +356,27 @@ export default function EditorLibro() {
 
     // Añade esta función para manejar la selección de elementos
     const handleSelectElement = (elementId, cellId) => {
+        // Verificar si el elemento está bloqueado
+        if (cellId) {
+            const cell = pages[currentPage].cells.find(cell => cell.id === cellId);
+            const element = cell?.elements.find(el => el.id === elementId);
+            
+            if (element?.locked) {
+                console.log('Elemento bloqueado, no se puede seleccionar');
+                // Mostrar mensaje temporal (opcional)
+                const message = document.createElement('div');
+                message.className = 'fixed top-4 right-4 bg-amber-100 border border-amber-400 text-amber-700 px-4 py-2 rounded-lg z-50';
+                message.textContent = 'Este elemento es parte del diseño base y no se puede editar';
+                document.body.appendChild(message);
+                setTimeout(() => {
+                    if (document.body.contains(message)) {
+                        document.body.removeChild(message);
+                    }
+                }, 3000);
+                return;
+            }
+        }
+        
         // Siempre actualizar la celda seleccionada si se proporciona
         if (cellId) {
             setSelectedCell(cellId);
@@ -109,23 +412,16 @@ export default function EditorLibro() {
 
     // Obtener el layout actual
     const getCurrentLayout = () => {
+        if (pages.length === 0) return layouts[0];
+        
+        const currentPageData = pages[currentPage];
+        if (!currentPageData) return layouts[0];
+        
         return (
-            layouts.find((layout) => layout.id === pages[currentPage].layout) ||
+            layouts.find((layout) => layout.id === currentPageData.layout) ||
             layouts[0]
         );
     };
-
-    // Obtener el elemento seleccionado
-    /* const getSelectedElement = () => {
-        if (!selectedElement || !selectedCell) return null;
-
-        const cell = pages[currentPage].cells.find(
-            (cell) => cell.id === selectedCell
-        );
-        if (!cell) return null;
-
-        return cell.elements.find((el) => el.id === selectedElement);
-    };*/
 
     // Actualizar el estado de las páginas
     const updatePages = (newPages) => {
@@ -171,44 +467,125 @@ export default function EditorLibro() {
         setSelectedCell(null);
     };
 
-    // Añadir una nueva página
+    // Añadir una nueva página de contenido
     const addPage = () => {
-        const newPageId = `page-${pages.length + 1}`;
-        const layout = getCurrentLayout();
+        if (!presetData) return;
+        
+        // Encontrar el último número de página de contenido
+        const contentPages = pages.filter(p => p.type === "content");
+        const lastPageNumber = contentPages.length > 0 
+            ? Math.max(...contentPages.map(p => p.pageNumber))
+            : 0;
+        
+        const newPageNumber = lastPageNumber + 1;
+        const newPageId = `page-content-${newPageNumber}`;
+        
         const newPage = {
             id: newPageId,
-            layout: layout.id,
-            cells: Array.from({ length: layout.cells }).map((_, index) => ({
-                id: `cell-${newPageId}-${index + 1}`,
-                elements: [],
-            })),
+            type: "content",
+            pageNumber: newPageNumber,
+            layout: "layout-1",
+            cells: [{
+                id: `cell-content-${newPageNumber}-1`,
+                elements: [
+                    // Imagen base de contenido del preset
+                    {
+                        id: `content-base-${newPageNumber}`,
+                        type: "image",
+                        content: `/storage/${presetData.content_layer_image}`,
+                        position: { x: 0, y: 0 },
+                        size: { width: 100, height: 100 },
+                        filters: {},
+                        mask: "none",
+                        zIndex: 1,
+                        locked: true // Base no editable
+                    }
+                ]
+            }]
         };
 
-        const updatedPages = [...pages, newPage];
+        // Insertar antes de la página final
+        const updatedPages = [...pages];
+        const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
+        
+        if (finalPageIndex > -1) {
+            updatedPages.splice(finalPageIndex, 0, newPage);
+        } else {
+            updatedPages.push(newPage);
+        }
+
         updatePages(updatedPages);
-        setCurrentPage(updatedPages.length - 1);
+        
+        // Navegar a la nueva página
+        const newPageIndex = updatedPages.findIndex(p => p.id === newPageId);
+        setCurrentPage(newPageIndex);
     };
 
-    // Eliminar la página actual
+    // Eliminar la página actual (solo páginas de contenido)
     const deleteCurrentPage = () => {
-        if (pages.length <= 1) return;
+        if (pages.length <= 3) return; // Mínimo: portada + 1 contenido + final
+        
+        const currentPageData = pages[currentPage];
+        
+        // No permitir borrar portada ni contraportada
+        if (currentPageData.type === "cover" || currentPageData.type === "final") {
+            console.log('No se puede eliminar la portada o contraportada');
+            return;
+        }
+
+        // Confirmar eliminación
+        if (!confirm(`¿Estás seguro de eliminar la ${currentPageData.type === "content" ? `página ${currentPageData.pageNumber}` : "página"}?`)) {
+            return;
+        }
 
         const updatedPages = pages.filter((_, index) => index !== currentPage);
         updatePages(updatedPages);
         setCurrentPage(Math.min(currentPage, updatedPages.length - 1));
     };
 
-    // Duplicar la página actual
+    // Duplicar la página actual (solo páginas de contenido)
     const duplicateCurrentPage = () => {
         const currentPageData = pages[currentPage];
+        
+        // Solo duplicar páginas de contenido
+        if (currentPageData.type !== "content") {
+            console.log('Solo se pueden duplicar páginas de contenido');
+            return;
+        }
+
+        // Crear una copia de la página actual
+        const lastPageNumber = Math.max(...pages.filter(p => p.type === "content").map(p => p.pageNumber));
+        const newPageNumber = lastPageNumber + 1;
+        
         const newPage = {
             ...JSON.parse(JSON.stringify(currentPageData)),
-            id: `page-${pages.length + 1}-copy`,
+            id: `page-content-${newPageNumber}`,
+            pageNumber: newPageNumber,
+            cells: currentPageData.cells.map(cell => ({
+                ...cell,
+                id: `cell-content-${newPageNumber}-${cell.id.split('-').pop()}`,
+                elements: cell.elements.map(element => ({
+                    ...element,
+                    id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+                }))
+            }))
         };
 
-        const updatedPages = [...pages, newPage];
+        // Insertar antes de la página final
+        const updatedPages = [...pages];
+        const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
+        
+        if (finalPageIndex > -1) {
+            updatedPages.splice(finalPageIndex, 0, newPage);
+        } else {
+            updatedPages.push(newPage);
+        }
+
         updatePages(updatedPages);
-        setCurrentPage(updatedPages.length - 1);
+        
+        // Navegar a la nueva página
+        const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
+        setCurrentPage(newPageIndex);
     };
 
     // Añadir un elemento a una celda
@@ -402,6 +779,39 @@ export default function EditorLibro() {
 
     return (
         <DndProvider backend={HTML5Backend}>
+            {/* Pantalla de carga */}
+            {isLoading ? (
+                <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                    <div className="bg-white p-8 rounded-lg shadow-lg text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+                        <h2 className="text-xl font-semibold text-gray-800 mb-2">Cargando Editor</h2>
+                        <p className="text-gray-600">Preparando tu álbum personalizado...</p>
+                    </div>
+                </div>
+            ) : pages.length === 0 || loadError ? (
+                <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                    <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
+                        <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
+                        <p className="text-gray-600 mb-4">
+                            {loadError || "No se pudieron cargar los datos del álbum."}
+                        </p>
+                        <div className="space-y-2">
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                            >
+                                Reintentar
+                            </button>
+                            <button 
+                                onClick={() => window.history.back()} 
+                                className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                            >
+                                Volver
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            ) : (
             <div className="bg-white py-4">
                 <div className="flex flex-col min-h-screen  mx-auto  max-w-[82rem]">
                     {/* Header */}
@@ -411,6 +821,26 @@ export default function EditorLibro() {
                                 <ChevronLeft className="h-5 w-5 mr-1" />
                                 Regresar
                             </Button>
+                            {/* Información del álbum */}
+                            <div className="ml-4">
+                                <h1 className="text-lg font-semibold text-gray-800">
+                                    {albumData?.title || "Álbum Sin Título"}
+                                </h1>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-sm text-gray-600">
+                                        {getCurrentPageTitle()} {pages.length > 0 && `• ${pages.length} páginas total`}
+                                    </p>
+                                    {pages.length > 0 && (
+                                        <span className={`text-xs px-2 py-1 rounded-full ${
+                                            isCurrentPageEditable() 
+                                            ? "bg-green-100 text-green-700" 
+                                            : "bg-amber-100 text-amber-700"
+                                        }`}>
+                                            {isCurrentPageEditable() ? "✏️ Editable" : "🔒 Solo vista"}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <div className="flex gap-2">
@@ -1563,15 +1993,26 @@ export default function EditorLibro() {
                                             <button
                                                 className="p-1 rounded hover:bg-gray-100"
                                                 onClick={duplicateCurrentPage}
-                                                title="Duplicar página"
+                                                disabled={pages[currentPage]?.type !== "content"}
+                                                title={
+                                                    pages[currentPage]?.type !== "content" 
+                                                    ? "Solo se pueden duplicar páginas de contenido"
+                                                    : "Duplicar página"
+                                                }
                                             >
                                                 <Copy className="h-4 w-4" />
                                             </button>
                                             <button
                                                 className="p-1 rounded hover:bg-gray-100"
                                                 onClick={deleteCurrentPage}
-                                                disabled={pages.length <= 1}
-                                                title="Eliminar página"
+                                                disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
+                                                title={
+                                                    pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final" 
+                                                    ? "No se puede eliminar la portada o contraportada"
+                                                    : pages.length <= 3 
+                                                    ? "Debe haber al menos una página de contenido"
+                                                    : "Eliminar página"
+                                                }
                                             >
                                                 <Trash2 className="h-4 w-4" />
                                             </button>
@@ -1586,24 +2027,49 @@ export default function EditorLibro() {
                                     </div>
 
                                     <div className="flex overflow-x-auto gap-3 custom-scroll">
-                                        {pages?.map((page, index) => (
-                                            <div
-                                                key={page.id}
-                                                className={`flex-shrink-0 w-40 p-4 `}
-                                                onClick={() =>
-                                                    setCurrentPage(index)
-                                                }
-                                            >
+                                        {pages?.map((page, index) => {
+                                            // Obtener título de página basado en el tipo
+                                            let pageTitle = "Página";
+                                            let pageIcon = "";
+                                            let pageColor = "bg-gray-100";
+                                            
+                                            if (page.type === "cover") {
+                                                pageTitle = "Portada";
+                                                pageIcon = "📖";
+                                                pageColor = "bg-purple-100";
+                                            } else if (page.type === "content") {
+                                                pageTitle = `Pág. ${page.pageNumber}`;
+                                                pageIcon = "📄";
+                                                pageColor = "bg-blue-100";
+                                            } else if (page.type === "final") {
+                                                pageTitle = "Contraportada";
+                                                pageIcon = "📚";
+                                                pageColor = "bg-green-100";
+                                            }
+                                            
+                                            return (
                                                 <div
-                                                    className={`relative bg-gray-100 h-48 rounded-md overflow-hidden ${
-                                                        currentPage === index
-                                                            ? "border border-primary"
-                                                            : ""
-                                                    }`}
+                                                    key={page.id}
+                                                    className={`flex-shrink-0 w-40 p-4 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors`}
+                                                    onClick={() => setCurrentPage(index)}
                                                 >
-                                                    <span className="absolute top-1 left-1 text-xs bg-white/80 px-1 rounded z-10">
-                                                        Pág. {index + 1}
-                                                    </span>
+                                                    <div
+                                                        className={`relative ${pageColor} h-48 rounded-md overflow-hidden border-2 transition-all ${
+                                                            currentPage === index
+                                                                ? "border-purple-500 shadow-lg"
+                                                                : "border-transparent"
+                                                        }`}
+                                                    >
+                                                        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-10">
+                                                            <span className="text-xs bg-white/90 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+                                                                {pageIcon} {pageTitle}
+                                                            </span>
+                                                            {page.type === "content" && (
+                                                                <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
+                                                                    Editable
+                                                                </span>
+                                                            )}
+                                                        </div>
 
                                                     {pageThumbnails[page.id] ? (
                                                         <img
@@ -1643,7 +2109,8 @@ export default function EditorLibro() {
                                                     )}
                                                 </div>
                                             </div>
-                                        ))}
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             </aside>
@@ -1651,6 +2118,7 @@ export default function EditorLibro() {
                     </div>
                 </div>
             </div>
+            )}
         </DndProvider>
     );
 }
@@ -1670,4 +2138,4 @@ export default function EditorLibro() {
         background-color: #c7d2fe;
         border-radius: 3px;
     }
-`}</style>;
+`}</style>

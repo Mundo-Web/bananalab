@@ -1,1 +1,0 @@
-var e=Object.defineProperty;var o=(t,s,i)=>s in t?e(t,s,{enumerable:!0,configurable:!0,writable:!0,value:i}):t[s]=i;var a=(t,s,i)=>o(t,typeof s!="symbol"?s+"":s,i);import{B as p}from"./ModalImportItem-Cjgn8e-W.js";class n extends p{constructor(){super(...arguments);a(this,"path","subscriptions")}}export{n as S};

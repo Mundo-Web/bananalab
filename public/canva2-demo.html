@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canva2 Demo - Album Save Flow</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <h1 class="text-2xl font-bold text-gray-900">BananaLab Canvas Demo</h1>
+                <div class="flex items-center space-x-4">
+                    <div id="auth-indicator" class="text-sm">
+                        <span class="text-gray-500">Checking auth...</span>
+                    </div>
+                    <button id="login-btn" class="hidden bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">
+                        Login
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Canvas Area -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h2 class="text-xl font-semibold mb-4">Canvas Preview</h2>
+                    <div class="border-2 border-dashed border-gray-300 rounded-lg h-96 flex items-center justify-center">
+                        <div class="text-center text-gray-500">
+                            <div class="w-16 h-16 bg-gray-200 rounded-lg mx-auto mb-4 flex items-center justify-center">
+                                <span class="text-2xl">🎨</span>
+                            </div>
+                            <p>Canvas Preview Area</p>
+                            <p class="text-sm">Your customization will appear here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Controls Panel -->
+            <div class="space-y-6">
+                <!-- Customization Options -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">Customization Options</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Background Color</label>
+                            <input type="color" id="bg-color" value="#ffffff" 
+                                   class="w-full h-10 rounded border">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Text Color</label>
+                            <input type="color" id="text-color" value="#000000" 
+                                   class="w-full h-10 rounded border">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Layout</label>
+                            <select id="layout" class="w-full p-2 border rounded">
+                                <option value="grid">Grid</option>
+                                <option value="list">List</option>
+                                <option value="masonry">Masonry</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Album Save Section -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">Save Album</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Album Name</label>
+                            <input type="text" id="album-name" placeholder="My Awesome Album" 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                            <textarea id="album-description" placeholder="Album description..." 
+                                      class="w-full p-2 border rounded" rows="3"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Cover Image</label>
+                            <input type="file" id="cover-image" accept="image/*" 
+                                   class="w-full p-2 border rounded">
+                        </div>
+                        <button id="create-project-btn" 
+                                class="w-full bg-green-600 text-white py-3 px-4 rounded-md hover:bg-green-700 font-medium">
+                            🎯 Crear Proyecto (Save Album)
+                        </button>
+                    </div>
+                    <div id="save-status" class="mt-4"></div>
+                </div>
+
+                <!-- Test Results -->
+                <div class="bg-white rounded-lg shadow p-6">
+                    <h3 class="text-lg font-semibold mb-4">Activity Log</h3>
+                    <div id="activity-log" class="space-y-2 max-h-64 overflow-y-auto">
+                        <!-- Activity items will be added here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="login-modal" class="fixed inset-0 bg-black bg-opacity-50 items-center justify-center z-50" style="display: none;">
+        <div class="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <h2 class="text-2xl font-bold mb-6 text-center">Login Required</h2>
+            <p class="text-gray-600 mb-6 text-center">
+                You need to be logged in to save your album. Please log in to continue.
+            </p>
+            <div class="space-y-4">
+                <input type="email" id="login-email" placeholder="Email" 
+                       class="w-full p-3 border rounded-md">
+                <input type="password" id="login-password" placeholder="Password" 
+                       class="w-full p-3 border rounded-md">
+                <button id="submit-login" 
+                        class="w-full bg-blue-600 text-white py-3 rounded-md hover:bg-blue-700">
+                    Login
+                </button>
+                <button id="close-modal" 
+                        class="w-full border border-gray-300 py-3 rounded-md hover:bg-gray-50">
+                    Cancel
+                </button>
+            </div>
+            <div id="login-error" class="mt-4 text-red-600 text-sm hidden"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let isAuthenticated = false;
+        let currentUser = null;
+
+        // Utility function to add activity log
+        function addActivity(message, type = 'info') {
+            const log = document.getElementById('activity-log');
+            const item = document.createElement('div');
+            const colors = {
+                info: 'bg-blue-100 text-blue-800',
+                success: 'bg-green-100 text-green-800',
+                error: 'bg-red-100 text-red-800',
+                warning: 'bg-yellow-100 text-yellow-800'
+            };
+            item.className = `p-2 rounded text-sm ${colors[type] || colors.info}`;
+            item.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(item);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Check authentication status
+        async function checkAuth() {
+            try {
+                addActivity('Checking authentication status...', 'info');
+                
+                const response = await fetch(`${API_BASE}/auth/check`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: {
+                        'Accept': 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.authenticated) {
+                    isAuthenticated = true;
+                    currentUser = data.user;
+                    updateAuthUI(true);
+                    addActivity(`✅ Authenticated as: ${currentUser?.name || currentUser?.email || 'User'}`, 'success');
+                } else {
+                    isAuthenticated = false;
+                    currentUser = null;
+                    updateAuthUI(false);
+                    addActivity('❌ Not authenticated', 'error');
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+                addActivity(`❌ Auth check failed: ${error.message}`, 'error');
+                updateAuthUI(false);
+            }
+        }
+
+        // Update authentication UI
+        function updateAuthUI(authenticated) {
+            const indicator = document.getElementById('auth-indicator');
+            const loginBtn = document.getElementById('login-btn');
+            
+            if (authenticated) {
+                indicator.innerHTML = `<span class="text-green-600">✅ ${currentUser?.name || 'Logged in'}</span>`;
+                loginBtn.classList.add('hidden');
+            } else {
+                indicator.innerHTML = `<span class="text-red-600">❌ Not logged in</span>`;
+                loginBtn.classList.remove('hidden');
+            }
+        }        // Show login modal
+        function showLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.style.display = 'flex';
+            addActivity('🔐 Login modal opened', 'info');
+        }
+
+        // Hide login modal
+        function hideLoginModal() {
+            const modal = document.getElementById('login-modal');
+            modal.style.display = 'none';
+            document.getElementById('login-error').classList.add('hidden');
+        }
+
+        // Handle login
+        async function handleLogin() {
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            const errorDiv = document.getElementById('login-error');
+
+            if (!email || !password) {
+                errorDiv.textContent = 'Please enter both email and password';
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                addActivity('🔄 Attempting login...', 'info');
+                
+                // Note: This is a demo - in a real app you'd have a proper login endpoint
+                errorDiv.textContent = 'Login functionality is not implemented in this demo. For testing, use the auth check.';
+                errorDiv.classList.remove('hidden');
+                addActivity('ℹ️ Login demo - not implemented', 'warning');
+                
+            } catch (error) {
+                errorDiv.textContent = 'Login failed: ' + error.message;
+                errorDiv.classList.remove('hidden');
+                addActivity(`❌ Login failed: ${error.message}`, 'error');
+            }
+        }
+
+        // Save album
+        async function saveAlbum() {
+            // Check authentication first
+            if (!isAuthenticated) {
+                addActivity('❌ Authentication required for saving album', 'error');
+                showLoginModal();
+                return;
+            }
+
+            try {
+                addActivity('🎨 Starting album save...', 'info');
+                
+                const albumName = document.getElementById('album-name').value || 'Untitled Album';
+                const albumDescription = document.getElementById('album-description').value || '';
+                const coverImage = document.getElementById('cover-image').files[0];
+                
+                // Get customization data
+                const customizationData = {
+                    backgroundColor: document.getElementById('bg-color').value,
+                    textColor: document.getElementById('text-color').value,
+                    layout: document.getElementById('layout').value,
+                    timestamp: new Date().toISOString()
+                };
+
+                // Create FormData
+                const formData = new FormData();
+                formData.append('name', albumName);
+                formData.append('description', albumDescription);
+                formData.append('customization_data', JSON.stringify(customizationData));
+                
+                if (coverImage) {
+                    formData.append('cover_image', coverImage);
+                    addActivity(`📷 Added cover image: ${coverImage.name}`, 'info');
+                }
+
+                addActivity(`📝 Album data: ${albumName}`, 'info');
+                document.getElementById('save-status').innerHTML = `
+                    <div class="text-blue-600">🔄 Saving album...</div>
+                `;
+
+                const response = await fetch(`${API_BASE}/albums`, {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include',
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('save-status').innerHTML = `
+                        <div class="text-green-600">✅ Album saved successfully!</div>
+                        <div class="text-sm text-gray-600 mt-1">ID: ${data.album?.id || 'Unknown'}</div>
+                    `;
+                    addActivity(`🎉 Album saved successfully! ID: ${data.album?.id || 'Unknown'}`, 'success');
+                    
+                    // Clear form
+                    document.getElementById('album-name').value = '';
+                    document.getElementById('album-description').value = '';
+                    document.getElementById('cover-image').value = '';
+                } else {
+                    throw new Error(data.message || `HTTP ${response.status}`);
+                }
+            } catch (error) {
+                console.error('Save error:', error);
+                document.getElementById('save-status').innerHTML = `
+                    <div class="text-red-600">❌ Save failed: ${error.message}</div>
+                `;
+                addActivity(`❌ Save failed: ${error.message}`, 'error');
+                
+                if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                    addActivity('🔐 Authentication expired, please login again', 'warning');
+                    isAuthenticated = false;
+                    updateAuthUI(false);
+                }
+            }
+        }
+
+        // Event listeners
+        document.getElementById('login-btn').addEventListener('click', showLoginModal);
+        document.getElementById('close-modal').addEventListener('click', hideLoginModal);
+        document.getElementById('submit-login').addEventListener('click', handleLogin);
+        document.getElementById('create-project-btn').addEventListener('click', saveAlbum);
+
+        // Close modal on backdrop click
+        document.getElementById('login-modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideLoginModal();
+            }
+        });
+
+        // Initial setup
+        addActivity('🚀 Canva2 Demo initialized', 'success');
+        checkAuth();
+    </script>
+</body>
+</html>

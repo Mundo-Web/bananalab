@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editor Simple Test - BananaLab</title>
+    <style>
+        body { 
+            font-family: system-ui, -apple-system, sans-serif; 
+            margin: 20px;
+            line-height: 1.6;
+        }
+        .test-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .test-link {
+            display: inline-block;
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        .test-link:hover {
+            background: #0056b3;
+        }
+        pre {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Editor Testing Dashboard</h1>
+    
+    <div class="test-section">
+        <h2>🔗 API Endpoint Tests</h2>
+        <p>Test the backend API endpoints directly:</p>
+        <a href="/projects/bananalab/public/api/test/albums/1" class="test-link" target="_blank">📚 Test Album API</a>
+        <a href="/projects/bananalab/public/api/test/item-presets/1" class="test-link" target="_blank">🎨 Test Preset API</a>
+    </div>
+
+    <div class="test-section">
+        <h2>🖼️ Editor Component Tests</h2>
+        <p>Test the Editor component with different configurations:</p>
+        <a href="editor-test-working.html" class="test-link" target="_blank">🎯 Basic Editor Test</a>
+        <a href="editor-full-test.html" class="test-link" target="_blank">🚀 Full Editor Test</a>
+    </div>
+
+    <div class="test-section">
+        <h2>⚙️ Editor with URL Parameters</h2>
+        <p>Test the Editor with different URL parameters:</p>
+        <a href="editor-full-test.html?albumId=1&presetId=1&itemId=test&pages=5" class="test-link" target="_blank">
+            📖 5 Pages
+        </a>
+        <a href="editor-full-test.html?albumId=1&presetId=1&itemId=test&pages=10" class="test-link" target="_blank">
+            📚 10 Pages
+        </a>
+        <a href="editor-full-test.html?albumId=1&presetId=1&itemId=test&pages=20" class="test-link" target="_blank">
+            📊 20 Pages
+        </a>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Test Results</h2>
+        <div id="test-results">
+            <p>Click the buttons above to run tests. Results will appear here:</p>
+        </div>
+    </div>
+
+    <script>
+        // Auto-test API endpoints
+        async function testApiEndpoints() {
+            const results = document.getElementById('test-results');
+            results.innerHTML = '<p>🔄 Testing API endpoints...</p>';
+            
+            try {
+                // Test album endpoint
+                const albumResponse = await fetch('/projects/bananalab/public/api/test/albums/1');
+                const albumData = await albumResponse.json();
+                
+                // Test preset endpoint
+                const presetResponse = await fetch('/projects/bananalab/public/api/test/item-presets/1');
+                const presetData = await presetResponse.json();
+                
+                results.innerHTML = `
+                    <h3>✅ API Tests Successful</h3>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div>
+                            <h4>📚 Album Data:</h4>
+                            <pre>${JSON.stringify(albumData, null, 2)}</pre>
+                        </div>
+                        <div>
+                            <h4>🎨 Preset Data:</h4>
+                            <pre>${JSON.stringify(presetData, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                results.innerHTML = `
+                    <h3>❌ API Test Failed</h3>
+                    <pre>Error: ${error.message}</pre>
+                `;
+            }
+        }
+
+        // Run tests on page load
+        window.addEventListener('load', testApiEndpoints);
+    </script>
+</body>
+</html>

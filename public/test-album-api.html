@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Album API</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; }
+        .success { color: green; }
+        .error { color: red; }
+        pre { background: #f5f5f5; padding: 10px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>Album API Test</h1>
+
+    <div class="test-section">
+        <h3>Test 1: Login</h3>
+        <button onclick="testLogin()">Test Login</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 2: Get Item Presets</h3>
+        <button onclick="getItemPresets()">Get Presets</button>
+        <div id="presets-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Test 3: Save Album</h3>
+        <button onclick="testSaveAlbum()">Save Album</button>
+        <div id="save-result"></div>
+    </div>
+
+    <script>
+        let testData = {};
+
+        async function testLogin() {
+            const resultDiv = document.getElementById('login-result');
+            try {
+                // Test login
+                const response = await fetch('/api/test-login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        email: 'admin@admin.com',
+                        password: 'admin123'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<div class="success">✓ Login successful</div><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                    testData.user = data;
+                } else {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `<div class="error">✗ Login failed (${response.status})</div><pre>${errorText}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function getItemPresets() {
+            const resultDiv = document.getElementById('presets-result');
+            try {
+                const response = await fetch('/api/item-presets', {
+                    method: 'GET',
+                    headers: {
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include'
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    resultDiv.innerHTML = `<div class="success">✓ Got ${data.length} presets</div><pre>${JSON.stringify(data.slice(0, 2), null, 2)}</pre>`;
+                    testData.presets = data;
+                } else {
+                    const errorText = await response.text();
+                    resultDiv.innerHTML = `<div class="error">✗ Failed to get presets (${response.status})</div><pre>${errorText}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        }
+
+        async function testSaveAlbum() {
+            const resultDiv = document.getElementById('save-result');
+            
+            if (!testData.presets || testData.presets.length === 0) {
+                resultDiv.innerHTML = '<div class="error">✗ Please get presets first</div>';
+                return;
+            }
+
+            const preset = testData.presets[0];
+            const albumData = {
+                title: "Test Album " + new Date().toISOString(),
+                description: "Test album created by API test",
+                itemId: preset.item_id,
+                itemPresetId: preset.id,
+                selectedPages: 20,
+                selectedCoverType: "Tapa Dura",
+                selectedFinish: "Brillante",
+                custom_options: {
+                    design_layers: preset.design_layers || {},
+                    customization_data: preset.customization_data || {}
+                }
+            };
+
+            try {
+                resultDiv.innerHTML = '<div>Saving album...</div>';
+                
+                const response = await fetch('/api/albums', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify(albumData)
+                });
+
+                const responseData = await response.json();
+
+                if (response.ok) {
+                    resultDiv.innerHTML = `<div class="success">✓ Album saved successfully!</div><pre>${JSON.stringify(responseData, null, 2)}</pre>`;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">✗ Save failed (${response.status})</div><pre>${JSON.stringify(responseData, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">✗ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

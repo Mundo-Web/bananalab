@@ -1,0 +1,186 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\BasicController;
+use App\Models\Item;
+use App\Models\ItemPreset;
+use Illuminate\Http\Request;
+
+class ItemPresetReactController extends BasicController
+{
+    public $model = ItemPreset::class;
+    public $reactView = 'Admin/ItemPresets';
+    public $imageFields = ['image', 'cover_image', 'content_layer_image', 'final_layer_image', 'preview_image'];
+    public $prefix4filter = 'item_presets';
+
+    public function setReactViewProperties(Request $request)
+    {
+        $items = Item::select('id', 'name')->orderBy('name')->get();
+
+        return [
+            'items' => $items
+        ];
+    }    public function setPaginationInstance(Request $request, string $model)
+    {
+        $query = $model::select(['item_presets.*'])
+            ->with(['item:id,name']);
+            
+        // Filtrar por item_id si se proporciona
+        if ($request->filled('item_id')) {
+            $query->where('item_id', $request->item_id);
+        }
+        
+        return $query->orderBy('item_presets.sort_order')
+            ->orderBy('item_presets.name');
+    }
+
+    /**
+     * Get presets for a specific item (public endpoint)
+     */    public function getByItemPublic(Request $request, Item $item)
+    {
+        try {
+            $presets = $item->presets()
+                ->where('is_active', true) // Solo presets activos
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+                
+            return response()->json([
+                'success' => true,
+                'data' => $presets
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cargar los presets: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get a specific preset by ID (public endpoint)
+     */
+    public function getByIdPublic(Request $request, ItemPreset $preset)
+    {
+        try {
+            // Solo devolver si el preset está activo
+            if (!$preset->is_active) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Preset no encontrado o no disponible'
+                ], 404);
+            }
+
+            // Cargar relación con item para obtener información adicional
+            $preset->load('item:id,name');
+            
+            return response()->json([
+                'success' => true,
+                'data' => $preset
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cargar el preset: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get presets for a specific item
+     */
+    public function getItemPresets(Request $request, Item $item)
+    {
+        try {
+            $presets = $item->presets()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get();
+                
+            return response()->json([
+                'success' => true,
+                'data' => $presets
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cargar los presets: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+    
+    /**
+     * Toggle preset status
+     */
+    public function toggleStatus(Request $request, Item $item, ItemPreset $preset)
+    {
+        try {
+            // Verificar que el preset pertenece al item
+            if ($preset->item_id !== $item->id) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El preset no pertenece a este item'
+                ], 400);
+            }
+            
+            $preset->is_active = !$preset->is_active;
+            $preset->save();
+            
+            return response()->json([
+                'success' => true,
+                'message' => 'Estado actualizado correctamente',
+                'data' => $preset
+            ]);        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al actualizar el estado: ' . $e->getMessage()
+            ], 500);
+        }    }
+
+    /**
+     * Override save method to handle item context and nested route
+     */
+    public function save(Request $request, $item = null): \Illuminate\Http\Response|\Illuminate\Routing\ResponseFactory
+    {
+        try {
+            // Si la ruta es anidada, forzar item_id desde la URL
+            if ($item) {
+                $itemModel = Item::find($item);
+                if (!$itemModel) {
+                    return response([
+                        'success' => false,
+                        'message' => 'Item no encontrado'
+                    ], 404);
+                }
+                // Merge item_id en el request
+                $request->merge(['item_id' => $item]);
+            } elseif ($request->has('item_id')) {
+                $itemModel = Item::find($request->input('item_id'));
+                if (!$itemModel) {
+                    return response([
+                        'success' => false,
+                        'message' => 'Item no encontrado'
+                    ], 404);
+                }
+                // Si estamos editando, verificar que el preset pertenece al item
+                if ($request->has('id')) {
+                    $preset = ItemPreset::find($request->input('id'));
+                    if ($preset && $preset->item_id != $itemModel->id) {
+                        return response([
+                            'success' => false,
+                            'message' => 'El preset no pertenece a este item'
+                        ], 400);
+                    }
+                }
+            }
+            // Llamar al método save del padre
+            return parent::save($request);
+        } catch (\Exception $e) {
+            return response([
+                'success' => false,
+                'message' => 'Error al guardar el preset: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+}

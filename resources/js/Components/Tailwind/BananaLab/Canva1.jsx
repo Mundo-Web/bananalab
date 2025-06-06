@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronLeft, X, ArrowRight, Heart, Share2, Edit } from "lucide-react";
+import ItemPresetsRest from "../../../Actions/Admin/ItemPresetsRest";
 
 // Animaciones configuradas
 const animations = {
@@ -151,7 +152,7 @@ const CardBanana = ({ producto, onClick }) => {
 
   return (
     <motion.a
-      href="/canva2"
+      href={`/canva2?item=${producto.item_id || producto.id}&preset=${producto.item_preset_id || producto.id}`}
       className="block bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-2xl transition-all cursor-pointer relative"
       variants={animations.item}
       whileHover={{
@@ -164,7 +165,7 @@ const CardBanana = ({ producto, onClick }) => {
       onHoverStart={() => setIsHovered(true)}
       onHoverEnd={() => setIsHovered(false)}
     >
-      {/* Etiquetas 
+      {/* Etiquetas */}
       {producto.tags && (
         <div className="absolute top-2 left-2 z-10 flex gap-1">
           {producto.tags.map((tag, index) => (
@@ -179,7 +180,7 @@ const CardBanana = ({ producto, onClick }) => {
             </motion.span>
           ))}
         </div>
-      )}*/}
+      )}
 
       {/* Imagen del producto */}
       <div className="aspect-square bg-gray-100 relative overflow-hidden">
@@ -190,7 +191,7 @@ const CardBanana = ({ producto, onClick }) => {
           initial={{ scale: 1 }}
           animate={{ scale: isHovered ? 1.05 : 1 }}
           transition={{ duration: 0.3 }}
-          onError={(e) => e.target.src = "/placeholder-image.png"}
+          onError={(e) => e.target.src = "/assets/img/backgrounds/resources/default-image.png"}
         />
 
         {/* Efecto hover */}
@@ -202,15 +203,13 @@ const CardBanana = ({ producto, onClick }) => {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
             >
-              <motion.a 
-              href="/canva2"
-                
+              <motion.div
                 className="bg-white customtext-primary rounded-full p-3 shadow-lg"
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
               >
                 <Edit size={20} />
-              </motion.a>
+              </motion.div>
             </motion.div>
           )}
         </AnimatePresence>
@@ -224,19 +223,12 @@ const CardBanana = ({ producto, onClick }) => {
         <p className="text-gray-500 text-sm line-clamp-2 mb-2">
           {producto.descripcion}
         </p>
-        {/* Precio del producto
-        <div className="flex justify-between items-center">
-          <div>
-            {producto.descuento > 0 && (
-              <span className="text-xs text-gray-400 line-through mr-2">
-                S/ {(producto.precio).toFixed(2)}
-              </span>
-            )}
-            <span className="font-bold text-primary">
-              S/ {(producto.precio * (1 - producto.descuento/100)).toFixed(2)}
-            </span>
+        {/* Información adicional del preset */}
+        {producto.item_preset_id && (
+          <div className="text-xs text-primary font-medium">
+            Diseño personalizable
           </div>
-        </div> */}
+        )}
       </div>
     </motion.a>
   );
@@ -394,11 +386,69 @@ const ProductoModal = ({ producto, onClose }) => {
   );
 };
 
-export default function Canva1() {
+export default function Canva1({ data, filteredData }) {
   const [selectedProduct, setSelectedProduct] = useState(null);
+  const [presets, setPresets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const itemPresetsRest = new ItemPresetsRest();
+
+  // Obtener el item ID de la URL
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const itemId = urlParams.get('item');
+    
+    if (itemId) {
+      loadItemPresets(itemId);
+    } else {
+      // Si no hay item seleccionado, usar datos estáticos como fallback
+      setPresets(productos);
+      setLoading(false);
+    }
+  }, []);
+
+  const loadItemPresets = async (itemId) => {
+    try {
+      setLoading(true);
+      console.log('Cargando presets para item:', itemId);
+      
+      // Cargar presets del item usando el método específico
+      const response = await itemPresetsRest.getByItem(itemId);
+      
+      if (response && response.data) {
+        console.log('Presets cargados:', response.data);
+        
+        // Transformar los presets al formato esperado por el componente
+        const transformedPresets = response.data.map(preset => ({
+          id: preset.id,
+          imagen: preset.preview_image ? `/storage/images/item_presets/${preset.preview_image}` : "/assets/img/backgrounds/resources/default-image.png",
+          titulo: preset.name || `Preset ${preset.id}`,
+          descripcion: preset.description || "Diseño predefinido personalizable",
+          precio: 0, // Los presets no tienen precio individual
+          descuento: 0,
+          colores: ["#FF5733", "#33FF57", "#3357FF"], // Colores por defecto
+          tags: preset.is_active ? ["Disponible"] : ["No disponible"],
+          item_preset_id: preset.id,
+          design_layers: preset.design_layers
+        }));
+
+        setPresets(transformedPresets);
+        setSelectedItem({ id: itemId });
+      } else {
+        console.warn('No se encontraron presets para el item:', itemId);
+        setPresets([]);
+      }
+    } catch (error) {
+      console.error('Error al cargar presets:', error);
+      // En caso de error, usar datos estáticos como fallback
+      setPresets(productos);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleProductClick = (id) => {
-    setSelectedProduct(productos.find(p => p.id === id));
+    setSelectedProduct(presets.find(p => p.id === id));
   };
 
   return (
@@ -415,6 +465,7 @@ export default function Canva1() {
           variants={animations.button}
           whileHover="hover"
           whileTap="tap"
+          onClick={() => window.history.back()}
         >
           <ChevronLeft className="h-5 w-5" />
           <span className="ml-1">Regresar</span>
@@ -426,29 +477,60 @@ export default function Canva1() {
         className="text-3xl md:text-4xl font-bold mb-8 text-start"
         variants={animations.title}
       >
-        Elige el diseño predefinido
+        {selectedItem ? 'Elige el diseño predefinido' : 'Elige el diseño predefinido'}
       </motion.h1>
 
-      {/* Grid de productos */}
-      <motion.div 
-        className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
-        variants={animations.container}
-      >
-        <AnimatePresence>
-          {productos.map((producto) => (
-            <motion.div
-              key={producto.id}
-              variants={animations.item}
-              layoutId={`product-${producto.id}`}
+      {/* Estado de carga */}
+      {loading && (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          <span className="ml-4 text-lg">Cargando diseños...</span>
+        </div>
+      )}
+
+      {/* Grid de productos/presets */}
+      {!loading && (
+        <>
+          {presets.length > 0 ? (
+            <motion.div 
+              className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
+              variants={animations.container}
             >
-              <CardBanana 
-                producto={producto} 
-                onClick={handleProductClick} 
-              />
+              <AnimatePresence>
+                {presets.map((producto) => (
+                  <motion.div
+                    key={producto.id}
+                    variants={animations.item}
+                    layoutId={`product-${producto.id}`}
+                  >
+                    <CardBanana 
+                      producto={producto} 
+                      onClick={handleProductClick} 
+                    />
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </motion.div>
-          ))}
-        </AnimatePresence>
-      </motion.div>
+          ) : (
+            <div className="text-center py-20">
+              <div className="text-gray-500 text-lg mb-4">
+                {selectedItem ? 
+                  'No hay diseños predefinidos disponibles para este producto.' :
+                  'No se encontraron diseños predefinidos.'
+                }
+              </div>
+              <motion.button 
+                className="bg-primary text-white px-6 py-3 rounded-xl hover:opacity-90 transition-all"
+                onClick={() => window.history.back()}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+              >
+                Regresar al producto
+              </motion.button>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Modal de producto */}
       <AnimatePresence>
