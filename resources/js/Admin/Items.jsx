@@ -444,11 +444,17 @@ const Items = ({ categories, brands, collections }) => {
         if (presetPreviewImageRef.current)  presetPreviewImageRef.image.src = `/storage/images/item_preset/${
             preset?.preview_image ?? "undefined"
         }`;
-        // Canvas config
-        canvasWidthRef.current.value = preset?.canvas_config?.width || 1000;
-        canvasHeightRef.current.value = preset?.canvas_config?.height || 1000;
-        canvasDpiRef.current.value = preset?.canvas_config?.dpi || 300;
-        canvasBackgroundColorRef.current.value = preset?.canvas_config?.background_color || '#ffffff';
+        // Canvas config (convertir JSON si es string)
+        let canvasCfg = {};
+        if (preset?.canvas_config) {
+            canvasCfg = typeof preset.canvas_config === 'string'
+                ? JSON.parse(preset.canvas_config)
+                : preset.canvas_config;
+        }
+        canvasWidthRef.current.value = canvasCfg.width || 1000;
+        canvasHeightRef.current.value = canvasCfg.height || 1000;
+        canvasDpiRef.current.value = canvasCfg.dpi || 300;
+        canvasBackgroundColorRef.current.value = canvasCfg.background_color || '#ffffff';
         // Content area config
         contentXRef.current.value = preset?.content_layer_config?.x || 0;
         contentYRef.current.value = preset?.content_layer_config?.y || 0;
@@ -750,6 +756,12 @@ const Items = ({ categories, brands, collections }) => {
             formData.append("content_layer_config", JSON.stringify(contentLayerConfig));
 
             if (isEditingPreset && presetIdRef.current?.value) {
+                // Asegurarse de que el campo 'id' esté presente y actualizado en el FormData
+                if (formData.has('id')) {
+                    formData.set('id', presetIdRef.current.value);
+                } else {
+                    formData.append('id', presetIdRef.current.value);
+                }
                 await itemPresetsRest.updateForItem(finalItemId, presetIdRef.current.value, formData);
             } else {
                 await itemPresetsRest.saveForItem(finalItemId, formData);

@@ -82,8 +82,10 @@ class ItemPresetsRest extends BasicRest {
      * Actualizar preset para un item específico usando el endpoint anidado
      */    updateForItem = async (itemId, presetId, formData) => {
         try {
+            // Laravel no parsea bien FormData en PUT, usar POST con override
+            formData.append('_method', 'PUT');
             const response = await fetch(`/api/admin/items/${itemId}/presets/${presetId}`, {
-                method: "PUT",
+                method: "POST",
                 body: formData,
                 headers: {
                     "X-CSRF-TOKEN": document.querySelector('meta[name="csrf_token"]').getAttribute('content'),

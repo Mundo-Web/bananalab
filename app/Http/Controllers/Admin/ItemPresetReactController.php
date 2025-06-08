@@ -141,40 +141,17 @@ class ItemPresetReactController extends BasicController
     /**
      * Override save method to handle item context and nested route
      */
-    public function save(Request $request, $item = null): \Illuminate\Http\Response|\Illuminate\Routing\ResponseFactory
+    public function save(Request $request, \App\Models\Item $item = null, \App\Models\ItemPreset $preset = null): \Illuminate\Http\Response|\Illuminate\Routing\ResponseFactory
     {
         try {
-            // Si la ruta es anidada, forzar item_id desde la URL
+            // Si la ruta es anidada, el $item y $preset ya son modelos inyectados
             if ($item) {
-                $itemModel = Item::find($item);
-                if (!$itemModel) {
-                    return response([
-                        'success' => false,
-                        'message' => 'Item no encontrado'
-                    ], 404);
-                }
-                // Merge item_id en el request
-                $request->merge(['item_id' => $item]);
-            } elseif ($request->has('item_id')) {
-                $itemModel = Item::find($request->input('item_id'));
-                if (!$itemModel) {
-                    return response([
-                        'success' => false,
-                        'message' => 'Item no encontrado'
-                    ], 404);
-                }
-                // Si estamos editando, verificar que el preset pertenece al item
-                if ($request->has('id')) {
-                    $preset = ItemPreset::find($request->input('id'));
-                    if ($preset && $preset->item_id != $itemModel->id) {
-                        return response([
-                            'success' => false,
-                            'message' => 'El preset no pertenece a este item'
-                        ], 400);
-                    }
+                $request->merge(['item_id' => $item->id]);
+                if ($preset) {
+                    $request->merge(['id' => $preset->id]);
                 }
             }
-            // Llamar al método save del padre
+            // Llamar al método save del padre (create o update según 'id' en el request)
             return parent::save($request);
         } catch (\Exception $e) {
             return response([

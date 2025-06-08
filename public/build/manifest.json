@@ -219,8 +219,8 @@
       "_index-BH53Isel.js"
     ]
   },
-  "_ItemPresetsRest-DAo8oqYC.js": {
-    "file": "assets/ItemPresetsRest-DAo8oqYC.js",
+  "_ItemPresetsRest-Dmbx2fkO.js": {
+    "file": "assets/ItemPresetsRest-Dmbx2fkO.js",
     "name": "ItemPresetsRest",
     "imports": [
       "_main-BvVILmTO.js",
@@ -1475,7 +1475,7 @@
     ]
   },
   "resources/js/Admin/ItemPresets.jsx": {
-    "file": "assets/ItemPresets-DzPWqLDW.js",
+    "file": "assets/ItemPresets--0Xcvgnx.js",
     "name": "ItemPresets",
     "src": "resources/js/Admin/ItemPresets.jsx",
     "isEntry": true,
@@ -1488,7 +1488,7 @@
       "resources/js/Utils/ReactAppend.jsx",
       "resources/js/Components/Adminto/Dx/DxBox.jsx",
       "resources/js/Components/Tailwind/Components/ProductCard.jsx",
-      "_ItemPresetsRest-DAo8oqYC.js",
+      "_ItemPresetsRest-Dmbx2fkO.js",
       "_Modal-BJ3DTV_x.js",
       "_Table-cP0w99G1.js",
       "_ImageFormGroup-Dx5myhwn.js",
@@ -1518,7 +1518,7 @@
     ]
   },
   "resources/js/Admin/Items.jsx": {
-    "file": "assets/Items-UqzpHe7Y.js",
+    "file": "assets/Items-BZP0z2dQ.js",
     "name": "Items",
     "src": "resources/js/Admin/Items.jsx",
     "isEntry": true,
@@ -1545,7 +1545,7 @@
       "_Number2Currency-e57Tgsuk.js",
       "_ReactAppend-D7S498fx.js",
       "_SetSelectValue-UxyCmHse.js",
-      "_ItemPresetsRest-DAo8oqYC.js",
+      "_ItemPresetsRest-Dmbx2fkO.js",
       "_index-yBjzXJbu.js",
       "_Global-BM4Id4Pw.js",
       "_tippy-react.esm-BWiGTO87.js",
@@ -2856,7 +2856,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-DCFYO9R2.js",
+    "file": "assets/BananaLab-Dhntx3LN.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -6334,7 +6334,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-BFYheQ4v.js",
+    "file": "assets/System-Q78Cwkjy.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
