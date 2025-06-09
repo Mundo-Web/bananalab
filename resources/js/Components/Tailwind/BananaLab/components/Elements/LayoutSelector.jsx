@@ -45,7 +45,7 @@ export default function LayoutSelector({ currentLayoutId, onLayoutChange }) {
 
 
             {/* Grid de layouts */}
-            <div className="grid grid-cols-2  gap-3 max-h-96 overflow-y-auto overflow-x-hidden custom-scroll">
+            <div className="grid grid-cols-2  gap-3 overflow-x-hidden custom-scroll">
                 {categories[selectedCategory].layouts.map((layout) => (
                     <div
                         key={layout.id}

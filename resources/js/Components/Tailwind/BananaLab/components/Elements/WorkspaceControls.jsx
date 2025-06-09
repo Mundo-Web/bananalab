@@ -28,8 +28,8 @@ const WorkspaceControls = ({ currentSize, onSizeChange, presetData, workspaceDim
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 h-full items-center">
             {/* Mostrar información de las dimensiones actuales */}
             {workspaceDimensions && (
-                <div className="text-xs text-gray-500 ml-2">
-                    <div>Actual: {workspaceDimensions.width}x{workspaceDimensions.height} px</div>
+                <div className="text-sm customtext-neutral-dark font-medium ml-2">
+                   {/* <div>Actual: {workspaceDimensions.width}x{workspaceDimensions.height} px</div>
                     {workspaceDimensions.originalWidth && (
                         <div>Original: {workspaceDimensions.originalWidth}x{workspaceDimensions.originalHeight} cm</div>
                     )}
@@ -38,6 +38,10 @@ const WorkspaceControls = ({ currentSize, onSizeChange, presetData, workspaceDim
                     )}
                     {workspaceDimensions.scale && workspaceDimensions.scale < 1 && (
                         <div>Escala: {Math.round(workspaceDimensions.scale * 100)}%</div>
+                    )} */}
+
+                     {workspaceDimensions.originalWidth && (
+                        <div>Dimensiones: {workspaceDimensions.originalWidth} cm x{workspaceDimensions.originalHeight} cm</div>
                     )}
                 </div>
             )}

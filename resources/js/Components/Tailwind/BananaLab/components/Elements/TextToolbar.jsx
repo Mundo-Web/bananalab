@@ -273,8 +273,8 @@ const TextToolbar = ({ element, onUpdate, onClose }) => {
     );
 
     return (
-        <div className="  bg-white  rounded-lg shadow-sm p-4  border-gray-200  z-50 transition-all duration-200">
-            <div className="max-w-7xl mx-auto p-2">
+        <div className="  bg-white  rounded-lg shadow-sm px-4  border-gray-200  z-50 transition-all duration-200">
+            <div className="w-full ">
                 <div className="flex items-center justify-between mb-1">
                     <h3 className="text-sm font-medium flex items-center gap-1.5">
                         <Type className="h-4 w-4" />
@@ -310,8 +310,8 @@ const TextToolbar = ({ element, onUpdate, onClose }) => {
                         <button
                             className={`px-3 py-1.5 text-sm font-medium ${
                                 activeTab === "basic"
-                                    ? "border-b-2 border-blue-500 text-blue-600"
-                                    : "text-gray-600"
+                                    ? "border-b-2 border-primary customtext-primary"
+                                    : "customtext-neutral-dark"
                             }`}
                             onClick={() => setActiveTab("basic")}
                         >
@@ -320,8 +320,8 @@ const TextToolbar = ({ element, onUpdate, onClose }) => {
                         <button
                             className={`px-3 py-1.5 text-sm font-medium ${
                                 activeTab === "paragraph"
-                                    ? "border-b-2 border-blue-500 text-blue-600"
-                                    : "text-gray-600"
+                                    ? "border-b-2 border-primary customtext-primary"
+                                    : "customtext-neutral-dark"
                             }`}
                             onClick={() => setActiveTab("paragraph")}
                         >
@@ -330,8 +330,8 @@ const TextToolbar = ({ element, onUpdate, onClose }) => {
                         <button
                             className={`px-3 py-1.5 text-sm font-medium ${
                                 activeTab === "advanced"
-                                    ? "border-b-2 border-blue-500 text-blue-600"
-                                    : "text-gray-600"
+                                    ? "border-b-2 border-primary customtext-primary"
+                                    : "customtext-neutral-dark"
                             }`}
                             onClick={() => setActiveTab("advanced")}
                         >

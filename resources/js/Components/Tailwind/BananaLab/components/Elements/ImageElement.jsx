@@ -513,16 +513,15 @@ export default function ImageElement({
                             title="Redimensionar horizontalmente"
                         />
 
-                        {/* Indicador visual de manipulación */}
-                        {isManipulating && (
+                        {/* Indicador visual de manipulación   */}
+                      {isManipulating && (
                             <div className="absolute -inset-2 border-2 border-blue-300 border-dashed rounded animate-pulse" />
                         )}
                     </>
                 )}
             </div>
 
-            {/* Botones de acción mejorados */}
-            {isSelected && !isManipulating && (
+            {/* Botones de acción mejorados {isSelected && !isManipulating && (
                 <div className="absolute -top-12 right-0 flex gap-1 bg-white rounded-lg shadow-lg px-2 py-1">
                     <button
                         className="bg-white rounded-md p-1.5 shadow-sm hover:bg-gray-100 transition-colors"
@@ -550,7 +549,8 @@ export default function ImageElement({
                         <Trash2 className="h-4 w-4 text-red-600" />
                     </button>
                 </div>
-            )}
+            )}*/}
+            
 
             {/* Menú contextual mejorado */}
             {showContextMenu && (
@@ -656,12 +656,12 @@ export default function ImageElement({
                 </>
             )}
 
-            {/* Información de estado para debugging (solo en desarrollo) */}
-            {process.env.NODE_ENV === 'development' && isSelected && (
+            {/* Información de estado para debugging (solo en desarrollo)   {process.env.NODE_ENV === 'development' && isSelected && (
                 <div className="absolute -bottom-8 left-0 text-xs bg-black text-white px-2 py-1 rounded">
                     {`${Math.round(currentPosition.x)}, ${Math.round(currentPosition.y)} | ${Math.round(currentSize.width)}×${Math.round(currentSize.height)}`}
                 </div>
-            )}
+            )}*/}
+          
         </div>
     );
 }

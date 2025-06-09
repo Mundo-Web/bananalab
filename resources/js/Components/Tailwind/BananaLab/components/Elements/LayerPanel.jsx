@@ -15,7 +15,7 @@ const LayerPanel = ({ elements, onReorder, onSelect, selectedElement }) => {
 
     return (
         <div className="bg-white ">
-            <h3 className="font-medium mb-2">Capas</h3>
+           
             <DragDropContext onDragEnd={handleDragEnd}>
                 <Droppable droppableId="layers">
                     {(provided) => (

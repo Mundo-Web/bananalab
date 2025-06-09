@@ -15,6 +15,8 @@ import {
     FlipVertical,
     Copy,
     Book,
+    Lock,
+    Pencil,
 } from "lucide-react";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
@@ -33,6 +35,7 @@ import { MaskSelector } from "./components/Elements/MaskSelector";
 import TextToolbar from "./components/Elements/TextToolbar";
 import WorkspaceControls from "./components/Elements/WorkspaceControls";
 import BookPreviewModal from "./components/Editor/BookPreview ";
+import Global from "../../../Utils/Global";
 
 // Componente principal del editor
 export default function EditorLibro({ albumId, itemId, presetId, pages: initialPages }) {
@@ -41,7 +44,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     const [presetData, setPresetData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
-    
+
     // Estado inicial de páginas - se actualizará cuando carguemos el preset
     const [pages, setPages] = useState([]);
 
@@ -74,7 +77,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 pages: initialPages || 20
             };
         }
-        
+
         // Fallback: obtener de la URL
         const params = new URLSearchParams(window.location.search);
         return {
@@ -91,17 +94,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             setIsLoading(true);
             setLoadError(null);
             const params = getParams();
-            
+
             console.log('🔍 Editor params:', params);
-            
+
             if (!params.albumId || !params.presetId) {
                 throw new Error('Faltan parámetros requeridos: albumId y presetId');
             }
 
 
             // Determinar la URL base correcta
-            const baseUrl = window.location.origin.includes('bananalab') 
-                ? '/projects/bananalab/public' 
+            const baseUrl = window.location.origin.includes('bananalab')
+                ? '/projects/bananalab/public'
                 : '';
 
             // Siempre usar los endpoints REALES para traer datos de la base de datos
@@ -122,7 +125,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             });
 
             console.log('📚 Album response status:', albumResponse.status);
-            
+
             if (!albumResponse.ok) {
                 const errorText = await albumResponse.text();
                 console.error('❌ Album response error:', errorText);
@@ -131,7 +134,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             const albumResponseData = await albumResponse.json();
             console.log('✅ Album response data:', albumResponseData);
-            
+
             // Extraer datos del álbum (puede estar en .data o directamente en la respuesta)
             const album = albumResponseData.data || albumResponseData;
             console.log('📚 Album loaded:', album);
@@ -158,7 +161,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             const presetResponseData = await presetResponse.json();
             console.log('✅ Preset response data:', presetResponseData);
-            
+
             // Extraer datos del preset (puede estar en .data o directamente en la respuesta)
             const preset = presetResponseData.data || presetResponseData;
             console.log('🎨 Preset loaded:', preset);
@@ -182,14 +185,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('Creating pages from preset:', preset);
             console.log('Album data:', album);
             console.log('Total pages requested:', totalPages);
-            
+
             const newPages = [];
-            
+
             // Validar que el preset tenga las imágenes necesarias
             if (!preset.cover_image || !preset.content_layer_image || !preset.final_layer_image) {
                 throw new Error('El preset no tiene todas las imágenes requeridas');
             }
-            
+
             // Función helper para obtener la URL correcta de la imagen
             const getImageUrl = (imagePath) => {
                 if (imagePath.startsWith('http')) {
@@ -221,7 +224,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         // Imagen personalizada del álbum (si existe)
                         ...(album.cover_image_path ? [{
                             id: "cover-custom",
-                            type: "image", 
+                            type: "image",
                             content: `/storage/images/albums/covers/${album.cover_image_path}`,
                             position: { x: 10, y: 10 },
                             size: { width: 80, height: 80 },
@@ -232,7 +235,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     ]
                 }]
             };
-            
+
             newPages.push(coverPage);
 
             // 2. PÁGINAS DE CONTENIDO (content_layer_image)
@@ -261,7 +264,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         ]
                     }]
                 };
-                
+
                 newPages.push(contentPage);
             }
 
@@ -269,7 +272,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const finalPage = {
                 id: "page-final",
                 type: "final",
-                layout: "layout-1", 
+                layout: "layout-1",
                 cells: [{
                     id: "cell-final-1",
                     elements: [
@@ -288,19 +291,19 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     ]
                 }]
             };
-            
+
             newPages.push(finalPage);
 
             console.log('✅ Created pages:', newPages);
             setPages(newPages);
             setCurrentPage(0); // Empezar en la portada
-            
+
             // Si hay canvas_config en el preset, cambiar automáticamente a "preset"
             if (preset.canvas_config) {
                 console.log('📐 Canvas config found, setting workspace to preset dimensions');
                 setWorkspaceSize("preset");
             }
-            
+
         } catch (error) {
             console.error('❌ Error creating pages:', error);
             throw error;
@@ -315,10 +318,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Función para obtener el título de la página actual
     const getCurrentPageTitle = () => {
         if (pages.length === 0) return "Cargando...";
-        
+
         const page = pages[currentPage];
         if (!page) return "Página";
-        
+
         switch (page.type) {
             case "cover":
                 return "Portada";
@@ -342,10 +345,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Modifica la función getSelectedElement para que use useCallback
     const getSelectedElement = useCallback(() => {
         if (!selectedElement || !selectedCell || pages.length === 0) return null;
-        
+
         const currentPageData = pages[currentPage];
         if (!currentPageData) return null;
-        
+
         const cell = currentPageData.cells.find(
             (cell) => cell.id === selectedCell
         );
@@ -359,7 +362,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         if (cellId) {
             const cell = pages[currentPage].cells.find(cell => cell.id === cellId);
             const element = cell?.elements.find(el => el.id === elementId);
-            
+
             if (element?.locked) {
                 console.log('Elemento bloqueado, no se puede seleccionar');
                 // Mostrar mensaje temporal (opcional)
@@ -375,7 +378,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 return;
             }
         }
-        
+
         // Siempre actualizar la celda seleccionada si se proporciona
         if (cellId) {
             setSelectedCell(cellId);
@@ -412,10 +415,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Obtener el layout actual
     const getCurrentLayout = () => {
         if (pages.length === 0) return layouts[0];
-        
+
         const currentPageData = pages[currentPage];
         if (!currentPageData) return layouts[0];
-        
+
         return (
             layouts.find((layout) => layout.id === currentPageData.layout) ||
             layouts[0]
@@ -469,16 +472,16 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Añadir una nueva página de contenido
     const addPage = () => {
         if (!presetData) return;
-        
+
         // Encontrar el último número de página de contenido
         const contentPages = pages.filter(p => p.type === "content");
-        const lastPageNumber = contentPages.length > 0 
+        const lastPageNumber = contentPages.length > 0
             ? Math.max(...contentPages.map(p => p.pageNumber))
             : 0;
-        
+
         const newPageNumber = lastPageNumber + 1;
         const newPageId = `page-content-${newPageNumber}`;
-        
+
         const newPage = {
             id: newPageId,
             type: "content",
@@ -506,7 +509,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Insertar antes de la página final
         const updatedPages = [...pages];
         const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
-        
+
         if (finalPageIndex > -1) {
             updatedPages.splice(finalPageIndex, 0, newPage);
         } else {
@@ -514,7 +517,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         }
 
         updatePages(updatedPages);
-        
+
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPageId);
         setCurrentPage(newPageIndex);
@@ -523,9 +526,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Eliminar la página actual (solo páginas de contenido)
     const deleteCurrentPage = () => {
         if (pages.length <= 3) return; // Mínimo: portada + 1 contenido + final
-        
+
         const currentPageData = pages[currentPage];
-        
+
         // No permitir borrar portada ni contraportada
         if (currentPageData.type === "cover" || currentPageData.type === "final") {
             console.log('No se puede eliminar la portada o contraportada');
@@ -545,7 +548,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Duplicar la página actual (solo páginas de contenido)
     const duplicateCurrentPage = () => {
         const currentPageData = pages[currentPage];
-        
+
         // Solo duplicar páginas de contenido
         if (currentPageData.type !== "content") {
             console.log('Solo se pueden duplicar páginas de contenido');
@@ -555,7 +558,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Crear una copia de la página actual
         const lastPageNumber = Math.max(...pages.filter(p => p.type === "content").map(p => p.pageNumber));
         const newPageNumber = lastPageNumber + 1;
-        
+
         const newPage = {
             ...JSON.parse(JSON.stringify(currentPageData)),
             id: `page-content-${newPageNumber}`,
@@ -573,7 +576,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Insertar antes de la página final
         const updatedPages = [...pages];
         const finalPageIndex = updatedPages.findIndex(p => p.type === "final");
-        
+
         if (finalPageIndex > -1) {
             updatedPages.splice(finalPageIndex, 0, newPage);
         } else {
@@ -581,7 +584,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         }
 
         updatePages(updatedPages);
-        
+
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
         setCurrentPage(newPageIndex);
@@ -634,7 +637,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         elementIndex
                     ] = {
                         ...updatedPages[currentPage].cells[cellIndex].elements[
-                            elementIndex
+                        elementIndex
                         ],
                         ...updates,
                     };
@@ -739,8 +742,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     const getWorkspaceDimensions = () => {
         // Si hay preset con canvas_config, usar esas dimensiones
         if (presetData?.canvas_config) {
-            const canvasConfig = typeof presetData.canvas_config === 'string' 
-                ? JSON.parse(presetData.canvas_config) 
+            const canvasConfig = typeof presetData.canvas_config === 'string'
+                ? JSON.parse(presetData.canvas_config)
                 : presetData.canvas_config;
 
             // Siempre asumir que width y height vienen en centímetros
@@ -868,26 +871,26 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 <div className="h-screen bg-gray-100 flex items-center justify-center">
                     <div className="bg-white p-8 rounded-lg shadow-lg text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                        <h2 className="text-xl font-semibold text-gray-800 mb-2">Cargando Editor</h2>
-                        <p className="text-gray-600">Preparando tu álbum personalizado...</p>
+                        <h2 className="text-xl font-semibold customtext-neutral-dark mb-2">Cargando Editor</h2>
+                        <p className="customtext-neutral-dark">Preparando tu álbum personalizado...</p>
                     </div>
                 </div>
             ) : pages.length === 0 || loadError ? (
                 <div className="h-screen bg-gray-100 flex items-center justify-center">
                     <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
                         <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
-                        <p className="text-gray-600 mb-4">
+                        <p className="customtext-neutral-dark mb-4">
                             {loadError || "No se pudieron cargar los datos del álbum."}
                         </p>
                         <div className="space-y-2">
-                            <button 
-                                onClick={() => window.location.reload()} 
+                            <button
+                                onClick={() => window.location.reload()}
                                 className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                             >
                                 Reintentar
                             </button>
-                            <button 
-                                onClick={() => window.history.back()} 
+                            <button
+                                onClick={() => window.history.back()}
                                 className="w-full px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
                             >
                                 Volver
@@ -896,541 +899,558 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             ) : (
-            <div className="h-screen w-screen overflow-hidden bg-gray-50">
-                {/* Book Preview Modal */}
-                <BookPreviewModal
-                    isOpen={isBookPreviewOpen}
-                    onRequestClose={() => setIsBookPreviewOpen(false)}
-                    pages={pages.map((page) => ({
-                        ...page,
-                        layout: layouts.find((l) => l.id === page.layout) || layouts[0],
-                    }))}
-                />
-                
-                {/* Header - Top Bar */}
-                <header className="fixed top-0 left-0 right-0 h-14 border-b bg-white flex items-center justify-between px-4 z-10">
-                    <div className="flex items-center gap-2">
-                        <Button variant="ghost" size="sm">
-                            <ChevronLeft className="h-5 w-5 mr-1" />
-                            Regresar
-                        </Button>
-                        {/* Información del álbum */}
-                        <div className="ml-4 truncate">
-                            <h1 className="text-sm font-semibold text-gray-800 truncate">
-                                {albumData?.title || "Álbum Sin Título"}
-                            </h1>
-                            <div className="flex items-center gap-2">
-                                <p className="text-xs text-gray-600">
-                                    {getCurrentPageTitle()} {pages.length > 0 && `• ${pages.length} páginas total`}
-                                </p>
-                                {pages.length > 0 && (
-                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
-                                        isCurrentPageEditable() 
-                                        ? "bg-green-100 text-green-700" 
-                                        : "bg-amber-100 text-amber-700"
-                                    }`}>
-                                        {isCurrentPageEditable() ? "✏️ Editable" : "🔒 Solo vista"}
+                <div className="h-screen w-screen overflow-hidden bg-gray-50 font-paragraph">
+                    { /* Book Preview Modal */}
+                    <BookPreviewModal
+                        isOpen={isBookPreviewOpen}
+                        onRequestClose={() => setIsBookPreviewOpen(false)}
+                        pages={pages.map((page) => ({
+                            ...page,
+                            layout: layouts.find((l) => l.id === page.layout) || layouts[0],
+                        }))}
+                    />
+
+                    {/* Header - Top Bar */}
+                    <header className="fixed top-0 left-0 right-0 h-16 border-b bg-primary shadow-sm flex items-center px-4 z-10">
+                        <div className="container mx-auto flex items-center justify-between">
+                            {/* Logo and brand */}
+                            <div className="flex items-center gap-3">
+                                <img
+                                    src={`/assets/resources/logo.png?v=${crypto.randomUUID()}`}
+                                    alt={Global.APP_NAME}
+                                    className="h-7 object-contain object-center invert brightness-0"
+                                />
+                                <div className="h-6 w-px bg-white/20"></div>
+                                <h1 className="text-lg font-bold text-white truncate hidden sm:block">
+                                    {albumData?.title || "Álbum Sin Título"}
+                                </h1>
+                            </div>
+
+                            {/* Page information */}
+                            <div className="flex items-center gap-3">
+                                <div className="bg-white/10 rounded-full px-4 py-1.5 flex items-center gap-2">
+                                    <span className="h-2 w-2 rounded-full bg-secondary animate-pulse"></span>
+                                    <p className="text-sm text-white font-medium">
+                                        {getCurrentPageTitle()}
+                                    </p>
+                                </div>
+
+                                <div className="text-xs text-white/70 hidden sm:block">
+                                    {pages.length > 0 && `${pages.length} páginas total`}
+                                </div>
+
+                                {isCurrentPageEditable() ? (
+                                    <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-1">
+                                        <Pencil className="h-3 w-3" />
+                                        Editable
+                                    </span>
+                                ) : (
+                                    <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-1">
+                                        <Lock className="h-3 w-3" />
+                                        Solo lectura
                                     </span>
                                 )}
                             </div>
-                        </div>
-                    </div>
 
-                    <div className="flex gap-2 items-center">
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={togglePreview}
-                            icon={<Eye className="h-4 w-4" />}
-                        >
-                            {previewMode ? "Editar" : "Vista previa"}
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            onClick={() => setIsBookPreviewOpen(true)}
-                            icon={<Book className="h-4 w-4" />}
-                        >
-                            Vista de Álbum
-                        </Button>
-                    </div>
-                </header>
-
-                <div className="flex w-full h-full pt-14">
-                    {/* Left sidebar */}
-                    <aside className="w-64 bg-white border-r flex flex-col">
-                        {/* Tab navigation */}
-                        <div className="p-3 border-b">
-                            <div className="flex space-x-1 bg-gray-100 p-1 rounded-md">
-                                <button
-                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
-                                        activeTab === "elements"
-                                            ? "bg-white shadow-sm text-purple-700"
-                                            : "text-gray-600 hover:bg-white/50"
-                                    }`}
-                                    onClick={() => setActiveTab("elements")}
+                            {/* Action buttons */}
+                            <div className="flex gap-3 items-center">
+                                <Button
+                                    variant={previewMode ? "secondary" : "outline"}
+                                    size="sm"
+                                    onClick={togglePreview}
+                                    icon={<Eye className="h-4 w-4" />}
+                                    className="border-white/20 text-white hover:bg-white/10 hover:text-white"
                                 >
-                                    Elementos
-                                </button>
-                                <button
-                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
-                                        activeTab === "filters"
-                                            ? "bg-white shadow-sm text-purple-700"
-                                            : "text-gray-600 hover:bg-white/50"
-                                    }`}
-                                    onClick={() => setActiveTab("filters")}
+                                    {previewMode ? "Editar" : "Vista previa"}
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => setIsBookPreviewOpen(true)}
+                                    icon={<Book className="h-4 w-4" />}
                                 >
-                                    Filtros
-                                </button>
+                                    Vista de Álbum
+                                </Button>
                             </div>
                         </div>
-                        
-                        {/* Sidebar content */}
-                        <div className="flex-1 overflow-y-auto p-3 custom-scroll">
-                            {activeTab === "elements" && (
-                                <div className="space-y-4">
-                                    <div>
-                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
-                                            Layouts
-                                        </h3>
-                                        <LayoutSelector
-                                            currentLayoutId={pages[currentPage]?.layout}
-                                            onLayoutChange={changeLayout}
-                                        />
-                                    </div>
+                    </header>
 
-                                    <div>
-                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
-                                            Herramientas rápidas
-                                        </h3>
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => {
-                                                    const input = document.createElement("input");
-                                                    input.type = "file";
-                                                    input.accept = "image/*";
-                                                    input.onchange = (e) => {
-                                                        if (e.target.files && e.target.files[0]) {
-                                                            const newId = `img-${Date.now()}`;
-                                                            const newElement = {
-                                                                id: newId,
-                                                                type: "image",
-                                                                content: "",
-                                                                position: { x: 10, y: 10 },
-                                                                filters: {
-                                                                    brightness: 100,
-                                                                    contrast: 100,
-                                                                    saturation: 100,
-                                                                    tint: 0,
-                                                                    hue: 0,
-                                                                    blur: 0,
-                                                                    scale: 1,
-                                                                    rotate: 0,
-                                                                    opacity: 100,
-                                                                    blendMode: "normal",
-                                                                },
-                                                                mask: "none",
-                                                            };
-
-                                                            const reader = new FileReader();
-                                                            reader.onload = (e) => {
-                                                                if (e.target?.result) {
-                                                                    newElement.content = e.target.result;
-                                                                    if (selectedCell) {
-                                                                        addElementToCell(selectedCell, newElement);
-                                                                    } else {
-                                                                        addElementToCell(pages[currentPage].cells[0].id, newElement);
-                                                                    }
-                                                                }
-                                                            };
-                                                            reader.readAsDataURL(e.target.files[0]);
-                                                        }
-                                                    };
-                                                    input.click();
-                                                }}
-                                                className="justify-start"
-                                                icon={<ImageIcon className="h-4 w-4" />}
-                                            >
-                                                Imagen
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={handleAddText}
-                                                className="justify-start"
-                                                icon={<Type className="h-4 w-4" />}
-                                            >
-                                                Texto
-                                            </Button>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
-                                            Capas
-                                        </h3>
-                                        <LayerPanel
-                                            elements={
-                                                pages[currentPage].cells.find(
-                                                    (cell) => cell.id === selectedCell
-                                                )?.elements || []
-                                            }
-                                            onReorder={(reorderedElements) => {
-                                                const updatedPages = [...pages];
-                                                const cellIndex = updatedPages[currentPage].cells.findIndex(
-                                                    (cell) => cell.id === selectedCell
-                                                );
-                                                if (cellIndex !== -1) {
-                                                    updatedPages[currentPage].cells[cellIndex].elements = reorderedElements;
-                                                    updatePages(updatedPages);
-                                                }
-                                            }}
-                                            onSelect={handleSelectElement}
-                                            selectedElement={selectedElement}
-                                        />
-                                    </div>
+                    <div className="flex w-full h-full pt-16">
+                        {/* Left sidebar */}
+                        <aside className="w-64 bg-white border-r flex flex-col">
+                            {/* Tab navigation */}
+                            <div className="p-3 border-b">
+                                <div className="flex space-x-1 bg-gray-100 p-1 rounded-md">
+                                    <button
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${activeTab === "elements"
+                                            ? "bg-white shadow-sm text-purple-700"
+                                            : "customtext-neutral-dark hover:bg-white/50"
+                                            }`}
+                                        onClick={() => setActiveTab("elements")}
+                                    >
+                                        Elementos
+                                    </button>
+                                    <button
+                                        className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${activeTab === "filters"
+                                            ? "bg-white shadow-sm text-purple-700"
+                                            : "customtext-neutral-dark hover:bg-white/50"
+                                            }`}
+                                        onClick={() => setActiveTab("filters")}
+                                    >
+                                        Filtros
+                                    </button>
                                 </div>
-                            )}
+                            </div>
 
-                            {activeTab === "filters" && (
-                                <div className="space-y-4">
-                                    {(() => {
-                                        const currentElement = getSelectedElement();
-                                        console.log('🔍 Filter tab - Current element:', currentElement);
-                                        console.log('🔍 Filter tab - Selected element ID:', selectedElement);
-                                        console.log('🔍 Filter tab - Selected cell ID:', selectedCell);
-                                        
-                                        return currentElement ? (
-                                            <>
-                                                {currentElement.type === "image" && (
-                                                    <div className="p-3 bg-gray-50 rounded-lg">
-                                                        <div className="flex items-center gap-2 mb-2">
-                                                            <ImageIcon className="h-4 w-4 text-purple-600" />
-                                                            <span className="text-sm font-medium">Imagen seleccionada</span>
-                                                        </div>
-                                                        <div className="w-full h-16 rounded-md overflow-hidden bg-gray-200">
-                                                            <img
-                                                                src={currentElement.content}
-                                                                alt=""
-                                                                className="w-full h-full object-cover"
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
+                            {/* Sidebar content */}
+                            <div className="flex-1 overflow-y-auto p-3 custom-scroll">
+                                {activeTab === "elements" && (
+                                    <div className="space-y-4">
+                                        <div>
+                                            <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
+                                                Layouts
+                                            </h3>
+                                            <LayoutSelector
+                                                currentLayoutId={pages[currentPage]?.layout}
+                                                onLayoutChange={changeLayout}
+                                            />
+                                        </div>
 
-                                                <FilterControls
-                                                    filters={currentElement.filters || {}}
-                                                    onFilterChange={(newFilters) => {
-                                                        updateElementInCell(
-                                                            selectedCell,
-                                                            selectedElement,
-                                                            { filters: newFilters }
-                                                        );
+                                 {/*       <div>
+                                            <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
+                                                Herramientas rápidas
+                                            </h3>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        const input = document.createElement("input");
+                                                        input.type = "file";
+                                                        input.accept = "image/*";
+                                                        input.onchange = (e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                const newId = `img-${Date.now()}`;
+                                                                const newElement = {
+                                                                    id: newId,
+                                                                    type: "image",
+                                                                    content: "",
+                                                                    position: { x: 10, y: 10 },
+                                                                    filters: {
+                                                                        brightness: 100,
+                                                                        contrast: 100,
+                                                                        saturation: 100,
+                                                                        tint: 0,
+                                                                        hue: 0,
+                                                                        blur: 0,
+                                                                        scale: 1,
+                                                                        rotate: 0,
+                                                                        opacity: 100,
+                                                                        blendMode: "normal",
+                                                                    },
+                                                                    mask: "none",
+                                                                };
+
+                                                                const reader = new FileReader();
+                                                                reader.onload = (e) => {
+                                                                    if (e.target?.result) {
+                                                                        newElement.content = e.target.result;
+                                                                        if (selectedCell) {
+                                                                            addElementToCell(selectedCell, newElement);
+                                                                        } else {
+                                                                            addElementToCell(pages[currentPage].cells[0].id, newElement);
+                                                                        }
+                                                                    }
+                                                                };
+                                                                reader.readAsDataURL(e.target.files[0]);
+                                                            }
+                                                        };
+                                                        input.click();
                                                     }}
-                                                    selectedElement={currentElement}
-                                                />
-                                            </>
-                                        ) : (
-                                            <div className="text-center py-8 px-2">
-                                                <div className="bg-gray-100 p-4 rounded-lg mb-3">
-                                                    <ImageIcon className="h-6 w-6 text-gray-400 mx-auto" />
-                                                </div>
-                                                <h3 className="text-sm font-medium text-gray-600">
-                                                    Selecciona un elemento
-                                                </h3>
-                                                <p className="text-xs text-gray-500 mt-1">
-                                                    Para aplicar filtros y efectos, primero selecciona una imagen o texto en el lienzo
-                                                </p>
-                                                <div className="mt-2 text-xs text-gray-400">
-                                                    Debug: selectedElement={selectedElement}, selectedCell={selectedCell}
-                                                </div>
+                                                    className="justify-start"
+                                                    icon={<ImageIcon className="h-4 w-4" />}
+                                                >
+                                                    Imagen
+                                                </Button>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={handleAddText}
+                                                    className="justify-start"
+                                                    icon={<Type className="h-4 w-4" />}
+                                                >
+                                                    Texto
+                                                </Button>
                                             </div>
-                                        );
-                                    })()}
-                                </div>
-                            )}
-                        </div>
-                    </aside>
-                    
-                    {/* Main canvas area */}
-                    <main className="flex-1 flex flex-col h-full">
-                        {/* Enhanced top toolbar - switches between main toolbar and text toolbar */}
-                        <div className="bg-white border-b px-4 py-2 flex items-center justify-between">
-                            {textToolbarVisible ? (
-                                /* Text editing toolbar */
-                                <>
-                                    <div className="flex items-center space-x-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setTextToolbarVisible(false)}
-                                            className="h-8 px-2"
-                                            icon={<ChevronLeft className="h-4 w-4" />}
-                                        >
-                                            Volver
-                                        </Button>
-                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                                    </div>
-                                    
-                                    <div className="flex-1 flex justify-center">
-                                        <TextToolbar
-                                            element={getSelectedElement()}
-                                            onUpdate={(updates) => {
-                                                updateElementInCell(
-                                                    textEditingOptions.cellId,
-                                                    textEditingOptions.elementId,
-                                                    updates
-                                                );
-                                            }}
-                                            onClose={() => setTextToolbarVisible(false)}
-                                        />
-                                    </div>
-                                    
-                                    <div className="flex items-center space-x-2">
-                                        <WorkspaceControls
-                                            currentSize={workspaceSize}
-                                            onSizeChange={setWorkspaceSize}
-                                            presetData={presetData}
-                                            workspaceDimensions={workspaceDimensions}
-                                        />
-                                    </div>
-                                </>
-                            ) : (
-                                /* Main toolbar */
-                                <>
-                                    {/* Left side - History controls */}
-                                    <div className="flex items-center space-x-2">
-                                        <div className="flex space-x-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={undo}
-                                                disabled={historyIndex <= 0}
-                                                className="h-8 px-2"
-                                                icon={<Undo2 className="h-4 w-4" />}
-                                            >
-                                                Deshacer
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={redo}
-                                                disabled={historyIndex >= history.length - 1}
-                                                className="h-8 px-2"
-                                                icon={<Redo2 className="h-4 w-4" />}
-                                            >
-                                                Rehacer
-                                            </Button>
-                                        </div>
-                                        
-                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                                        
-                                        {/* Quick add tools */}
-                                        <div className="flex space-x-1">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => {
-                                                    const input = document.createElement("input");
-                                                    input.type = "file";
-                                                    input.accept = "image/*";
-                                                    input.onchange = (e) => {
-                                                        if (e.target.files && e.target.files[0]) {
-                                                            const newId = `img-${Date.now()}`;
-                                                            const newElement = {
-                                                                id: newId,
-                                                                type: "image",
-                                                                content: "",
-                                                                position: { x: 0.1, y: 0.1 },
-                                                                size: { width: 0.3, height: 0.3 },
-                                                                filters: {
-                                                                    brightness: 100,
-                                                                    contrast: 100,
-                                                                    saturation: 100,
-                                                                    tint: 0,
-                                                                    hue: 0,
-                                                                    blur: 0,
-                                                                    scale: 1,
-                                                                    rotate: 0,
-                                                                    opacity: 100,
-                                                                    blendMode: "normal",
-                                                                },
-                                                                mask: "none",
-                                                            };
+                                        </div> */}
 
-                                                            const reader = new FileReader();
-                                                            reader.onload = (e) => {
-                                                                if (e.target?.result) {
-                                                                    newElement.content = e.target.result;
-                                                                    if (selectedCell) {
-                                                                        addElementToCell(selectedCell, newElement);
-                                                                    } else if (pages[currentPage]?.cells[0]) {
-                                                                        addElementToCell(pages[currentPage].cells[0].id, newElement);
-                                                                    }
-                                                                }
-                                                            };
-                                                            reader.readAsDataURL(e.target.files[0]);
-                                                        }
-                                                    };
-                                                    input.click();
+                                        <div>
+                                            <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
+                                                Capas
+                                            </h3>
+                                            <LayerPanel
+                                                elements={
+                                                    pages[currentPage].cells.find(
+                                                        (cell) => cell.id === selectedCell
+                                                    )?.elements || []
+                                                }
+                                                onReorder={(reorderedElements) => {
+                                                    const updatedPages = [...pages];
+                                                    const cellIndex = updatedPages[currentPage].cells.findIndex(
+                                                        (cell) => cell.id === selectedCell
+                                                    );
+                                                    if (cellIndex !== -1) {
+                                                        updatedPages[currentPage].cells[cellIndex].elements = reorderedElements;
+                                                        updatePages(updatedPages);
+                                                    }
                                                 }}
-                                                className="h-8 px-2"
-                                                icon={<ImageIcon className="h-4 w-4" />}
-                                            >
-                                                Imagen
-                                            </Button>
+                                                onSelect={handleSelectElement}
+                                                selectedElement={selectedElement}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === "filters" && (
+                                    <div className="space-y-4">
+                                        {(() => {
+                                            const currentElement = getSelectedElement();
+                                            console.log('🔍 Filter tab - Current element:', currentElement);
+                                            console.log('🔍 Filter tab - Selected element ID:', selectedElement);
+                                            console.log('🔍 Filter tab - Selected cell ID:', selectedCell);
+
+                                            return currentElement ? (
+                                                <>
+                                                    {currentElement.type === "image" && (
+                                                        <div className="p-3 bg-gray-50 rounded-lg">
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <ImageIcon className="h-4 w-4 text-purple-600" />
+                                                                <span className="text-sm font-medium">Imagen seleccionada</span>
+                                                            </div>
+                                                            <div className="w-full h-16 rounded-md overflow-hidden bg-gray-200">
+                                                                <img
+                                                                    src={currentElement.content}
+                                                                    alt=""
+                                                                    className="w-full h-full object-cover"
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    <FilterControls
+                                                        filters={currentElement.filters || {}}
+                                                        onFilterChange={(newFilters) => {
+                                                            updateElementInCell(
+                                                                selectedCell,
+                                                                selectedElement,
+                                                                { filters: newFilters }
+                                                            );
+                                                        }}
+                                                        selectedElement={currentElement}
+                                                    />
+                                                </>
+                                            ) : (
+                                                <div className="text-center py-8 px-2">
+                                                    <div className="bg-gray-100 p-4 rounded-lg mb-3">
+                                                        <ImageIcon className="h-6 w-6 text-gray-400 mx-auto" />
+                                                    </div>
+                                                    <h3 className="text-sm font-medium customtext-neutral-dark">
+                                                        Selecciona un elemento
+                                                    </h3>
+                                                    <p className="text-xs customtext-neutral-dark mt-1">
+                                                        Para aplicar filtros y efectos, primero selecciona una imagen o texto en el lienzo
+                                                    </p>
+                                                    <div className="mt-2 text-xs text-gray-400">
+                                                        Debug: selectedElement={selectedElement}, selectedCell={selectedCell}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        </aside>
+
+                        {/* Main canvas area */}
+                        <main className="flex-1 flex flex-col h-full">
+                            {/* Enhanced top toolbar - switches between main toolbar and text toolbar */}
+                            <div className="bg-white border-b px-4 py-2 flex items-center justify-between">
+                                {textToolbarVisible ? (
+                                    /* Text editing toolbar */
+                                    <>
+                                        <div className="flex items-center space-x-2">
                                             <Button
                                                 variant="ghost"
                                                 size="sm"
-                                                onClick={handleAddText}
+                                                onClick={() => setTextToolbarVisible(false)}
                                                 className="h-8 px-2"
-                                                icon={<Type className="h-4 w-4" />}
+                                                icon={<ChevronLeft className="h-4 w-4" />}
                                             >
-                                                Texto
+                                                Volver
                                             </Button>
+                                            <div className="h-6 w-px bg-gray-300 mx-2"></div>
                                         </div>
-                                        
-                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                                        
-                                        {/* Element actions */}
-                                        {selectedElement && (
+
+                                        <div className="flex-1 flex justify-start">
+                                            <TextToolbar
+                                                element={getSelectedElement()}
+                                                onUpdate={(updates) => {
+                                                    updateElementInCell(
+                                                        textEditingOptions.cellId,
+                                                        textEditingOptions.elementId,
+                                                        updates
+                                                    );
+                                                }}
+                                                onClose={() => setTextToolbarVisible(false)}
+                                            />
+                                        </div>
+
+                                       
+                                    </>
+                                ) : (
+                                    /* Main toolbar */
+                                    <>
+                                        {/* Left side - History controls */}
+                                        <div className="flex items-center space-x-2">
+                                            <div className="flex space-x-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={undo}
+                                                    disabled={historyIndex <= 0}
+                                                    className="h-8 px-2"
+                                                    icon={<Undo2 className="h-4 w-4" />}
+                                                >
+                                                    Deshacer
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={redo}
+                                                    disabled={historyIndex >= history.length - 1}
+                                                    className="h-8 px-2"
+                                                    icon={<Redo2 className="h-4 w-4" />}
+                                                >
+                                                    Rehacer
+                                                </Button>
+                                            </div>
+
+                                            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+
+                                            {/* Quick add tools */}
                                             <div className="flex space-x-1">
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() => {
-                                                        if (selectedElement && selectedCell) {
-                                                            const element = getSelectedElement();
-                                                            if (element) {
-                                                                const duplicateElement = {
-                                                                    ...element,
-                                                                    id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                                                                    position: {
-                                                                        x: element.position.x + 0.05,
-                                                                        y: element.position.y + 0.05
+                                                        const input = document.createElement("input");
+                                                        input.type = "file";
+                                                        input.accept = "image/*";
+                                                        input.onchange = (e) => {
+                                                            if (e.target.files && e.target.files[0]) {
+                                                                const newId = `img-${Date.now()}`;
+                                                                const newElement = {
+                                                                    id: newId,
+                                                                    type: "image",
+                                                                    content: "",
+                                                                    position: { x: 0.1, y: 0.1 },
+                                                                    size: { width: 0.3, height: 0.3 },
+                                                                    filters: {
+                                                                        brightness: 100,
+                                                                        contrast: 100,
+                                                                        saturation: 100,
+                                                                        tint: 0,
+                                                                        hue: 0,
+                                                                        blur: 0,
+                                                                        scale: 1,
+                                                                        rotate: 0,
+                                                                        opacity: 100,
+                                                                        blendMode: "normal",
+                                                                    },
+                                                                    mask: "none",
+                                                                };
+
+                                                                const reader = new FileReader();
+                                                                reader.onload = (e) => {
+                                                                    if (e.target?.result) {
+                                                                        newElement.content = e.target.result;
+                                                                        if (selectedCell) {
+                                                                            addElementToCell(selectedCell, newElement);
+                                                                        } else if (pages[currentPage]?.cells[0]) {
+                                                                            addElementToCell(pages[currentPage].cells[0].id, newElement);
+                                                                        }
                                                                     }
                                                                 };
-                                                                addElementToCell(selectedCell, duplicateElement);
+                                                                reader.readAsDataURL(e.target.files[0]);
                                                             }
-                                                        }
+                                                        };
+                                                        input.click();
                                                     }}
                                                     className="h-8 px-2"
-                                                    icon={<Copy className="h-4 w-4" />}
+                                                    icon={<ImageIcon className="h-4 w-4" />}
                                                 >
-                                                    Duplicar
+                                                    Imagen
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="sm"
-                                                    onClick={() => {
-                                                        if (selectedElement && selectedCell) {
-                                                            deleteElementFromCell(selectedCell, selectedElement);
-                                                        }
-                                                    }}
-                                                    className="h-8 px-2 text-red-600 hover:text-red-700"
-                                                    icon={<Trash2 className="h-4 w-4" />}
+                                                    onClick={handleAddText}
+                                                    className="h-8 px-2"
+                                                    icon={<Type className="h-4 w-4" />}
                                                 >
-                                                    Eliminar
+                                                    Texto
                                                 </Button>
                                             </div>
-                                        )}
-                                    </div>
-                                    
-                                    {/* Center - Page info */}
-                                    <div className="flex items-center space-x-4">
-                                        <div className="text-sm text-gray-600">
-                                            {pages[currentPage] && (
-                                                <span>
-                                                    {pages[currentPage].type === "cover" && "Portada"}
-                                                    {pages[currentPage].type === "content" && `Página ${pages[currentPage].pageNumber}`}
-                                                    {pages[currentPage].type === "final" && "Contraportada"}
-                                                </span>
-                                            )}
-                                        </div>
-                                        
-                                        <Button
-                                            variant={previewMode ? "default" : "ghost"}
-                                            size="sm"
-                                            onClick={togglePreview}
-                                            className="h-8 px-2"
-                                            icon={<Eye className="h-4 w-4" />}
-                                        >
-                                            {previewMode ? "Salir vista previa" : "Vista previa"}
-                                        </Button>
-                                    </div>
-                                    
-                                    {/* Right side - Workspace controls */}
-                                    <div className="flex items-center space-x-2">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            onClick={() => setIsBookPreviewOpen(true)}
-                                            className="h-8 px-2"
-                                            icon={<Book className="h-4 w-4" />}
-                                        >
-                                            Previsualizar libro
-                                        </Button>
-                                        
-                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
-                                        
-                                        <WorkspaceControls
-                                            currentSize={workspaceSize}
-                                            onSizeChange={setWorkspaceSize}
-                                            presetData={presetData}
-                                            workspaceDimensions={workspaceDimensions}
-                                        />
-                                    </div>
-                                </>
-                            )}
-                        </div>
-                        
 
-                        
-                        {/* Canvas workspace - centered */}
-                        <div className="flex-1 flex items-center justify-center p-6 overflow-hidden bg-gray-100">
-                            {previewMode ? (
-                                <div className="bg-white rounded-lg shadow-lg">
-                                    <div
-                                        className="overflow-hidden"
-                                        style={{
-                                            width: workspaceDimensions.width,
-                                            height: workspaceDimensions.height,
-                                        }}
-                                    >
+                                            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+
+                                            {/* Element actions */}
+                                            {selectedElement && (
+                                                <div className="flex space-x-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            if (selectedElement && selectedCell) {
+                                                                const element = getSelectedElement();
+                                                                if (element) {
+                                                                    const duplicateElement = {
+                                                                        ...element,
+                                                                        id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                                                        position: {
+                                                                            x: element.position.x + 0.05,
+                                                                            y: element.position.y + 0.05
+                                                                        }
+                                                                    };
+                                                                    addElementToCell(selectedCell, duplicateElement);
+                                                                }
+                                                            }
+                                                        }}
+                                                        className="h-8 px-2"
+                                                        icon={<Copy className="h-4 w-4" />}
+                                                    >
+                                                        Duplicar
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => {
+                                                            if (selectedElement && selectedCell) {
+                                                                deleteElementFromCell(selectedCell, selectedElement);
+                                                            }
+                                                        }}
+                                                        className="h-8 px-2 text-red-600 hover:text-white"
+                                                        icon={<Trash2 className="h-4 w-4" />}
+                                                    >
+                                                        Eliminar
+                                                    </Button>
+                                                </div>
+                                            )}
+
+                                             <div className="flex items-center space-x-2">
+                                            <WorkspaceControls
+                                                currentSize={workspaceSize}
+                                                onSizeChange={setWorkspaceSize}
+                                                presetData={presetData}
+                                                workspaceDimensions={workspaceDimensions}
+                                            />
+                                        </div>
+                                        </div>
+
+                                        {/* Center - Page info 
+                                           <div className="flex items-center space-x-4">
+                                            <div className="text-sm customtext-neutral-dark">
+                                                {pages[currentPage] && (
+                                                    <span>
+                                                        {pages[currentPage].type === "cover" && "Portada"}
+                                                        {pages[currentPage].type === "content" && `Página ${pages[currentPage].pageNumber}`}
+                                                        {pages[currentPage].type === "final" && "Contraportada"}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            <Button
+                                                variant={previewMode ? "default" : "ghost"}
+                                                size="sm"
+                                                onClick={togglePreview}
+                                                className="h-8 px-2"
+                                                icon={<Eye className="h-4 w-4" />}
+                                            >
+                                                {previewMode ? "Salir vista previa" : "Vista previa"}
+                                            </Button>
+                                        </div>*/}
+                                     
+
+                                        {/* Right side - Workspace controls 
+                                         <div className="flex items-center space-x-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setIsBookPreviewOpen(true)}
+                                                className="h-8 px-2"
+                                                icon={<Book className="h-4 w-4" />}
+                                            >
+                                                Previsualizar libro
+                                            </Button>
+
+                                            <div className="h-6 w-px bg-gray-300 mx-2"></div>
+
+                                            <WorkspaceControls
+                                                currentSize={workspaceSize}
+                                                onSizeChange={setWorkspaceSize}
+                                                presetData={presetData}
+                                                workspaceDimensions={workspaceDimensions}
+                                            />
+                                        </div>*/}
+                                       
+                                    </>
+                                )}
+                            </div>
+
+
+
+                            {/* Canvas workspace - centered */}
+                            <div className="flex-1 flex items-center justify-center p-6 overflow-hidden bg-gray-100">
+                                {previewMode ? (
+                                    <div className="bg-white rounded-lg shadow-lg">
                                         <div
-                                            id={`page-${pages[currentPage].id}`} 
-                                            className={`grid ${getCurrentLayout().template} gap-6`}
-                                            style={{ width: '100%', height: '100%' }}
+                                            className="overflow-hidden"
+                                            style={{
+                                                width: workspaceDimensions.width,
+                                                height: workspaceDimensions.height,
+                                            }}
                                         >
-                                            {pages[currentPage].cells.map((cell) => (
-                                                <div
-                                                    key={cell.id}
-                                                    className="relative bg-gray-50 rounded-lg overflow-hidden"
-                                                >
-                                                    {cell.elements.map((element) =>
-                                                        element.type === "image" ? (
-                                                            <div
-                                                                key={element.id}
-                                                                className={`absolute ${
-                                                                    imageMasks.find(
+                                            <div
+                                                id={`page-${pages[currentPage].id}`}
+                                                className={`grid ${getCurrentLayout().template} gap-6`}
+                                                style={{ width: '100%', height: '100%' }}
+                                            >
+                                                {pages[currentPage].cells.map((cell) => (
+                                                    <div
+                                                        key={cell.id}
+                                                        className="relative bg-gray-50 rounded-lg overflow-hidden"
+                                                    >
+                                                        {cell.elements.map((element) =>
+                                                            element.type === "image" ? (
+                                                                <div
+                                                                    key={element.id}
+                                                                    className={`absolute ${imageMasks.find(
                                                                         (m) => m.id === element.mask
                                                                     )?.class || ""
-                                                                }`}
-                                                                style={{
-                                                                    left: `${element.position.x}px`,
-                                                                    top: `${element.position.y}px`,
-                                                                    width: "100%",
-                                                                    height: "100%",
-                                                                }}
-                                                            >
-                                                                <img
-                                                                    src={element.content}
-                                                                    alt=""
-                                                                    className="w-full h-full object-cover"
+                                                                        }`}
                                                                     style={{
-                                                                        filter: `
+                                                                        left: `${element.position.x}px`,
+                                                                        top: `${element.position.y}px`,
+                                                                        width: "100%",
+                                                                        height: "100%",
+                                                                    }}
+                                                                >
+                                                                    <img
+                                                                        src={element.content}
+                                                                        alt=""
+                                                                        className="w-full h-full object-cover"
+                                                                        style={{
+                                                                            filter: `
                                                                             brightness(${(element.filters?.brightness || 100) / 100})
                                                                             contrast(${(element.filters?.contrast || 100) / 100})
                                                                             saturate(${(element.filters?.saturation || 100) / 100})
@@ -1438,260 +1458,255 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                             hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
                                                                             blur(${element.filters?.blur || 0}px)
                                                                         `,
-                                                                        transform: `scale(${
-                                                                            element.filters?.scale || 1
-                                                                        }) rotate(${
-                                                                            element.filters?.rotate || 0
-                                                                        }deg) ${
-                                                                            element.filters?.flipHorizontal
-                                                                                ? "scaleX(-1)"
-                                                                                : ""
-                                                                        } ${
-                                                                            element.filters?.flipVertical
-                                                                                ? "scaleY(-1)"
-                                                                                : ""
-                                                                        }`,
-                                                                        mixBlendMode: element.filters?.blendMode || "normal",
-                                                                        opacity: (element.filters?.opacity || 100) / 100,
+                                                                            transform: `scale(${element.filters?.scale || 1
+                                                                                }) rotate(${element.filters?.rotate || 0
+                                                                                }deg) ${element.filters?.flipHorizontal
+                                                                                    ? "scaleX(-1)"
+                                                                                    : ""
+                                                                                } ${element.filters?.flipVertical
+                                                                                    ? "scaleY(-1)"
+                                                                                    : ""
+                                                                                }`,
+                                                                            mixBlendMode: element.filters?.blendMode || "normal",
+                                                                            opacity: (element.filters?.opacity || 100) / 100,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            ) : (
+                                                                <div
+                                                                    key={element.id}
+                                                                    className="absolute"
+                                                                    style={{
+                                                                        left: `${element.position.x}px`,
+                                                                        top: `${element.position.y}px`,
+                                                                        fontFamily: element.style?.fontFamily,
+                                                                        fontSize: element.style?.fontSize,
+                                                                        fontWeight: element.style?.fontWeight,
+                                                                        fontStyle: element.style?.fontStyle,
+                                                                        textDecoration: element.style?.textDecoration,
+                                                                        color: element.style?.color,
+                                                                        textAlign: element.style?.textAlign,
+                                                                        backgroundColor: element.style?.backgroundColor || "transparent",
+                                                                        padding: element.style?.padding || "8px",
+                                                                        borderRadius: element.style?.borderRadius || "0px",
+                                                                        border: element.style?.border || "none",
+                                                                        opacity: element.style?.opacity || 1,
                                                                     }}
-                                                                />
-                                                            </div>
-                                                        ) : (
-                                                            <div
-                                                                key={element.id}
-                                                                className="absolute"
-                                                                style={{
-                                                                    left: `${element.position.x}px`,
-                                                                    top: `${element.position.y}px`,
-                                                                    fontFamily: element.style?.fontFamily,
-                                                                    fontSize: element.style?.fontSize,
-                                                                    fontWeight: element.style?.fontWeight,
-                                                                    fontStyle: element.style?.fontStyle,
-                                                                    textDecoration: element.style?.textDecoration,
-                                                                    color: element.style?.color,
-                                                                    textAlign: element.style?.textAlign,
-                                                                    backgroundColor: element.style?.backgroundColor || "transparent",
-                                                                    padding: element.style?.padding || "8px",
-                                                                    borderRadius: element.style?.borderRadius || "0px",
-                                                                    border: element.style?.border || "none",
-                                                                    opacity: element.style?.opacity || 1,
-                                                                }}
-                                                            >
-                                                                {element.content}
-                                                            </div>
-                                                        )
-                                                    )}
-                                                </div>
+                                                                >
+                                                                    {element.content}
+                                                                </div>
+                                                            )
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div
+                                        id={`page-${pages[currentPage].id}`}
+                                        className="bg-white rounded-lg shadow-xl"
+                                        style={{
+                                            width: workspaceDimensions.width,
+                                            height: workspaceDimensions.height,
+                                            position: 'relative'
+                                        }}
+                                    >
+                                        {/* Background layer */}
+                                        {(() => {
+                                            const page = pages[currentPage];
+                                            let bgUrl = null;
+                                            if (page.type === 'cover' && presetData?.cover_image) {
+                                                bgUrl = presetData.cover_image.startsWith('http')
+                                                    ? presetData.cover_image
+                                                    : `/storage/images/item_preset/${presetData.cover_image}`;
+                                            } else if (page.type === 'content' && presetData?.content_layer_image) {
+                                                bgUrl = presetData.content_layer_image.startsWith('http')
+                                                    ? presetData.content_layer_image
+                                                    : `/storage/images/item_preset/${presetData.content_layer_image}`;
+                                            } else if (page.type === 'final' && presetData?.final_layer_image) {
+                                                bgUrl = presetData.final_layer_image.startsWith('http')
+                                                    ? presetData.final_layer_image
+                                                    : `/storage/images/item_preset/${presetData.final_layer_image}`;
+                                            }
+                                            return bgUrl ? (
+                                                <img
+                                                    src={bgUrl}
+                                                    alt="background"
+                                                    style={{
+                                                        position: 'absolute',
+                                                        top: 0,
+                                                        left: 0,
+                                                        width: '100%',
+                                                        height: '100%',
+                                                        objectFit: 'cover',
+                                                        zIndex: 0,
+                                                        pointerEvents: 'none',
+                                                    }}
+                                                />
+                                            ) : null;
+                                        })()}
+
+                                        {/* Editable cells layer */}
+                                        <div
+                                            className={`grid ${getCurrentLayout().template}`}
+                                            style={{
+                                                position: 'relative',
+                                                zIndex: 1,
+                                                width: '100%',
+                                                height: '100%',
+                                                boxSizing: 'border-box',
+                                                gap: getCurrentLayout().style?.gap || '16px',
+                                                padding: getCurrentLayout().style?.padding || '16px'
+                                            }}
+                                        >
+                                            {pages[currentPage].cells.map((cell) => (
+                                                <EditableCell
+                                                    key={cell.id}
+                                                    id={cell.id}
+                                                    elements={cell.elements.filter(el => !el.locked)}
+                                                    workspaceSize={workspaceDimensions}
+                                                    cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
+                                                    selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                    onSelectElement={handleSelectElement}
+                                                    onAddElement={(element) => addElementToCell(cell.id, element)}
+                                                    onUpdateElement={(elementId, updates, isDuplicate) =>
+                                                        updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                    onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                    availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
+                                                />
                                             ))}
                                         </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <div
-                                    id={`page-${pages[currentPage].id}`}
-                                    className="bg-white rounded-lg shadow-xl"
-                                    style={{
-                                        width: workspaceDimensions.width,
-                                        height: workspaceDimensions.height,
-                                        position: 'relative'
-                                    }}
-                                >
-                                    {/* Background layer */}
-                                    {(() => {
-                                        const page = pages[currentPage];
-                                        let bgUrl = null;
-                                        if (page.type === 'cover' && presetData?.cover_image) {
-                                            bgUrl = presetData.cover_image.startsWith('http')
-                                                ? presetData.cover_image
-                                                : `/storage/images/item_preset/${presetData.cover_image}`;
-                                        } else if (page.type === 'content' && presetData?.content_layer_image) {
-                                            bgUrl = presetData.content_layer_image.startsWith('http')
-                                                ? presetData.content_layer_image
-                                                : `/storage/images/item_preset/${presetData.content_layer_image}`;
-                                        } else if (page.type === 'final' && presetData?.final_layer_image) {
-                                            bgUrl = presetData.final_layer_image.startsWith('http')
-                                                ? presetData.final_layer_image
-                                                : `/storage/images/item_preset/${presetData.final_layer_image}`;
-                                        }
-                                        return bgUrl ? (
-                                            <img
-                                                src={bgUrl}
-                                                alt="background"
-                                                style={{
-                                                    position: 'absolute',
-                                                    top: 0,
-                                                    left: 0,
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover',
-                                                    zIndex: 0,
-                                                    pointerEvents: 'none',
-                                                }}
-                                            />
-                                        ) : null;
-                                    })()}
-                                    
-                                    {/* Editable cells layer */}
-                                    <div
-                                        className={`grid ${getCurrentLayout().template}`}
-                                        style={{ 
-                                            position: 'relative', 
-                                            zIndex: 1,
-                                            width: '100%',
-                                            height: '100%',
-                                            boxSizing: 'border-box',
-                                            gap: getCurrentLayout().style?.gap || '16px',
-                                            padding: getCurrentLayout().style?.padding || '16px'
-                                        }}
-                                    >
-                                        {pages[currentPage].cells.map((cell) => (
-                                            <EditableCell
-                                                key={cell.id}
-                                                id={cell.id}
-                                                elements={cell.elements.filter(el => !el.locked)}
-                                                workspaceSize={workspaceDimensions}
-                                                cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
-                                                selectedElement={selectedCell === cell.id ? selectedElement : null}
-                                                onSelectElement={handleSelectElement}
-                                                onAddElement={(element) => addElementToCell(cell.id, element)}
-                                                onUpdateElement={(elementId, updates, isDuplicate) => 
-                                                    updateElementInCell(cell.id, elementId, updates, isDuplicate)}
-                                                onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
-                                                availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
-                                            />
-                                        ))}
+                                )}
+                            </div>
+                        </main>
+
+                        {/* Right sidebar - Page management */}
+                        <aside className="w-64 bg-white border-l flex flex-col h-full">
+                            <div className="p-3 border-b">
+                                <h3 className="font-medium text-xs uppercase customtext-neutral-dark">Páginas</h3>
+                                <div className="flex justify-end mt-2">
+                                    <div className="flex gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={duplicateCurrentPage}
+                                            disabled={pages[currentPage]?.type !== "content"}
+                                            title={pages[currentPage]?.type !== "content" ? "Solo se pueden duplicar páginas de contenido" : "Duplicar página"}
+                                            className="h-7 w-7"
+                                        >
+                                            <Copy className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            onClick={deleteCurrentPage}
+                                            disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
+                                            title={
+                                                pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"
+                                                    ? "No se puede eliminar la portada o contraportada"
+                                                    : pages.length <= 3
+                                                        ? "Debe haber al menos una página de contenido"
+                                                        : "Eliminar página"
+                                            }
+                                            className="h-7 w-7"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={addPage}
+                                            className="flex items-center h-7"
+                                        >
+                                            <Plus className="h-3.5 w-3.5 mr-1" />
+                                            <span className="text-xs">Nueva página</span>
+                                        </Button>
                                     </div>
                                 </div>
-                            )}
-                        </div>
-                    </main>
-                    
-                    {/* Right sidebar - Page management */}
-                    <aside className="w-64 bg-white border-l flex flex-col h-full">
-                        <div className="p-3 border-b">
-                            <h3 className="font-medium text-xs uppercase text-gray-500">Páginas</h3>
-                            <div className="flex justify-end mt-2">
-                                <div className="flex gap-1">
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon" 
-                                        onClick={duplicateCurrentPage}
-                                        disabled={pages[currentPage]?.type !== "content"}
-                                        title={pages[currentPage]?.type !== "content" ? "Solo se pueden duplicar páginas de contenido" : "Duplicar página"}
-                                        className="h-7 w-7"
-                                    >
-                                        <Copy className="h-4 w-4" />
-                                    </Button>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="icon"
-                                        onClick={deleteCurrentPage}
-                                        disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
-                                        title={
-                                            pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final" 
-                                            ? "No se puede eliminar la portada o contraportada"
-                                            : pages.length <= 3 
-                                            ? "Debe haber al menos una página de contenido"
-                                            : "Eliminar página"
-                                        }
-                                        className="h-7 w-7"
-                                    >
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={addPage}
-                                        className="flex items-center h-7"
-                                    >
-                                        <Plus className="h-3.5 w-3.5 mr-1" />
-                                        <span className="text-xs">Nueva página</span>
-                                    </Button>
-                                </div>
                             </div>
-                        </div>
-                        
-                        {/* Page thumbnails - scrollable */}
-                        <div className="flex-1 overflow-y-auto p-3 custom-scroll">
-                            <div className="space-y-3">
-                                {pages.map((page, index) => {
-                                    // Obtener título de página basado en el tipo
-                                    let pageTitle = "Página";
-                                    let pageIcon = "";
-                                    let pageColor = "bg-gray-100";
-                                    
-                                    if (page.type === "cover") {
-                                        pageTitle = "Portada";
-                                        pageIcon = "📖";
-                                        pageColor = "bg-purple-100";
-                                    } else if (page.type === "content") {
-                                        pageTitle = `Pág. ${page.pageNumber}`;
-                                        pageIcon = "📄";
-                                        pageColor = "bg-blue-100";
-                                    } else if (page.type === "final") {
-                                        pageTitle = "Contraportada";
-                                        pageIcon = "📚";
-                                        pageColor = "bg-green-100";
-                                    }
-                                    
-                                    return (
-                                        <div
-                                            key={page.id}
-                                            className={`flex flex-col cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${
-                                                currentPage === index ? "ring-2 ring-purple-400" : ""
-                                            }`}
-                                            onClick={() => setCurrentPage(index)}
-                                        >
-                                            <div className={`relative ${pageColor} rounded-md overflow-hidden border mb-1 aspect-[4/3]`}>
-                                                <div className="absolute top-1 left-1 right-1 flex justify-between items-start z-10">
-                                                    <span className="text-[10px] bg-white/90 px-1.5 py-0.5 rounded-full font-medium">
-                                                        {pageIcon} {pageTitle}
-                                                    </span>
-                                                    {page.type === "content" && (
-                                                        <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
-                                                            Editable
+
+                            {/* Page thumbnails - scrollable */}
+                            <div className="flex-1 overflow-y-auto p-3 custom-scroll">
+                                <div className="space-y-3">
+                                    {pages.map((page, index) => {
+                                        // Obtener título de página basado en el tipo
+                                        let pageTitle = "Página";
+                                        let pageIcon = "";
+                                        let pageColor = "bg-gray-100";
+
+                                        if (page.type === "cover") {
+                                            pageTitle = "Portada";
+                                            pageIcon = "📖";
+                                            pageColor = "bg-purple-100";
+                                        } else if (page.type === "content") {
+                                            pageTitle = `Pág. ${page.pageNumber}`;
+                                            pageIcon = "📄";
+                                            pageColor = "bg-blue-100";
+                                        } else if (page.type === "final") {
+                                            pageTitle = "Contraportada";
+                                            pageIcon = "📚";
+                                            pageColor = "bg-green-100";
+                                        }
+
+                                        return (
+                                            <div
+                                                key={page.id}
+                                                className={`flex flex-col cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${currentPage === index ? "ring-2 ring-purple-400" : ""
+                                                    }`}
+                                                onClick={() => setCurrentPage(index)}
+                                            >
+                                                <div className={`relative ${pageColor} rounded-md overflow-hidden border mb-1 aspect-[4/3]`}>
+                                                    <div className="absolute top-1 left-1 right-1 flex justify-between items-start z-10">
+                                                        <span className="text-[10px] bg-white/90 px-1.5 py-0.5 rounded-full font-medium">
+                                                            {pageIcon} {pageTitle}
                                                         </span>
+                                                        {page.type === "content" && (
+                                                            <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
+                                                                Editable
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {pageThumbnails[page.id] ? (
+                                                        <img
+                                                            src={pageThumbnails[page.id]}
+                                                            alt={`Miniatura página ${index + 1}`}
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <div
+                                                                className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
+                                                            >
+                                                                {Array.from({
+                                                                    length: getCurrentLayout().cells,
+                                                                }).map((_, i) => (
+                                                                    <div
+                                                                        key={i}
+                                                                        className="bg-gray-200 rounded-sm"
+                                                                    ></div>
+                                                                ))}
+                                                            </div>
+                                                        </div>
                                                     )}
                                                 </div>
-
-                                                {pageThumbnails[page.id] ? (
-                                                    <img
-                                                        src={pageThumbnails[page.id]}
-                                                        alt={`Miniatura página ${index + 1}`}
-                                                        className="w-full h-full object-contain"
-                                                    />
-                                                ) : (
-                                                    <div className="w-full h-full flex items-center justify-center">
-                                                        <div
-                                                            className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
-                                                        >
-                                                            {Array.from({
-                                                                length: getCurrentLayout().cells,
-                                                            }).map((_, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className="bg-gray-200 rounded-sm"
-                                                                ></div>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                )}
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    </aside>
+                        </aside>
+                    </div>
                 </div>
-            </div>
             )}
         </DndProvider>
     );
 }
 
 
-                                                   
+
 <style jsx>{`
     .custom-scroll {
         scrollbar-width: thin;
