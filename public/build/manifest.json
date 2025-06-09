@@ -2856,7 +2856,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-t7mhSnPI.js",
+    "file": "assets/BananaLab-C7kRZYzY.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -2991,6 +2991,17 @@
       "_index-yBjzXJbu.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Editor/FilterControls.jsx": {
+    "file": "assets/FilterControls-Co_3lRRe.js",
+    "name": "FilterControls",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/FilterControls.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/FilterPresets.jsx": {
@@ -6356,7 +6367,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-IJMhXKH8.js",
+    "file": "assets/System-CgnzyZGw.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,

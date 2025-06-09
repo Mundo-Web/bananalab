@@ -28,6 +28,7 @@ import EditableCell from "./components/Elements/EditableCell";
 import LayoutSelector from "./components/Elements/LayoutSelector";
 import { AdvancedSettings } from "./components/Editor/AdvancedSettings";
 import { FilterPresets } from "./components/Editor/FilterPresets";
+import { FilterControls } from "./components/Editor/FilterControls";
 import { MaskSelector } from "./components/Elements/MaskSelector";
 import TextToolbar from "./components/Elements/TextToolbar";
 import WorkspaceControls from "./components/Elements/WorkspaceControls";
@@ -863,9 +864,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     return (
         <DndProvider backend={HTML5Backend}>
-            {/* Pantalla de carga */}
             {isLoading ? (
-                <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="h-screen bg-gray-100 flex items-center justify-center">
                     <div className="bg-white p-8 rounded-lg shadow-lg text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
                         <h2 className="text-xl font-semibold text-gray-800 mb-2">Cargando Editor</h2>
@@ -873,7 +873,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             ) : pages.length === 0 || loadError ? (
-                <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+                <div className="h-screen bg-gray-100 flex items-center justify-center">
                     <div className="bg-white p-8 rounded-lg shadow-lg text-center max-w-md">
                         <h2 className="text-xl font-semibold text-red-600 mb-2">Error</h2>
                         <p className="text-gray-600 mb-4">
@@ -896,1220 +896,802 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             ) : (
-            <div className="bg-white py-4">
-                <div className="flex flex-col min-h-screen  mx-auto  max-w-[82rem]">
-                    {/* Header */}
-                    <header className="border-b bg-white py-4 flex items-center justify-between ">
-                        <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm">
-                                <ChevronLeft className="h-5 w-5 mr-1" />
-                                Regresar
-                            </Button>
-                            {/* Información del álbum */}
-                            <div className="ml-4">
-                                <h1 className="text-lg font-semibold text-gray-800">
-                                    {albumData?.title || "Álbum Sin Título"}
-                                </h1>
-                                <div className="flex items-center gap-2">
-                                    <p className="text-sm text-gray-600">
-                                        {getCurrentPageTitle()} {pages.length > 0 && `• ${pages.length} páginas total`}
-                                    </p>
-                                    {pages.length > 0 && (
-                                        <span className={`text-xs px-2 py-1 rounded-full ${
-                                            isCurrentPageEditable() 
-                                            ? "bg-green-100 text-green-700" 
-                                            : "bg-amber-100 text-amber-700"
-                                        }`}>
-                                            {isCurrentPageEditable() ? "✏️ Editable" : "🔒 Solo vista"}
-                                        </span>
-                                    )}
-                                </div>
+            <div className="h-screen w-screen overflow-hidden bg-gray-50">
+                {/* Book Preview Modal */}
+                <BookPreviewModal
+                    isOpen={isBookPreviewOpen}
+                    onRequestClose={() => setIsBookPreviewOpen(false)}
+                    pages={pages.map((page) => ({
+                        ...page,
+                        layout: layouts.find((l) => l.id === page.layout) || layouts[0],
+                    }))}
+                />
+                
+                {/* Header - Top Bar */}
+                <header className="fixed top-0 left-0 right-0 h-14 border-b bg-white flex items-center justify-between px-4 z-10">
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm">
+                            <ChevronLeft className="h-5 w-5 mr-1" />
+                            Regresar
+                        </Button>
+                        {/* Información del álbum */}
+                        <div className="ml-4 truncate">
+                            <h1 className="text-sm font-semibold text-gray-800 truncate">
+                                {albumData?.title || "Álbum Sin Título"}
+                            </h1>
+                            <div className="flex items-center gap-2">
+                                <p className="text-xs text-gray-600">
+                                    {getCurrentPageTitle()} {pages.length > 0 && `• ${pages.length} páginas total`}
+                                </p>
+                                {pages.length > 0 && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                                        isCurrentPageEditable() 
+                                        ? "bg-green-100 text-green-700" 
+                                        : "bg-amber-100 text-amber-700"
+                                    }`}>
+                                        {isCurrentPageEditable() ? "✏️ Editable" : "🔒 Solo vista"}
+                                    </span>
+                                )}
                             </div>
                         </div>
+                    </div>
 
-                        <div className="flex gap-2">
-                            <Button
-                                variant="secondary"
-                                onClick={togglePreview}
-                                icon={<Eye className="h-4 w-4" />}
-                            >
-                                {previewMode ? "Editar" : "Vista previa"}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setIsBookPreviewOpen(true)}
-                                icon={<Book className="h-4 w-4" />} // Asegúrate de importar el icono Book
-                            >
-                                Vista de Álbum
-                            </Button>
-                            {/*  <Button
-                                className="bg-purple-600 hover:bg-purple-700"
-                                icon={<Download className="h-4 w-4" />}
-                                onClick={exportPage}
-                            >
-                                Exportar
-                            </Button>*/}
+                    <div className="flex gap-2 items-center">
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={togglePreview}
+                            icon={<Eye className="h-4 w-4" />}
+                        >
+                            {previewMode ? "Editar" : "Vista previa"}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setIsBookPreviewOpen(true)}
+                            icon={<Book className="h-4 w-4" />}
+                        >
+                            Vista de Álbum
+                        </Button>
+                    </div>
+                </header>
+
+                <div className="flex w-full h-full pt-14">
+                    {/* Left sidebar */}
+                    <aside className="w-64 bg-white border-r flex flex-col">
+                        {/* Tab navigation */}
+                        <div className="p-3 border-b">
+                            <div className="flex space-x-1 bg-gray-100 p-1 rounded-md">
+                                <button
+                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
+                                        activeTab === "elements"
+                                            ? "bg-white shadow-sm text-purple-700"
+                                            : "text-gray-600 hover:bg-white/50"
+                                    }`}
+                                    onClick={() => setActiveTab("elements")}
+                                >
+                                    Elementos
+                                </button>
+                                <button
+                                    className={`flex-1 py-1.5 text-xs font-medium rounded-md transition ${
+                                        activeTab === "filters"
+                                            ? "bg-white shadow-sm text-purple-700"
+                                            : "text-gray-600 hover:bg-white/50"
+                                    }`}
+                                    onClick={() => setActiveTab("filters")}
+                                >
+                                    Filtros
+                                </button>
+                            </div>
                         </div>
-                    </header>
+                        
+                        {/* Sidebar content */}
+                        <div className="flex-1 overflow-y-auto p-3 custom-scroll">
+                            {activeTab === "elements" && (
+                                <div className="space-y-4">
+                                    <div>
+                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
+                                            Layouts
+                                        </h3>
+                                        <LayoutSelector
+                                            currentLayoutId={pages[currentPage]?.layout}
+                                            onLayoutChange={changeLayout}
+                                        />
+                                    </div>
 
-                    <div className="flex flex-1 overflow-hidden">
-                        {/* Sidebar izquierdo */}
-                        <aside className="w-64 border-r bg-white p-4 overflow-y-auto shadow-sm">
-                            <div className="space-y-6">
-                                <div className="flex border-b pb-4">
-                                    <button
-                                        className={`flex-1 py-2 text-sm font-medium ${
-                                            activeTab === "elements"
-                                                ? "text-purple-600 border-b-2 border-purple-600"
-                                                : "text-gray-600 hover:text-gray-900"
-                                        }`}
-                                        onClick={() => setActiveTab("elements")}
-                                    >
-                                        Elementos
-                                    </button>
-                                    <button
-                                        className={`flex-1 py-2 text-sm font-medium ${
-                                            activeTab === "filters"
-                                                ? "text-purple-600 border-b-2 border-purple-600"
-                                                : "text-gray-600 hover:text-gray-900"
-                                        }`}
-                                        onClick={() => setActiveTab("filters")}
-                                    >
-                                        Filtros
-                                    </button>
-                                </div>
+                                    <div>
+                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
+                                            Herramientas rápidas
+                                        </h3>
+                                        <div className="grid grid-cols-2 gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const input = document.createElement("input");
+                                                    input.type = "file";
+                                                    input.accept = "image/*";
+                                                    input.onchange = (e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                            const newId = `img-${Date.now()}`;
+                                                            const newElement = {
+                                                                id: newId,
+                                                                type: "image",
+                                                                content: "",
+                                                                position: { x: 10, y: 10 },
+                                                                filters: {
+                                                                    brightness: 100,
+                                                                    contrast: 100,
+                                                                    saturation: 100,
+                                                                    tint: 0,
+                                                                    hue: 0,
+                                                                    blur: 0,
+                                                                    scale: 1,
+                                                                    rotate: 0,
+                                                                    opacity: 100,
+                                                                    blendMode: "normal",
+                                                                },
+                                                                mask: "none",
+                                                            };
 
-                                {activeTab === "elements" && (
-                                    <div className="space-y-4">
-                                        <div>
-                                            <h3 className="font-medium mb-3">
-                                                Layouts Disponibles
-                                            </h3>
-                                            <LayoutSelector
-                                                currentLayoutId={pages[currentPage]?.layout}
-                                                onLayoutChange={changeLayout}
-                                            />
-                                        </div>
-
-                                        <div>
-                                            {/* Panel de capas */}
-                                            <LayerPanel
-                                                elements={
-                                                    pages[
-                                                        currentPage
-                                                    ].cells.find(
-                                                        (cell) =>
-                                                            cell.id ===
-                                                            selectedCell
-                                                    )?.elements || []
-                                                }
-                                                onReorder={(
-                                                    reorderedElements
-                                                ) => {
-                                                    const updatedPages = [
-                                                        ...pages,
-                                                    ];
-                                                    const cellIndex =
-                                                        updatedPages[
-                                                            currentPage
-                                                        ].cells.findIndex(
-                                                            (cell) =>
-                                                                cell.id ===
-                                                                selectedCell
-                                                        );
-                                                    if (cellIndex !== -1) {
-                                                        updatedPages[
-                                                            currentPage
-                                                        ].cells[
-                                                            cellIndex
-                                                        ].elements =
-                                                            reorderedElements;
-                                                        updatePages(
-                                                            updatedPages
-                                                        );
-                                                    }
+                                                            const reader = new FileReader();
+                                                            reader.onload = (e) => {
+                                                                if (e.target?.result) {
+                                                                    newElement.content = e.target.result;
+                                                                    if (selectedCell) {
+                                                                        addElementToCell(selectedCell, newElement);
+                                                                    } else {
+                                                                        addElementToCell(pages[currentPage].cells[0].id, newElement);
+                                                                    }
+                                                                }
+                                                            };
+                                                            reader.readAsDataURL(e.target.files[0]);
+                                                        }
+                                                    };
+                                                    input.click();
                                                 }}
-                                                onSelect={handleSelectElement}
-                                                selectedElement={
-                                                    selectedElement
-                                                }
-                                            />
+                                                className="justify-start"
+                                                icon={<ImageIcon className="h-4 w-4" />}
+                                            >
+                                                Imagen
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleAddText}
+                                                className="justify-start"
+                                                icon={<Type className="h-4 w-4" />}
+                                            >
+                                                Texto
+                                            </Button>
                                         </div>
                                     </div>
-                                )}
 
-                                {activeTab === "filters" && (
-                                    <>
-                                        {selectedElement ? (
-                                            <div className="space-y-6">
-                                                <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-full max-w-md mx-auto">
-                                                    {[
-                                                        {
-                                                            key: "basic",
-                                                            label: "Básicos",
-                                                        },
-                                                        {
-                                                            key: "transform",
-                                                            label: "Avanzados",
-                                                        },
-                                                    ].map((tab) => (
-                                                        <button
-                                                            key={tab.key}
-                                                            onClick={() =>
-                                                                setFilterTab(
-                                                                    tab.key
-                                                                )
-                                                            }
-                                                            className={`flex-1 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
-                ${
-                    filterTab === tab.key
-                        ? "bg-purple-600 text-white shadow"
-                        : "text-gray-700 hover:bg-white hover:shadow-sm"
-                }`}
-                                                        >
-                                                            {tab.label}
-                                                        </button>
-                                                    ))}
-                                                </div>
+                                    <div>
+                                        <h3 className="font-medium text-xs uppercase text-gray-500 mb-2">
+                                            Capas
+                                        </h3>
+                                        <LayerPanel
+                                            elements={
+                                                pages[currentPage].cells.find(
+                                                    (cell) => cell.id === selectedCell
+                                                )?.elements || []
+                                            }
+                                            onReorder={(reorderedElements) => {
+                                                const updatedPages = [...pages];
+                                                const cellIndex = updatedPages[currentPage].cells.findIndex(
+                                                    (cell) => cell.id === selectedCell
+                                                );
+                                                if (cellIndex !== -1) {
+                                                    updatedPages[currentPage].cells[cellIndex].elements = reorderedElements;
+                                                    updatePages(updatedPages);
+                                                }
+                                            }}
+                                            onSelect={handleSelectElement}
+                                            selectedElement={selectedElement}
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
-                                                {filterTab === "basic" && (
-                                                    <>
-                                                        <FilterPresets
-                                                            onSelectPreset={
-                                                                applyFilterPreset
-                                                            }
-                                                            selectedImage={
-                                                                selectedImage
-                                                            }
-                                                        />
-                                                        <div className="space-y-4">
-                                                            <h3 className="font-medium">
-                                                                Ajustes básicos
-                                                            </h3>
-                                                            <Slider
-                                                                label="Brillo"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.brightness ||
-                                                                        100,
-                                                                ]}
-                                                                min={0}
-                                                                max={200}
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    brightness:
-                                                                                        value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
-                                                            <Slider
-                                                                label="Contraste"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.contrast ||
-                                                                        100,
-                                                                ]}
-                                                                min={0}
-                                                                max={200}
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    contrast:
-                                                                                        value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
-                                                            <Slider
-                                                                label="Saturación"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.saturation ||
-                                                                        100,
-                                                                ]}
-                                                                min={0}
-                                                                max={200}
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    saturation:
-                                                                                        value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
-                                                            <Slider
-                                                                label="Tono"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.hue ||
-                                                                        0,
-                                                                ]}
-                                                                min={0}
-                                                                max={360}
-                                                                unit="°"
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    hue: value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
-                                                            <Slider
-                                                                label="Sepia"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.tint ||
-                                                                        0,
-                                                                ]}
-                                                                min={0}
-                                                                max={100}
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    tint: value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
-                                                            <Slider
-                                                                label="Desenfoque"
-                                                                value={[
-                                                                    getSelectedElement()
-                                                                        ?.filters
-                                                                        ?.blur ||
-                                                                        0,
-                                                                ]}
-                                                                min={0}
-                                                                max={20}
-                                                                unit="px"
-                                                                onValueChange={(
-                                                                    value
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        {
-                                                                            filters:
-                                                                                {
-                                                                                    ...getSelectedElement()
-                                                                                        ?.filters,
-                                                                                    blur: value[0],
-                                                                                },
-                                                                        }
-                                                                    )
-                                                                }
-                                                            />
+                            {activeTab === "filters" && (
+                                <div className="space-y-4">
+                                    {(() => {
+                                        const currentElement = getSelectedElement();
+                                        console.log('🔍 Filter tab - Current element:', currentElement);
+                                        console.log('🔍 Filter tab - Selected element ID:', selectedElement);
+                                        console.log('🔍 Filter tab - Selected cell ID:', selectedCell);
+                                        
+                                        return currentElement ? (
+                                            <>
+                                                {currentElement.type === "image" && (
+                                                    <div className="p-3 bg-gray-50 rounded-lg">
+                                                        <div className="flex items-center gap-2 mb-2">
+                                                            <ImageIcon className="h-4 w-4 text-purple-600" />
+                                                            <span className="text-sm font-medium">Imagen seleccionada</span>
                                                         </div>
-                                                    </>
-                                                )}
-
-                                                {filterTab === "transform" && (
-                                                    <div className="space-y-4">
-                                                        {getSelectedElement()
-                                                            ?.type ===
-                                                            "image" && (
-                                                            <MaskSelector
-                                                                onSelect={(
-                                                                    mask
-                                                                ) =>
-                                                                    updateElementInCell(
-                                                                        selectedCell,
-                                                                        selectedElement,
-                                                                        { mask }
-                                                                    )
-                                                                }
-                                                                selectedMask={
-                                                                    getSelectedElement()
-                                                                        ?.mask ||
-                                                                    "none"
-                                                                }
-                                                                availableMasks={getCurrentLayout().maskCategories.flatMap(
-                                                                    (cat) =>
-                                                                        cat.masks
-                                                                )}
-                                                                selectedImage={
-                                                                    selectedImage
-                                                                }
+                                                        <div className="w-full h-16 rounded-md overflow-hidden bg-gray-200">
+                                                            <img
+                                                                src={currentElement.content}
+                                                                alt=""
+                                                                className="w-full h-full object-cover"
                                                             />
-                                                        )}
-                                                        <AdvancedSettings
-                                                            selectedImage={
-                                                                selectedImage
-                                                            }
-                                                            element={getSelectedElement()}
-                                                            onUpdate={(
-                                                                updates
-                                                            ) =>
-                                                                updateElementInCell(
-                                                                    selectedCell,
-                                                                    selectedElement,
-                                                                    updates
-                                                                )
-                                                            }
-                                                        />
-
-                                                        <div className="mt-6 space-y-4">
-                                                            <div className="flex items-center justify-between">
-                                                                <h3 className=" font-medium pt-4">
-                                                                    Transformación
-                                                                </h3>
-                                                            </div>
-
-                                                            <div className="grid grid-cols-2 gap-2">
-                                                                <Button
-                                                                    variant={
-                                                                        getSelectedElement()
-                                                                            ?.filters
-                                                                            ?.flipHorizontal
-                                                                            ? "secondary"
-                                                                            : "outline"
-                                                                    }
-                                                                    size="sm"
-                                                                    icon={
-                                                                        <FlipHorizontal className="h-4 w-4" />
-                                                                    }
-                                                                    className="justify-start "
-                                                                    onClick={() =>
-                                                                        updateElementInCell(
-                                                                            selectedCell,
-                                                                            selectedElement,
-                                                                            {
-                                                                                filters:
-                                                                                    {
-                                                                                        ...getSelectedElement()
-                                                                                            ?.filters,
-                                                                                        flipHorizontal:
-                                                                                            !getSelectedElement()
-                                                                                                ?.filters
-                                                                                                ?.flipHorizontal,
-                                                                                    },
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Giro
-                                                                    Horizontal
-                                                                </Button>
-                                                                <Button
-                                                                    variant={
-                                                                        getSelectedElement()
-                                                                            ?.filters
-                                                                            ?.flipVertical
-                                                                            ? "secondary"
-                                                                            : "outline"
-                                                                    }
-                                                                    size="sm"
-                                                                    icon={
-                                                                        <FlipVertical className="h-4 w-4" />
-                                                                    }
-                                                                    className="justify-start"
-                                                                    onClick={() =>
-                                                                        updateElementInCell(
-                                                                            selectedCell,
-                                                                            selectedElement,
-                                                                            {
-                                                                                filters:
-                                                                                    {
-                                                                                        ...getSelectedElement()
-                                                                                            ?.filters,
-                                                                                        flipVertical:
-                                                                                            !getSelectedElement()
-                                                                                                ?.filters
-                                                                                                ?.flipVertical,
-                                                                                    },
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Giro
-                                                                    Vertical
-                                                                </Button>
-                                                            </div>
-
-                                                            <div className="space-y-2">
-                                                                <Slider
-                                                                    label="Rotación"
-                                                                    value={[
-                                                                        getSelectedElement()
-                                                                            ?.filters
-                                                                            ?.rotate ||
-                                                                            0,
-                                                                    ]}
-                                                                    min={0}
-                                                                    max={360}
-                                                                    unit="°"
-                                                                    onValueChange={(
-                                                                        value
-                                                                    ) =>
-                                                                        updateElementInCell(
-                                                                            selectedCell,
-                                                                            selectedElement,
-                                                                            {
-                                                                                filters:
-                                                                                    {
-                                                                                        ...getSelectedElement()
-                                                                                            ?.filters,
-                                                                                        rotate: value[0],
-                                                                                    },
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                />
-                                                                <Slider
-                                                                    label="Escala"
-                                                                    value={[
-                                                                        (getSelectedElement()
-                                                                            ?.filters
-                                                                            ?.scale ||
-                                                                            1) *
-                                                                            100,
-                                                                    ]}
-                                                                    min={10}
-                                                                    max={200}
-                                                                    unit="%"
-                                                                    onValueChange={(
-                                                                        value
-                                                                    ) =>
-                                                                        updateElementInCell(
-                                                                            selectedCell,
-                                                                            selectedElement,
-                                                                            {
-                                                                                filters:
-                                                                                    {
-                                                                                        ...getSelectedElement()
-                                                                                            ?.filters,
-                                                                                        scale:
-                                                                                            value[0] /
-                                                                                            100,
-                                                                                    },
-                                                                            }
-                                                                        )
-                                                                    }
-                                                                />
-                                                            </div>
                                                         </div>
                                                     </div>
                                                 )}
-                                            </div>
-                                        ) : (
-                                            <h2 className="font-medium text-center">
-                                                Agrega imágenes y textos al área
-                                                de trabajo y selecciona tu
-                                                imagen para ver nuevas opciones
-                                            </h2>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-                        </aside>
-                        <BookPreviewModal
-                            isOpen={isBookPreviewOpen}
-                            onRequestClose={() => setIsBookPreviewOpen(false)}
-                            pages={pages.map((page) => ({
-                                ...page,
-                                layout:
-                                    layouts.find((l) => l.id === page.layout) ||
-                                    layouts[0],
-                            }))}
-                        />
 
-                        {/* Área principal de edición */}
-                        <main className="flex-1 overflow-auto bg-gray-100 p-6">
-                            <div className="max-w-5xl mx-auto ">
-                                {previewMode ? (
-                                    <div className="bg-white p-8 rounded-lg shadow-lg page-preview">
-                                        <div
-                                            className={`grid ${
-                                                getCurrentLayout().template
-                                            } gap-6 aspect-[4/3]`}
-                                        >
-                                            {pages[currentPage].cells.map(
-                                                (cell) => (
-                                                    <div
-                                                        key={cell.id}
-                                                        className="relative bg-gray-50 rounded-lg overflow-hidden"
-                                                    >
-                                                        {cell.elements.map(
-                                                            (element) =>
-                                                                element.type ===
-                                                                "image" ? (
-                                                                    <div
-                                                                        key={
-                                                                            element.id
-                                                                        }
-                                                                        className={`absolute ${
-                                                                            imageMasks.find(
-                                                                                (
-                                                                                    m
-                                                                                ) =>
-                                                                                    m.id ===
-                                                                                    element.mask
-                                                                            )
-                                                                                ?.class ||
-                                                                            ""
-                                                                        }`}
-                                                                        style={{
-                                                                            left: `${element.position.x}px`,
-                                                                            top: `${element.position.y}px`,
-                                                                            width: "100%",
-                                                                            height: "100%",
-                                                                        }}
-                                                                    >
-                                                                        <img
-                                                                            src={
-                                                                                element.content
-                                                                            }
-                                                                            alt=""
-                                                                            className="w-full h-full object-cover"
-                                                                            style={{
-                                                                                filter: `
-                                    brightness(${
-                                        (element.filters?.brightness || 100) /
-                                        100
-                                    })
-                                    contrast(${
-                                        (element.filters?.contrast || 100) / 100
-                                    })
-                                    saturate(${
-                                        (element.filters?.saturation || 100) /
-                                        100
-                                    })
-                                    sepia(${(element.filters?.tint || 0) / 100})
-                                    hue-rotate(${
-                                        (element.filters?.hue || 0) * 3.6
-                                    }deg)
-                                    blur(${element.filters?.blur || 0}px)
-                                  `,
-                                                                                transform: `scale(${
-                                                                                    element
-                                                                                        .filters
-                                                                                        ?.scale ||
-                                                                                    1
-                                                                                }) rotate(${
-                                                                                    element
-                                                                                        .filters
-                                                                                        ?.rotate ||
-                                                                                    0
-                                                                                }deg) ${
-                                                                                    element
-                                                                                        .filters
-                                                                                        ?.flipHorizontal
-                                                                                        ? "scaleX(-1)"
-                                                                                        : ""
-                                                                                } ${
-                                                                                    element
-                                                                                        .filters
-                                                                                        ?.flipVertical
-                                                                                        ? "scaleY(-1)"
-                                                                                        : ""
-                                                                                }`,
-                                                                                mixBlendMode:
-                                                                                    element
-                                                                                        .filters
-                                                                                        ?.blendMode ||
-                                                                                    "normal",
-                                                                                opacity:
-                                                                                    (element
-                                                                                        .filters
-                                                                                        ?.opacity ||
-                                                                                        100) /
-                                                                                    100,
-                                                                            }}
-                                                                        />
-                                                                    </div>
-                                                                ) : (
-                                                                    <div
-                                                                        key={
-                                                                            element.id
-                                                                        }
-                                                                        className="absolute"
-                                                                        style={{
-                                                                            left: `${element.position.x}px`,
-                                                                            top: `${element.position.y}px`,
-                                                                            fontFamily:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.fontFamily,
-                                                                            fontSize:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.fontSize,
-                                                                            fontWeight:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.fontWeight,
-                                                                            fontStyle:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.fontStyle,
-                                                                            textDecoration:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.textDecoration,
-                                                                            color: element
-                                                                                .style
-                                                                                ?.color,
-                                                                            textAlign:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.textAlign,
-                                                                            backgroundColor:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.backgroundColor ||
-                                                                                "transparent",
-                                                                            padding:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.padding ||
-                                                                                "8px",
-                                                                            borderRadius:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.borderRadius ||
-                                                                                "0px",
-                                                                            border:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.border ||
-                                                                                "none",
-                                                                            opacity:
-                                                                                element
-                                                                                    .style
-                                                                                    ?.opacity ||
-                                                                                1,
-                                                                        }}
-                                                                    >
-                                                                        {
-                                                                            element.content
-                                                                        }
-                                                                    </div>
-                                                                )
-                                                        )}
-                                                    </div>
-                                                )
-                                            )}
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-6">
-                                        {/* Barra de herramientas */}
-
-                                        {textToolbarVisible ? (
-                                            <TextToolbar
-                                                element={getSelectedElement()}
-                                                onUpdate={(updates) => {
-                                                    updateElementInCell(
-                                                        textEditingOptions.cellId,
-                                                        textEditingOptions.elementId,
-                                                        updates
-                                                    );
-                                                }}
-                                                onClose={() =>
-                                                    setTextToolbarVisible(false)
-                                                }
-                                            />
-                                        ) : (
-                                            <div className="bg-white rounded-lg shadow-sm p-4 flex items-center gap-4">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={undo}
-                                                    disabled={historyIndex <= 0}
-                                                >
-                                                    <Undo2 className="h-5 w-5" />
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={redo}
-                                                    disabled={
-                                                        historyIndex >=
-                                                        history.length - 1
-                                                    }
-                                                >
-                                                    <Redo2 className="h-5 w-5" />
-                                                </Button>
-                                                <div className="h-6 border-l"></div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    onClick={() => {
-                                                        const input =
-                                                            document.createElement(
-                                                                "input"
-                                                            );
-                                                        input.type = "file";
-                                                        input.accept =
-                                                            "image/*";
-                                                        input.onchange = (
-                                                            e
-                                                        ) => {
-                                                            if (
-                                                                e.target
-                                                                    .files &&
-                                                                e.target
-                                                                    .files[0]
-                                                            ) {
-                                                                const newId = `img-${Date.now()}`;
-                                                                const newElement =
-                                                                    {
-                                                                        id: newId,
-                                                                        type: "image",
-                                                                        content:
-                                                                            "",
-                                                                        position:
-                                                                            {
-                                                                                x: 10,
-                                                                                y: 10,
-                                                                            },
-                                                                        filters:
-                                                                            {
-                                                                                brightness: 100,
-                                                                                contrast: 100,
-                                                                                saturation: 100,
-                                                                                tint: 0,
-                                                                                hue: 0,
-                                                                                blur: 0,
-                                                                                scale: 1,
-                                                                                rotate: 0,
-                                                                                opacity: 100,
-                                                                                blendMode:
-                                                                                    "normal",
-                                                                            },
-                                                                        mask: "none",
-                                                                    };
-
-                                                                const reader =
-                                                                    new FileReader();
-                                                                reader.onload =
-                                                                    (e) => {
-                                                                        if (
-                                                                            e
-                                                                                .target
-                                                                                ?.result
-                                                                        ) {
-                                                                            newElement.content =
-                                                                                e.target.result;
-                                                                            if (
-                                                                                selectedCell
-                                                                            ) {
-                                                                                addElementToCell(
-                                                                                    selectedCell,
-                                                                                    newElement
-                                                                                );
-                                                                            } else {
-                                                                                addElementToCell(
-                                                                                    pages[
-                                                                                        currentPage
-                                                                                    ]
-                                                                                        .cells[0]
-                                                                                        .id,
-                                                                                    newElement
-                                                                                );
-                                                                            }
-                                                                        }
-                                                                    };
-                                                                reader.readAsDataURL(
-                                                                    e.target
-                                                                        .files[0]
-                                                                );
-                                                            }
-                                                        };
-                                                        input.click();
+                                                <FilterControls
+                                                    filters={currentElement.filters || {}}
+                                                    onFilterChange={(newFilters) => {
+                                                        updateElementInCell(
+                                                            selectedCell,
+                                                            selectedElement,
+                                                            { filters: newFilters }
+                                                        );
                                                     }}
-                                                >
-                                                    <ImageIcon className="h-5 w-5" />
-                                                </Button>
+                                                    selectedElement={currentElement}
+                                                />
+                                            </>
+                                        ) : (
+                                            <div className="text-center py-8 px-2">
+                                                <div className="bg-gray-100 p-4 rounded-lg mb-3">
+                                                    <ImageIcon className="h-6 w-6 text-gray-400 mx-auto" />
+                                                </div>
+                                                <h3 className="text-sm font-medium text-gray-600">
+                                                    Selecciona un elemento
+                                                </h3>
+                                                <p className="text-xs text-gray-500 mt-1">
+                                                    Para aplicar filtros y efectos, primero selecciona una imagen o texto en el lienzo
+                                                </p>
+                                                <div className="mt-2 text-xs text-gray-400">
+                                                    Debug: selectedElement={selectedElement}, selectedCell={selectedCell}
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            )}
+                        </div>
+                    </aside>
+                    
+                    {/* Main canvas area */}
+                    <main className="flex-1 flex flex-col h-full">
+                        {/* Enhanced top toolbar - switches between main toolbar and text toolbar */}
+                        <div className="bg-white border-b px-4 py-2 flex items-center justify-between">
+                            {textToolbarVisible ? (
+                                /* Text editing toolbar */
+                                <>
+                                    <div className="flex items-center space-x-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setTextToolbarVisible(false)}
+                                            className="h-8 px-2"
+                                            icon={<ChevronLeft className="h-4 w-4" />}
+                                        >
+                                            Volver
+                                        </Button>
+                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                                    </div>
+                                    
+                                    <div className="flex-1 flex justify-center">
+                                        <TextToolbar
+                                            element={getSelectedElement()}
+                                            onUpdate={(updates) => {
+                                                updateElementInCell(
+                                                    textEditingOptions.cellId,
+                                                    textEditingOptions.elementId,
+                                                    updates
+                                                );
+                                            }}
+                                            onClose={() => setTextToolbarVisible(false)}
+                                        />
+                                    </div>
+                                    
+                                    <div className="flex items-center space-x-2">
+                                        <WorkspaceControls
+                                            currentSize={workspaceSize}
+                                            onSizeChange={setWorkspaceSize}
+                                            presetData={presetData}
+                                            workspaceDimensions={workspaceDimensions}
+                                        />
+                                    </div>
+                                </>
+                            ) : (
+                                /* Main toolbar */
+                                <>
+                                    {/* Left side - History controls */}
+                                    <div className="flex items-center space-x-2">
+                                        <div className="flex space-x-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={undo}
+                                                disabled={historyIndex <= 0}
+                                                className="h-8 px-2"
+                                                icon={<Undo2 className="h-4 w-4" />}
+                                            >
+                                                Deshacer
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={redo}
+                                                disabled={historyIndex >= history.length - 1}
+                                                className="h-8 px-2"
+                                                icon={<Redo2 className="h-4 w-4" />}
+                                            >
+                                                Rehacer
+                                            </Button>
+                                        </div>
+                                        
+                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                                        
+                                        {/* Quick add tools */}
+                                        <div className="flex space-x-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => {
+                                                    const input = document.createElement("input");
+                                                    input.type = "file";
+                                                    input.accept = "image/*";
+                                                    input.onchange = (e) => {
+                                                        if (e.target.files && e.target.files[0]) {
+                                                            const newId = `img-${Date.now()}`;
+                                                            const newElement = {
+                                                                id: newId,
+                                                                type: "image",
+                                                                content: "",
+                                                                position: { x: 0.1, y: 0.1 },
+                                                                size: { width: 0.3, height: 0.3 },
+                                                                filters: {
+                                                                    brightness: 100,
+                                                                    contrast: 100,
+                                                                    saturation: 100,
+                                                                    tint: 0,
+                                                                    hue: 0,
+                                                                    blur: 0,
+                                                                    scale: 1,
+                                                                    rotate: 0,
+                                                                    opacity: 100,
+                                                                    blendMode: "normal",
+                                                                },
+                                                                mask: "none",
+                                                            };
+
+                                                            const reader = new FileReader();
+                                                            reader.onload = (e) => {
+                                                                if (e.target?.result) {
+                                                                    newElement.content = e.target.result;
+                                                                    if (selectedCell) {
+                                                                        addElementToCell(selectedCell, newElement);
+                                                                    } else if (pages[currentPage]?.cells[0]) {
+                                                                        addElementToCell(pages[currentPage].cells[0].id, newElement);
+                                                                    }
+                                                                }
+                                                            };
+                                                            reader.readAsDataURL(e.target.files[0]);
+                                                        }
+                                                    };
+                                                    input.click();
+                                                }}
+                                                className="h-8 px-2"
+                                                icon={<ImageIcon className="h-4 w-4" />}
+                                            >
+                                                Imagen
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={handleAddText}
+                                                className="h-8 px-2"
+                                                icon={<Type className="h-4 w-4" />}
+                                            >
+                                                Texto
+                                            </Button>
+                                        </div>
+                                        
+                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                                        
+                                        {/* Element actions */}
+                                        {selectedElement && (
+                                            <div className="flex space-x-1">
                                                 <Button
                                                     variant="ghost"
-                                                    size="icon"
-                                                    onClick={handleAddText}
-                                                >
-                                                    <Type className="h-5 w-5" />
-                                                </Button>
-                                                <div className="h-6 border-l"></div>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
+                                                    size="sm"
                                                     onClick={() => {
-                                                        if (
-                                                            selectedElement &&
-                                                            selectedCell
-                                                        ) {
-                                                            deleteElementFromCell(
-                                                                selectedCell,
-                                                                selectedElement
-                                                            );
+                                                        if (selectedElement && selectedCell) {
+                                                            const element = getSelectedElement();
+                                                            if (element) {
+                                                                const duplicateElement = {
+                                                                    ...element,
+                                                                    id: `${element.type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                                                                    position: {
+                                                                        x: element.position.x + 0.05,
+                                                                        y: element.position.y + 0.05
+                                                                    }
+                                                                };
+                                                                addElementToCell(selectedCell, duplicateElement);
+                                                            }
                                                         }
                                                     }}
-                                                    disabled={!selectedElement}
+                                                    className="h-8 px-2"
+                                                    icon={<Copy className="h-4 w-4" />}
                                                 >
-                                                    <Trash2 className="h-5 w-5" />
+                                                    Duplicar
                                                 </Button>
-                                                <WorkspaceControls
-                                                    currentSize={workspaceSize}
-                                                    onSizeChange={
-                                                        setWorkspaceSize
-                                                    }
-                                                    presetData={presetData}
-                                                    workspaceDimensions={workspaceDimensions}
-                                                />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={() => {
+                                                        if (selectedElement && selectedCell) {
+                                                            deleteElementFromCell(selectedCell, selectedElement);
+                                                        }
+                                                    }}
+                                                    className="h-8 px-2 text-red-600 hover:text-red-700"
+                                                    icon={<Trash2 className="h-4 w-4" />}
+                                                >
+                                                    Eliminar
+                                                </Button>
                                             </div>
                                         )}
-                                        {/* Información del área de trabajo */}
-                                        {workspaceDimensions && (
-                                            <div className="text-center mb-2 text-sm text-gray-600">
-                                                <span className="bg-gray-100 px-2 py-1 rounded text-xs">
-                                                    Área de trabajo: {workspaceDimensions.width} × {workspaceDimensions.height}px
-                                                    {workspaceDimensions.originalWidth && (
-                                                        <span className="ml-2 text-gray-500">
-                                                            (Original: {workspaceDimensions.originalWidth} × {workspaceDimensions.originalHeight}px)
-                                                        </span>
-                                                    )}
+                                    </div>
+                                    
+                                    {/* Center - Page info */}
+                                    <div className="flex items-center space-x-4">
+                                        <div className="text-sm text-gray-600">
+                                            {pages[currentPage] && (
+                                                <span>
+                                                    {pages[currentPage].type === "cover" && "Portada"}
+                                                    {pages[currentPage].type === "content" && `Página ${pages[currentPage].pageNumber}`}
+                                                    {pages[currentPage].type === "final" && "Contraportada"}
                                                 </span>
-                                            </div>
-                                        )}
-                                        {/* Área de edición */}
-                                        <div
-                                            id={`page-${pages[currentPage].id}`}
-                                            className={`bg-white rounded-lg shadow-lg overflow-hidden page-preview ${
-                                                getCurrentLayout().cells <= 4
-                                                    ? ""
-                                                    : ""
-                                            }`}
-                                            style={{
-                                                width: workspaceDimensions.width,
-                                                height: workspaceDimensions.height,
-                                                position: 'relative',
-                                                margin: '0 auto', // Centrar el área de trabajo
-                                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-                                                border: '2px solid #e5e7eb',
-                                            }}
+                                            )}
+                                        </div>
+                                        
+                                        <Button
+                                            variant={previewMode ? "default" : "ghost"}
+                                            size="sm"
+                                            onClick={togglePreview}
+                                            className="h-8 px-2"
+                                            icon={<Eye className="h-4 w-4" />}
                                         >
-                                            {/* Background layer fijo */}
-                                            {(() => {
-                                                const page = pages[currentPage];
-                                                let bgUrl = null;
-                                                if (page.type === 'cover' && presetData?.cover_image) {
-                                                    bgUrl = presetData.cover_image.startsWith('http')
-                                                        ? presetData.cover_image
-                                                        : `/storage/images/item_preset/${presetData.cover_image}`;
-                                                } else if (page.type === 'content' && presetData?.content_layer_image) {
-                                                    bgUrl = presetData.content_layer_image.startsWith('http')
-                                                        ? presetData.content_layer_image
-                                                        : `/storage/images/item_preset/${presetData.content_layer_image}`;
-                                                } else if (page.type === 'final' && presetData?.final_layer_image) {
-                                                    bgUrl = presetData.final_layer_image.startsWith('http')
-                                                        ? presetData.final_layer_image
-                                                        : `/storage/images/item_preset/${presetData.final_layer_image}`;
-                                                }
-                                                return bgUrl ? (
-                                                    <img
-                                                        src={bgUrl}
-                                                        alt="background"
-                                                        style={{
-                                                            position: 'absolute',
-                                                            top: 0,
-                                                            left: 0,
-                                                            width: '100%',
-                                                            height: '100%',
-                                                            objectFit: 'cover',
-                                                            zIndex: 0,
-                                                            pointerEvents: 'none',
-                                                        }}
-                                                    />
-                                                ) : null;
-                                            })()}
-                                            {/* Celdas editables por encima del background */}
-                                            <div
-                                                className={`grid ${getCurrentLayout().template}`}
-                                                style={{ 
-                                                    position: 'relative', 
-                                                    zIndex: 1,
+                                            {previewMode ? "Salir vista previa" : "Vista previa"}
+                                        </Button>
+                                    </div>
+                                    
+                                    {/* Right side - Workspace controls */}
+                                    <div className="flex items-center space-x-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setIsBookPreviewOpen(true)}
+                                            className="h-8 px-2"
+                                            icon={<Book className="h-4 w-4" />}
+                                        >
+                                            Previsualizar libro
+                                        </Button>
+                                        
+                                        <div className="h-6 w-px bg-gray-300 mx-2"></div>
+                                        
+                                        <WorkspaceControls
+                                            currentSize={workspaceSize}
+                                            onSizeChange={setWorkspaceSize}
+                                            presetData={presetData}
+                                            workspaceDimensions={workspaceDimensions}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
+                        
+
+                        
+                        {/* Canvas workspace - centered */}
+                        <div className="flex-1 flex items-center justify-center p-6 overflow-hidden bg-gray-100">
+                            {previewMode ? (
+                                <div className="bg-white rounded-lg shadow-lg">
+                                    <div
+                                        className="overflow-hidden"
+                                        style={{
+                                            width: workspaceDimensions.width,
+                                            height: workspaceDimensions.height,
+                                        }}
+                                    >
+                                        <div
+                                            id={`page-${pages[currentPage].id}`} 
+                                            className={`grid ${getCurrentLayout().template} gap-6`}
+                                            style={{ width: '100%', height: '100%' }}
+                                        >
+                                            {pages[currentPage].cells.map((cell) => (
+                                                <div
+                                                    key={cell.id}
+                                                    className="relative bg-gray-50 rounded-lg overflow-hidden"
+                                                >
+                                                    {cell.elements.map((element) =>
+                                                        element.type === "image" ? (
+                                                            <div
+                                                                key={element.id}
+                                                                className={`absolute ${
+                                                                    imageMasks.find(
+                                                                        (m) => m.id === element.mask
+                                                                    )?.class || ""
+                                                                }`}
+                                                                style={{
+                                                                    left: `${element.position.x}px`,
+                                                                    top: `${element.position.y}px`,
+                                                                    width: "100%",
+                                                                    height: "100%",
+                                                                }}
+                                                            >
+                                                                <img
+                                                                    src={element.content}
+                                                                    alt=""
+                                                                    className="w-full h-full object-cover"
+                                                                    style={{
+                                                                        filter: `
+                                                                            brightness(${(element.filters?.brightness || 100) / 100})
+                                                                            contrast(${(element.filters?.contrast || 100) / 100})
+                                                                            saturate(${(element.filters?.saturation || 100) / 100})
+                                                                            sepia(${(element.filters?.tint || 0) / 100})
+                                                                            hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
+                                                                            blur(${element.filters?.blur || 0}px)
+                                                                        `,
+                                                                        transform: `scale(${
+                                                                            element.filters?.scale || 1
+                                                                        }) rotate(${
+                                                                            element.filters?.rotate || 0
+                                                                        }deg) ${
+                                                                            element.filters?.flipHorizontal
+                                                                                ? "scaleX(-1)"
+                                                                                : ""
+                                                                        } ${
+                                                                            element.filters?.flipVertical
+                                                                                ? "scaleY(-1)"
+                                                                                : ""
+                                                                        }`,
+                                                                        mixBlendMode: element.filters?.blendMode || "normal",
+                                                                        opacity: (element.filters?.opacity || 100) / 100,
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : (
+                                                            <div
+                                                                key={element.id}
+                                                                className="absolute"
+                                                                style={{
+                                                                    left: `${element.position.x}px`,
+                                                                    top: `${element.position.y}px`,
+                                                                    fontFamily: element.style?.fontFamily,
+                                                                    fontSize: element.style?.fontSize,
+                                                                    fontWeight: element.style?.fontWeight,
+                                                                    fontStyle: element.style?.fontStyle,
+                                                                    textDecoration: element.style?.textDecoration,
+                                                                    color: element.style?.color,
+                                                                    textAlign: element.style?.textAlign,
+                                                                    backgroundColor: element.style?.backgroundColor || "transparent",
+                                                                    padding: element.style?.padding || "8px",
+                                                                    borderRadius: element.style?.borderRadius || "0px",
+                                                                    border: element.style?.border || "none",
+                                                                    opacity: element.style?.opacity || 1,
+                                                                }}
+                                                            >
+                                                                {element.content}
+                                                            </div>
+                                                        )
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div
+                                    id={`page-${pages[currentPage].id}`}
+                                    className="bg-white rounded-lg shadow-xl"
+                                    style={{
+                                        width: workspaceDimensions.width,
+                                        height: workspaceDimensions.height,
+                                        position: 'relative'
+                                    }}
+                                >
+                                    {/* Background layer */}
+                                    {(() => {
+                                        const page = pages[currentPage];
+                                        let bgUrl = null;
+                                        if (page.type === 'cover' && presetData?.cover_image) {
+                                            bgUrl = presetData.cover_image.startsWith('http')
+                                                ? presetData.cover_image
+                                                : `/storage/images/item_preset/${presetData.cover_image}`;
+                                        } else if (page.type === 'content' && presetData?.content_layer_image) {
+                                            bgUrl = presetData.content_layer_image.startsWith('http')
+                                                ? presetData.content_layer_image
+                                                : `/storage/images/item_preset/${presetData.content_layer_image}`;
+                                        } else if (page.type === 'final' && presetData?.final_layer_image) {
+                                            bgUrl = presetData.final_layer_image.startsWith('http')
+                                                ? presetData.final_layer_image
+                                                : `/storage/images/item_preset/${presetData.final_layer_image}`;
+                                        }
+                                        return bgUrl ? (
+                                            <img
+                                                src={bgUrl}
+                                                alt="background"
+                                                style={{
+                                                    position: 'absolute',
+                                                    top: 0,
+                                                    left: 0,
                                                     width: '100%',
                                                     height: '100%',
-                                                    boxSizing: 'border-box',
-                                                    gap: getCurrentLayout().style?.gap || '16px',
-                                                    padding: getCurrentLayout().style?.padding || '16px'
+                                                    objectFit: 'cover',
+                                                    zIndex: 0,
+                                                    pointerEvents: 'none',
                                                 }}
-                                            >
-                                                {pages[currentPage].cells.map(
-                                                    (cell, cellIndex) => (
-                                                        <EditableCell
-                                                            key={cell.id}
-                                                            id={cell.id}
-                                                            elements={cell.elements.filter(el => !el.locked)}
-                                                            workspaceSize={workspaceDimensions}
-                                                            cellStyle={getCurrentLayout().cellStyles?.[cellIndex]}
-                                                            selectedElement={
-                                                                selectedCell === cell.id ? selectedElement : null
-                                                            }
-                                                            onSelectElement={handleSelectElement}
-                                                            onAddElement={(element) => {
-                                                                const updatedPages = [...pages];
-                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
-                                                                if (
-                                                                    cellIndex !==
-                                                                    -1
-                                                                ) {
-                                                                    updatedPages[currentPage].cells[cellIndex].elements.push(element);
-                                                                    updatePages(updatedPages);
-                                                                    setSelectedElement(element.id);
-                                                                    setSelectedCell(cell.id);
-                                                                }
-                                                            }}
-                                                            onUpdateElement={(elementId, updates, isDuplicate) => {
-                                                                const updatedPages = [...pages];
-                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
-                                                                if (
-                                                                    cellIndex !==
-                                                                    -1
-                                                                ) {
-                                                                    if (
-                                                                        isDuplicate
-                                                                    ) {
-                                                                        updatedPages[currentPage].cells[cellIndex].elements.push({
-                                                                            ...updatedPages[currentPage].cells[cellIndex].elements.find((el) => el.id === elementId),
-                                                                            ...updates,
-                                                                        });
-                                                                    } else {
-                                                                        const elementIndex = updatedPages[currentPage].cells[cellIndex].elements.findIndex((el) => el.id === elementId);
-                                                                        if (
-                                                                            elementIndex !==
-                                                                            -1
-                                                                        ) {
-                                                                            updatedPages[currentPage].cells[cellIndex].elements[elementIndex] = {
-                                                                                ...updatedPages[currentPage].cells[cellIndex].elements[elementIndex],
-                                                                                ...updates,
-                                                                            };
-                                                                        }
-                                                                    }
-                                                                    updatePages(updatedPages);
-                                                                }
-                                                            }}
-                                                            onDeleteElement={(elementId) => {
-                                                                const updatedPages = [...pages];
-                                                                const cellIndex = updatedPages[currentPage].cells.findIndex((c) => c.id === cell.id);
-                                                                if (
-                                                                    cellIndex !==
-                                                                    -1
-                                                                ) {
-                                                                    updatedPages[currentPage].cells[cellIndex].elements = updatedPages[currentPage].cells[cellIndex].elements.filter((el) => el.id !== elementId);
-                                                                    updatePages(updatedPages);
-                                                                    if (
-                                                                        selectedElement ===
-                                                                        elementId
-                                                                    ) {
-                                                                        setSelectedElement(
-                                                                            null
-                                                                        );
-                                                                    }
-                                                                }
-                                                            }}
-                                                            availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
-                                                        />
-                                                    )
+                                            />
+                                        ) : null;
+                                    })()}
+                                    
+                                    {/* Editable cells layer */}
+                                    <div
+                                        className={`grid ${getCurrentLayout().template}`}
+                                        style={{ 
+                                            position: 'relative', 
+                                            zIndex: 1,
+                                            width: '100%',
+                                            height: '100%',
+                                            boxSizing: 'border-box',
+                                            gap: getCurrentLayout().style?.gap || '16px',
+                                            padding: getCurrentLayout().style?.padding || '16px'
+                                        }}
+                                    >
+                                        {pages[currentPage].cells.map((cell) => (
+                                            <EditableCell
+                                                key={cell.id}
+                                                id={cell.id}
+                                                elements={cell.elements.filter(el => !el.locked)}
+                                                workspaceSize={workspaceDimensions}
+                                                cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
+                                                selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                onSelectElement={handleSelectElement}
+                                                onAddElement={(element) => addElementToCell(cell.id, element)}
+                                                onUpdateElement={(elementId, updates, isDuplicate) => 
+                                                    updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
+                                            />
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </main>
+                    
+                    {/* Right sidebar - Page management */}
+                    <aside className="w-64 bg-white border-l flex flex-col h-full">
+                        <div className="p-3 border-b">
+                            <h3 className="font-medium text-xs uppercase text-gray-500">Páginas</h3>
+                            <div className="flex justify-end mt-2">
+                                <div className="flex gap-1">
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon" 
+                                        onClick={duplicateCurrentPage}
+                                        disabled={pages[currentPage]?.type !== "content"}
+                                        title={pages[currentPage]?.type !== "content" ? "Solo se pueden duplicar páginas de contenido" : "Duplicar página"}
+                                        className="h-7 w-7"
+                                    >
+                                        <Copy className="h-4 w-4" />
+                                    </Button>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="icon"
+                                        onClick={deleteCurrentPage}
+                                        disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
+                                        title={
+                                            pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final" 
+                                            ? "No se puede eliminar la portada o contraportada"
+                                            : pages.length <= 3 
+                                            ? "Debe haber al menos una página de contenido"
+                                            : "Eliminar página"
+                                        }
+                                        className="h-7 w-7"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={addPage}
+                                        className="flex items-center h-7"
+                                    >
+                                        <Plus className="h-3.5 w-3.5 mr-1" />
+                                        <span className="text-xs">Nueva página</span>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {/* Page thumbnails - scrollable */}
+                        <div className="flex-1 overflow-y-auto p-3 custom-scroll">
+                            <div className="space-y-3">
+                                {pages.map((page, index) => {
+                                    // Obtener título de página basado en el tipo
+                                    let pageTitle = "Página";
+                                    let pageIcon = "";
+                                    let pageColor = "bg-gray-100";
+                                    
+                                    if (page.type === "cover") {
+                                        pageTitle = "Portada";
+                                        pageIcon = "📖";
+                                        pageColor = "bg-purple-100";
+                                    } else if (page.type === "content") {
+                                        pageTitle = `Pág. ${page.pageNumber}`;
+                                        pageIcon = "📄";
+                                        pageColor = "bg-blue-100";
+                                    } else if (page.type === "final") {
+                                        pageTitle = "Contraportada";
+                                        pageIcon = "📚";
+                                        pageColor = "bg-green-100";
+                                    }
+                                    
+                                    return (
+                                        <div
+                                            key={page.id}
+                                            className={`flex flex-col cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${
+                                                currentPage === index ? "ring-2 ring-purple-400" : ""
+                                            }`}
+                                            onClick={() => setCurrentPage(index)}
+                                        >
+                                            <div className={`relative ${pageColor} rounded-md overflow-hidden border mb-1 aspect-[4/3]`}>
+                                                <div className="absolute top-1 left-1 right-1 flex justify-between items-start z-10">
+                                                    <span className="text-[10px] bg-white/90 px-1.5 py-0.5 rounded-full font-medium">
+                                                        {pageIcon} {pageTitle}
+                                                    </span>
+                                                    {page.type === "content" && (
+                                                        <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
+                                                            Editable
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {pageThumbnails[page.id] ? (
+                                                    <img
+                                                        src={pageThumbnails[page.id]}
+                                                        alt={`Miniatura página ${index + 1}`}
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center">
+                                                        <div
+                                                            className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
+                                                        >
+                                                            {Array.from({
+                                                                length: getCurrentLayout().cells,
+                                                            }).map((_, i) => (
+                                                                <div
+                                                                    key={i}
+                                                                    className="bg-gray-200 rounded-sm"
+                                                                ></div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                    </div>
-                                )}
+                                    );
+                                })}
                             </div>
-
-                            {/* Sidebar footer - Navegación de páginas */}
-                            {/* Sidebar footer - Navegación de páginas */}
-                            <aside className="max-w-5xl mt-6 mx-auto bg-white p-4 rounded-lg border">
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="font-medium">Páginas</h3>
-                                        <div className="flex gap-2">
-                                            <button
-                                                className="p-1 rounded hover:bg-gray-100"
-                                                onClick={duplicateCurrentPage}
-                                                disabled={pages[currentPage]?.type !== "content"}
-                                                title={
-                                                    pages[currentPage]?.type !== "content" 
-                                                    ? "Solo se pueden duplicar páginas de contenido"
-                                                    : "Duplicar página"
-                                                }
-                                            >
-                                                <Copy className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                className="p-1 rounded hover:bg-gray-100"
-                                                onClick={deleteCurrentPage}
-                                                disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
-                                                title={
-                                                    pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final" 
-                                                    ? "No se puede eliminar la portada o contraportada"
-                                                    : pages.length <= 3 
-                                                    ? "Debe haber al menos una página de contenido"
-                                                    : "Eliminar página"
-                                                }
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
-                                            <button
-                                                className="flex items-center gap-1 px-3 py-1 text-sm border rounded-md hover:bg-gray-50"
-                                                onClick={addPage}
-                                            >
-                                                <Plus className="h-4 w-4" />
-                                                <span>Nueva página</span>
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex overflow-x-auto gap-3 custom-scroll">
-                                        {pages?.map((page, index) => {
-                                            // Obtener título de página basado en el tipo
-                                            let pageTitle = "Página";
-                                            let pageIcon = "";
-                                            let pageColor = "bg-gray-100";
-                                            
-                                            if (page.type === "cover") {
-                                                pageTitle = "Portada";
-                                                pageIcon = "📖";
-                                                pageColor = "bg-purple-100";
-                                            } else if (page.type === "content") {
-                                                pageTitle = `Pág. ${page.pageNumber}`;
-                                                pageIcon = "📄";
-                                                pageColor = "bg-blue-100";
-                                            } else if (page.type === "final") {
-                                                pageTitle = "Contraportada";
-                                                pageIcon = "📚";
-                                                pageColor = "bg-green-100";
-                                            }
-                                            
-                                            return (
-                                                <div
-                                                    key={page.id}
-                                                    className={`flex-shrink-0 w-40 p-4 cursor-pointer hover:bg-gray-50 rounded-lg transition-colors`}
-                                                    onClick={() => setCurrentPage(index)}
-                                                >
-                                                    <div
-                                                        className={`relative ${pageColor} h-48 rounded-md overflow-hidden border-2 transition-all ${
-                                                            currentPage === index
-                                                                ? "border-purple-500 shadow-lg"
-                                                                : "border-transparent"
-                                                        }`}
-                                                    >
-                                                        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-10">
-                                                            <span className="text-xs bg-white/90 px-2 py-1 rounded-full font-medium flex items-center gap-1">
-                                                                {pageIcon} {pageTitle}
-                                                            </span>
-                                                            {page.type === "content" && (
-                                                                <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded-full">
-                                                                    Editable
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                    {pageThumbnails[page.id] ? (
-                                                        <img
-                                                            src={
-                                                                pageThumbnails[
-                                                                    page.id
-                                                                ]
-                                                            }
-                                                            alt={`Miniatura página ${
-                                                                index + 1
-                                                            }`}
-                                                            className="w-full h-full object-contain"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center">
-                                                            <div
-                                                                className={`grid ${
-                                                                    getCurrentLayout()
-                                                                        .template
-                                                                } gap-1 w-full h-full p-1`}
-                                                            >
-                                                                {Array.from({
-                                                                    length: getCurrentLayout()
-                                                                        .cells,
-                                                                }).map(
-                                                                    (_, i) => (
-                                                                        <div
-                                                                            key={
-                                                                                i
-                                                                            }
-                                                                            className="bg-gray-200 rounded-sm"
-                                                                        ></div>
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            </aside>
-                        </main>
-                    </div>
+                        </div>
+                    </aside>
                 </div>
             </div>
             )}
         </DndProvider>
     );
 }
+
+
+                                                   
 <style jsx>{`
     .custom-scroll {
         scrollbar-width: thin;
