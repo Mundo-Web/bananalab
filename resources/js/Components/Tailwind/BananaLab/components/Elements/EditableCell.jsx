@@ -12,7 +12,8 @@ export default function EditableCell({
     onUpdateElement,
     onDeleteElement,
     availableMasks = [],
-    size = "square", // nuevo prop para controlar el tamaño
+    workspaceSize = { width: 800, height: 600 }, // Tamaño del workspace completo
+    cellSize = "auto", // Tamaño específico de esta celda si se necesita
 }) {
     const [{ isOver }, drop] = useDrop(() => ({
         accept: ["IMAGE_FILE", "TEXT_ELEMENT", "IMAGE_ELEMENT"],
@@ -25,7 +26,7 @@ export default function EditableCell({
                             id: `img-${Date.now()}`,
                             type: "image",
                             content: e.target.result,
-                            position: { x: 10, y: 10 },
+                            position: { x: 0.05, y: 0.05 }, // Posición en porcentajes
                             filters: {
                                 brightness: 100,
                                 contrast: 100,
@@ -65,7 +66,7 @@ export default function EditableCell({
                             id: `img-${Date.now()}`,
                             type: "image",
                             content: e.target.result,
-                            position: { x: 10, y: 10 },
+                            position: { x: 0.05, y: 0.05 }, // Posición en porcentajes
                             filters: {
                                 brightness: 100,
                                 contrast: 100,
@@ -90,7 +91,7 @@ export default function EditableCell({
         input.click();
     };
 
-    // Definir las clases de tamaño
+    // Definir las clases de tamaño (mantenidas para compatibilidad)
     const sizeClasses = {
         square: "aspect-square", // 1:1
         landscape: "aspect-video", // 16:9
@@ -98,6 +99,7 @@ export default function EditableCell({
         wide: "aspect-[2/1]", // 2:1
         tall: "aspect-[9/16]", // 9:16
         custom: "h-[500px]", // tamaño personalizado
+        auto: "w-full h-full", // Ocupa todo el espacio disponible en el grid
     };
 
     // Determinar si la celda tiene contenido para aplicar el border correcto
@@ -106,10 +108,9 @@ export default function EditableCell({
     return (
         <div
             ref={drop}
-            className={`relative ${sizeClasses[size]} rounded-lg overflow-hidden ${
+            className={`relative rounded-lg overflow-hidden w-full h-full ${
                 isOver ? "ring-2 ring-purple-500 bg-transparent" : ""
             } ${
-                // Border condicional: con contenido = sin border, sin contenido = con border
                 !hasContent 
                     ? "border-2 border-dashed border-gray-300 bg-transparent hover:border-gray-400 hover:bg-gray-100" 
                     : "bg-transparent"
@@ -120,8 +121,9 @@ export default function EditableCell({
                 }
             }}
             style={{
-                isolation: "isolate", // Esto crea un nuevo contexto de apilamiento
-                background: hasContent ? "transparent" : undefined, // Fondo transparente cuando tiene contenido
+                isolation: "isolate",
+                background: hasContent ? "transparent" : undefined,
+                minHeight: "120px", // Altura mínima para celdas muy pequeñas
             }}
         >
             {elements.length === 0 ? (
@@ -146,7 +148,7 @@ export default function EditableCell({
                     >
                         {element.type === "image" ? (
                             <ImageElement
-                                element={element}
+                                element={{...element, workspaceSize: workspaceSize}}
                                 isSelected={selectedElement === element.id}
                                 onSelect={() => onSelectElement(element.id, id)}
                                 onUpdate={(updates) =>
@@ -158,6 +160,7 @@ export default function EditableCell({
                         ) : (
                             <TextElement
                                 element={element}
+                                workspaceSize={workspaceSize}
                                 isSelected={selectedElement === element.id}
                                 onSelect={() => onSelectElement(element.id, id)}
                                 onUpdate={(updates) =>

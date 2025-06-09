@@ -1,5 +1,6 @@
-const WorkspaceControls = ({ currentSize, onSizeChange }) => {
+const WorkspaceControls = ({ currentSize, onSizeChange, presetData, workspaceDimensions }) => {
     const sizes = [
+        { id: "preset", label: "Preset Original", description: "Usar dimensiones del preset" },
         { id: "square", label: "Cuadrado (1:1)", width: 600, height: 600 },
         { id: "landscape", label: "Paisaje (16:9)", width: 1280, height: 720 },
         { id: "portrait", label: "Retrato (3:4)", width: 600, height: 800 },
@@ -7,43 +8,39 @@ const WorkspaceControls = ({ currentSize, onSizeChange }) => {
         { id: "tall", label: "Alto (9:16)", width: 540, height: 960 },
     ];
 
+    // Función para obtener las dimensiones del preset
+    const getPresetDimensions = () => {
+        if (presetData?.canvas_config) {
+            const canvasConfig = typeof presetData.canvas_config === 'string' 
+                ? JSON.parse(presetData.canvas_config) 
+                : presetData.canvas_config;
+            let width = canvasConfig.width;
+            let height = canvasConfig.height;
+            // Siempre mostrar cm
+            return { width, height, unit: 'cm' };
+        }
+        return null;
+    };
+
+    const presetDimensions = getPresetDimensions();
+
     return (
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 h-full items-center">
-            <label
-                htmlFor="canvas-size"
-                className="text-sm font-medium text-gray-700"
-            >
-                Lienzo:
-            </label>
-            <div className="relative w-full sm:w-40">
-                <select
-                    id="canvas-size"
-                    value={currentSize}
-                    onChange={(e) => onSizeChange(e.target.value)}
-                    className="w-full appearance-none bg-white border border-gray-300 rounded-md pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
-                >
-                    {sizes.map((size) => (
-                        <option key={size.id} value={size.id}>
-                            {size.label}
-                        </option>
-                    ))}
-                </select>
-                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                    <svg
-                        className="h-5 w-5 text-gray-400"
-                        xmlns="http://www.w3.org/2000/svg"
-                        viewBox="0 0 20 20"
-                        fill="currentColor"
-                        aria-hidden="true"
-                    >
-                        <path
-                            fillRule="evenodd"
-                            d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
-                            clipRule="evenodd"
-                        />
-                    </svg>
+            {/* Mostrar información de las dimensiones actuales */}
+            {workspaceDimensions && (
+                <div className="text-xs text-gray-500 ml-2">
+                    <div>Actual: {workspaceDimensions.width}x{workspaceDimensions.height} px</div>
+                    {workspaceDimensions.originalWidth && (
+                        <div>Original: {workspaceDimensions.originalWidth}x{workspaceDimensions.originalHeight} cm</div>
+                    )}
+                    {workspaceDimensions.originalWidthPx && (
+                        <div>Original en px: {workspaceDimensions.originalWidthPx}x{workspaceDimensions.originalHeightPx} px</div>
+                    )}
+                    {workspaceDimensions.scale && workspaceDimensions.scale < 1 && (
+                        <div>Escala: {Math.round(workspaceDimensions.scale * 100)}%</div>
+                    )}
                 </div>
-            </div>
+            )}
         </div>
     );
 };

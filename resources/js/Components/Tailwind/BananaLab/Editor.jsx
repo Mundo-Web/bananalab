@@ -76,9 +76,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Fallback: obtener de la URL
         const params = new URLSearchParams(window.location.search);
         return {
-            albumId: params.get('albumId'),
-            itemId: params.get('itemId'),
-            presetId: params.get('presetId'),
+            albumId: params.get('album'),
+            itemId: params.get('item'),
+            presetId: params.get('preset'),
             pages: parseInt(params.get('pages')) || 20
         };
     };
@@ -220,7 +220,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         ...(album.cover_image_path ? [{
                             id: "cover-custom",
                             type: "image", 
-                            content: `/storage/images/album/${album.cover_image_path}`,
+                            content: `/storage/images/albums/covers/${album.cover_image_path}`,
                             position: { x: 10, y: 10 },
                             size: { width: 80, height: 80 },
                             filters: {},
@@ -292,6 +292,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('✅ Created pages:', newPages);
             setPages(newPages);
             setCurrentPage(0); // Empezar en la portada
+            
+            // Si hay canvas_config en el preset, cambiar automáticamente a "preset"
+            if (preset.canvas_config) {
+                console.log('📐 Canvas config found, setting workspace to preset dimensions');
+                setWorkspaceSize("preset");
+            }
             
         } catch (error) {
             console.error('❌ Error creating pages:', error);
@@ -687,7 +693,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             id: newId,
             type: "text",
             content: "Haz clic para editar",
-            position: { x: 20, y: 20 },
+            position: { x: 0.05, y: 0.05 }, // Posición en porcentajes para responsividad
             style: {
                 fontSize: "16px",
                 fontFamily: "Arial",
@@ -725,7 +731,93 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         });
     };
 
-    const [workspaceSize, setWorkspaceSize] = useState("square");
+    const [workspaceSize, setWorkspaceSize] = useState("preset");
+
+    // Función para obtener las dimensiones del área de trabajo
+    const getWorkspaceDimensions = () => {
+        // Si hay preset con canvas_config, usar esas dimensiones
+        if (presetData?.canvas_config) {
+            const canvasConfig = typeof presetData.canvas_config === 'string' 
+                ? JSON.parse(presetData.canvas_config) 
+                : presetData.canvas_config;
+
+            // Siempre asumir que width y height vienen en centímetros
+            let widthCm = canvasConfig.width;
+            let heightCm = canvasConfig.height;
+            let widthPx = widthCm * 37.8;
+            let heightPx = heightCm * 37.8;
+
+            if (widthPx && heightPx) {
+                const maxScreenWidth = window.innerWidth * 0.6; // 60% del ancho de pantalla
+                const maxScreenHeight = window.innerHeight * 0.7; // 70% del alto de pantalla
+
+                // Calcular escala para que quepa en pantalla manteniendo proporción
+                const scaleX = maxScreenWidth / widthPx;
+                const scaleY = maxScreenHeight / heightPx;
+                const scale = Math.min(scaleX, scaleY, 1); // No agrandar más del tamaño original
+
+                return {
+                    width: Math.round(widthPx * scale),
+                    height: Math.round(heightPx * scale),
+                    originalWidth: widthCm,
+                    originalHeight: heightCm,
+                    scale: scale,
+                    unit: 'cm',
+                    originalWidthPx: Math.round(widthPx),
+                    originalHeightPx: Math.round(heightPx)
+                };
+            }
+        }
+
+        // Fallback a tamaños predefinidos si no hay canvas_config
+        const predefinedSizes = {
+            "square": { width: 600, height: 600 },
+            "landscape": { width: 1280, height: 720 },
+            "portrait": { width: 600, height: 800 },
+            "wide": { width: 1200, height: 600 },
+            "tall": { width: 540, height: 960 },
+            "preset": { width: 800, height: 600 } // Default si no hay preset
+        };
+
+        const size = predefinedSizes[workspaceSize] || predefinedSizes.preset;
+
+        // Aplicar escalado también a tamaños predefinidos
+        const maxScreenWidth = window.innerWidth * 0.6;
+        const maxScreenHeight = window.innerHeight * 0.7;
+
+        const scaleX = maxScreenWidth / size.width;
+        const scaleY = maxScreenHeight / size.height;
+        const scale = Math.min(scaleX, scaleY, 1);
+
+        return {
+            width: Math.round(size.width * scale),
+            height: Math.round(size.height * scale),
+            originalWidth: size.width,
+            originalHeight: size.height,
+            scale: scale,
+            unit: 'px'
+        };
+    };
+
+    // Estado para las dimensiones calculadas
+    const [workspaceDimensions, setWorkspaceDimensions] = useState({ width: 800, height: 600 });
+
+    // Actualizar dimensiones cuando cambie el preset o el tamaño del workspace
+    useEffect(() => {
+        const dimensions = getWorkspaceDimensions();
+        setWorkspaceDimensions(dimensions);
+    }, [presetData, workspaceSize]);
+
+    // Actualizar dimensiones cuando cambie el tamaño de la ventana
+    useEffect(() => {
+        const handleResize = () => {
+            const dimensions = getWorkspaceDimensions();
+            setWorkspaceDimensions(dimensions);
+        };
+
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [presetData, workspaceSize]);
 
     useEffect(() => {
         const generateThumbnails = async () => {
@@ -1746,21 +1838,39 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                     onSizeChange={
                                                         setWorkspaceSize
                                                     }
+                                                    presetData={presetData}
+                                                    workspaceDimensions={workspaceDimensions}
                                                 />
+                                            </div>
+                                        )}
+                                        {/* Información del área de trabajo */}
+                                        {workspaceDimensions && (
+                                            <div className="text-center mb-2 text-sm text-gray-600">
+                                                <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                                                    Área de trabajo: {workspaceDimensions.width} × {workspaceDimensions.height}px
+                                                    {workspaceDimensions.originalWidth && (
+                                                        <span className="ml-2 text-gray-500">
+                                                            (Original: {workspaceDimensions.originalWidth} × {workspaceDimensions.originalHeight}px)
+                                                        </span>
+                                                    )}
+                                                </span>
                                             </div>
                                         )}
                                         {/* Área de edición */}
                                         <div
                                             id={`page-${pages[currentPage].id}`}
-                                            className={`bg-white rounded-lg shadow-lg overflow-hidden page-preview w-full ${
+                                            className={`bg-white rounded-lg shadow-lg overflow-hidden page-preview ${
                                                 getCurrentLayout().cells <= 4
                                                     ? ""
                                                     : ""
                                             }`}
                                             style={{
-                                                width: workspaceSize.width,
-                                                height: workspaceSize.height,
+                                                width: workspaceDimensions.width,
+                                                height: workspaceDimensions.height,
                                                 position: 'relative',
+                                                margin: '0 auto', // Centrar el área de trabajo
+                                                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                                                border: '2px solid #e5e7eb',
                                             }}
                                         >
                                             {/* Background layer fijo */}
@@ -1799,8 +1909,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             })()}
                                             {/* Celdas editables por encima del background */}
                                             <div
-                                                className={`grid ${getCurrentLayout().template} gap-4   p-4 max-h-full`}
-                                                style={{ position: 'relative', zIndex: 1 }}
+                                                className={`grid ${getCurrentLayout().template} gap-4 p-4`}
+                                                style={{ 
+                                                    position: 'relative', 
+                                                    zIndex: 1,
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    boxSizing: 'border-box'
+                                                }}
                                             >
                                                 {pages[currentPage].cells.map(
                                                     (cell) => (
@@ -1808,7 +1924,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             key={cell.id}
                                                             id={cell.id}
                                                             elements={cell.elements.filter(el => !el.locked)}
-                                                            size={workspaceSize}
+                                                            workspaceSize={workspaceDimensions}
                                                             selectedElement={
                                                                 selectedCell === cell.id ? selectedElement : null
                                                             }

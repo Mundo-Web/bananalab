@@ -9,6 +9,7 @@ export default function TextElement({
     onSelect,
     onUpdate,
     onDelete,
+    workspaceSize = { width: 800, height: 600 }, // Tamaño del workspace para cálculos responsivos
 }) {
     const [isEditing, setIsEditing] = useState(false);
     const inputRef = useRef(null);
@@ -54,17 +55,22 @@ export default function TextElement({
         if (isSelected && !isEditing) {
             e.stopPropagation();
             setIsDraggingInside(true);
+            
+            // Calcular posición en porcentajes para responsividad
+            const parentRect = e.currentTarget.parentElement.getBoundingClientRect();
+            const currentX = element.position.x <= 1 ? element.position.x * parentRect.width : element.position.x;
+            const currentY = element.position.y <= 1 ? element.position.y * parentRect.height : element.position.y;
+            
             setStartPos({
-                x: e.clientX - element.position.x,
-                y: e.clientY - element.position.y,
+                x: e.clientX - currentX,
+                y: e.clientY - currentY,
             });
         }
     };
 
     const handleMouseMove = (e) => {
         if (isDraggingInside && elementRef.current) {
-            const parentRect =
-                elementRef.current.parentElement.getBoundingClientRect();
+            const parentRect = elementRef.current.parentElement.getBoundingClientRect();
             const newX = e.clientX - startPos.x;
             const newY = e.clientY - startPos.y;
 
@@ -74,7 +80,16 @@ export default function TextElement({
             const boundedX = Math.max(0, Math.min(newX, maxX));
             const boundedY = Math.max(0, Math.min(newY, maxY));
 
-            onUpdate({ position: { x: boundedX, y: boundedY } });
+            // Convertir a porcentajes para mantener la responsividad
+            const percentX = boundedX / parentRect.width;
+            const percentY = boundedY / parentRect.height;
+
+            onUpdate({ 
+                position: { 
+                    x: percentX, 
+                    y: percentY 
+                } 
+            });
         }
     };
 
@@ -94,8 +109,8 @@ export default function TextElement({
             ...JSON.parse(JSON.stringify(element)),
             id: `text-${Date.now()}`,
             position: {
-                x: element.position.x + 10,
-                y: element.position.y + 10,
+                x: element.position.x <= 1 ? Math.min(element.position.x + 0.02, 0.9) : element.position.x + 10,
+                y: element.position.y <= 1 ? Math.min(element.position.y + 0.02, 0.9) : element.position.y + 10,
             },
         };
         onUpdate(newElement, true); // true indica que es un duplicado
@@ -130,39 +145,58 @@ export default function TextElement({
           }`
         : "none";
 
-    /*  const combinedStyle = {
-        ...element.style,
-        position: "absolute",
-        left: `${element.position.x}px`,
-        top: `${element.position.y}px`,
-        cursor: isSelected && !isEditing ? "move" : "pointer",
-        textShadow,
-        zIndex: 10,
-    };*/
-    // En el TextElement, actualiza el combinedStyle:
-    // En TextElement.jsx, actualiza el combinedStyle
-    const combinedStyle = {
-        ...element.style,
-        position: "absolute",
-        left: `${element.position.x}px`,
-        top: `${element.position.y}px`,
-        cursor: isSelected && !isEditing ? "move" : "pointer",
-        textShadow,
-        zIndex: 10,
-        fontFamily: element.style?.fontFamily || "Arial",
-        fontSize: element.style?.fontSize || "16px",
-        color: element.style?.color || "#000000",
-        fontWeight: element.style?.fontWeight || "normal",
-        fontStyle: element.style?.fontStyle || "normal",
-        textDecoration: element.style?.textDecoration || "none",
-        textAlign: element.style?.textAlign || "left",
-        backgroundColor: element.style?.backgroundColor || "transparent",
-        padding: element.style?.padding || "8px",
-        borderRadius: element.style?.borderRadius || "0px",
-        border: element.style?.border || "none",
-        opacity:
-            element.style?.opacity !== undefined ? element.style.opacity : 1,
+    // Calcular posición y tamaño responsivos
+    const calculateResponsiveStyle = () => {
+        const baseStyle = {
+            ...element.style,
+            position: "absolute",
+            cursor: isSelected && !isEditing ? "move" : "pointer",
+            textShadow,
+            zIndex: 10,
+            fontFamily: element.style?.fontFamily || "Arial",
+            color: element.style?.color || "#000000",
+            fontWeight: element.style?.fontWeight || "normal",
+            fontStyle: element.style?.fontStyle || "normal",
+            textDecoration: element.style?.textDecoration || "none",
+            textAlign: element.style?.textAlign || "left",
+            backgroundColor: element.style?.backgroundColor || "transparent",
+            padding: element.style?.padding || "8px",
+            borderRadius: element.style?.borderRadius || "0px",
+            border: element.style?.border || "none",
+            opacity: element.style?.opacity !== undefined ? element.style.opacity : 1,
+        };
+
+        // Calcular posición (porcentaje o píxeles)
+        if (element.position.x <= 1 && element.position.y <= 1) {
+            // Posición en porcentajes
+            baseStyle.left = `${element.position.x * 100}%`;
+            baseStyle.top = `${element.position.y * 100}%`;
+        } else {
+            // Posición en píxeles (fallback para elementos existentes)
+            baseStyle.left = `${element.position.x}px`;
+            baseStyle.top = `${element.position.y}px`;
+        }
+
+        // Calcular tamaño de fuente responsivo
+        if (element.style?.fontSize) {
+            const fontSize = parseFloat(element.style.fontSize);
+            if (fontSize && workspaceSize.width) {
+                // Hacer el tamaño de fuente responsivo basado en el workspace
+                const responsiveFontSize = (fontSize / 800) * workspaceSize.width;
+                baseStyle.fontSize = `${Math.max(12, responsiveFontSize)}px`;
+            } else {
+                baseStyle.fontSize = element.style.fontSize;
+            }
+        } else {
+            // Tamaño de fuente por defecto responsivo
+            const defaultFontSize = (16 / 800) * workspaceSize.width;
+            baseStyle.fontSize = `${Math.max(12, defaultFontSize)}px`;
+        }
+
+        return baseStyle;
     };
+
+    const combinedStyle = calculateResponsiveStyle();
     useEffect(() => {
         const fontFamily = element.style?.fontFamily?.replace(/'/g, "");
         if (fontFamily && !document.fonts.check(`12px ${fontFamily}`)) {

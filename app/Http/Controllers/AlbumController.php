@@ -49,10 +49,10 @@ class AlbumController extends Controller
                 $coverImage = $request->file('cover_image');
                 $uuid = Crypto::randomUUID();
                 $ext = $coverImage->getClientOriginalExtension();
-                $path = "albums/covers/{$uuid}.{$ext}";
+                $path = "images/albums/covers/{$uuid}.{$ext}";
                 
                 Storage::put($path, file_get_contents($coverImage));
-                $coverImagePath = $path;
+                $coverImagePath = "{$uuid}.{$ext}";
             }
 
             // Crear el álbum

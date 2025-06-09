@@ -248,6 +248,16 @@ export default function ImageElement({
         };
     }, [isResizing, handleResize, stopResize]);
 
+    // Adaptar a porcentaje si existen size/position en %
+    // Si el elemento tiene position/size en 0-1, se interpreta como porcentaje
+    const getPx = (val, total) => (val <= 1 ? val * total : val);
+    // Recibe el tamaño del workspace por prop (vía EditableCell)
+    const workspaceSize = element.workspaceSize || { width: 800, height: 600 };
+    const left = getPx(element.position.x, workspaceSize.width);
+    const top = getPx(element.position.y, workspaceSize.height);
+    const width = element.size?.width ? getPx(element.size.width, workspaceSize.width) : 200;
+    const height = element.size?.height ? getPx(element.size.height, workspaceSize.height) : 200;
+
     return (
         <div
             ref={ref}
@@ -256,18 +266,13 @@ export default function ImageElement({
             } ${isDragging ? "opacity-50" : "opacity-100"}`}
             style={{
                 position: "absolute",
-                left: `${element.position.x}px`,
-                top: `${element.position.y}px`,
-                width: element.size?.width
-                    ? `${element.size.width}px`
-                    : "200px",
-                height: element.size?.height
-                    ? `${element.size.height}px`
-                    : "200px",
+                left,
+                top,
+                width,
+                height,
                 cursor: isSelected ? "move" : "pointer",
-                //zIndex: isSelected ? 9999 : element.zIndex || 1,
                 zIndex: isSelected ? 1 : 0,
-                opacity: isSelected ? 0.9 : 1, // Hacemos ligeramente transparente el elemento seleccionado
+                opacity: isSelected ? 0.9 : 1,
                 transition: "opacity 0.2s, z-index 0.2s",
                 pointerEvents: "all",
                 overflow: "visible",
