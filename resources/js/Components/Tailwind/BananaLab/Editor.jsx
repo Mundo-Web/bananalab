@@ -940,14 +940,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 </div>
 
                                 {isCurrentPageEditable() ? (
-                                    <span className="bg-secondary/20 text-secondary px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-1">
+                                    <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Pencil className="h-3 w-3" />
-                                        Editable
+                                      
                                     </span>
                                 ) : (
-                                    <span className="bg-white/10 text-white/80 px-2 py-0.5 rounded-md text-xs font-medium flex items-center gap-1">
+                                    <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Lock className="h-3 w-3" />
-                                        Solo lectura
+                                      
                                     </span>
                                 )}
                             </div>
@@ -1016,7 +1016,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             />
                                         </div>
 
-                                 {/*       <div>
+                                        {/*       <div>
                                             <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
                                                 Herramientas rápidas
                                             </h3>
@@ -1205,7 +1205,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             />
                                         </div>
 
-                                       
+
                                     </>
                                 ) : (
                                     /* Main toolbar */
@@ -1347,14 +1347,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                 </div>
                                             )}
 
-                                             <div className="flex items-center space-x-2">
-                                            <WorkspaceControls
-                                                currentSize={workspaceSize}
-                                                onSizeChange={setWorkspaceSize}
-                                                presetData={presetData}
-                                                workspaceDimensions={workspaceDimensions}
-                                            />
-                                        </div>
+                                            <div className="flex items-center space-x-2">
+                                                <WorkspaceControls
+                                                    currentSize={workspaceSize}
+                                                    onSizeChange={setWorkspaceSize}
+                                                    presetData={presetData}
+                                                    workspaceDimensions={workspaceDimensions}
+                                                />
+                                            </div>
                                         </div>
 
                                         {/* Center - Page info 
@@ -1379,7 +1379,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                 {previewMode ? "Salir vista previa" : "Vista previa"}
                                             </Button>
                                         </div>*/}
-                                     
+
 
                                         {/* Right side - Workspace controls 
                                          <div className="flex items-center space-x-2">
@@ -1402,7 +1402,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                 workspaceDimensions={workspaceDimensions}
                                             />
                                         </div>*/}
-                                       
+
                                     </>
                                 )}
                             </div>
@@ -1583,118 +1583,223 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         </main>
 
                         {/* Right sidebar - Page management */}
-                        <aside className="w-64 bg-white border-l flex flex-col h-full">
-                            <div className="p-3 border-b">
-                                <h3 className="font-medium text-xs uppercase customtext-neutral-dark">Páginas</h3>
-                                <div className="flex justify-end mt-2">
-                                    <div className="flex gap-1">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={duplicateCurrentPage}
-                                            disabled={pages[currentPage]?.type !== "content"}
-                                            title={pages[currentPage]?.type !== "content" ? "Solo se pueden duplicar páginas de contenido" : "Duplicar página"}
-                                            className="h-7 w-7"
-                                        >
-                                            <Copy className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="ghost"
-                                            size="icon"
-                                            onClick={deleteCurrentPage}
-                                            disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
-                                            title={
-                                                pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"
-                                                    ? "No se puede eliminar la portada o contraportada"
-                                                    : pages.length <= 3
-                                                        ? "Debe haber al menos una página de contenido"
-                                                        : "Eliminar página"
-                                            }
-                                            className="h-7 w-7"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={addPage}
-                                            className="flex items-center h-7"
-                                        >
-                                            <Plus className="h-3.5 w-3.5 mr-1" />
-                                            <span className="text-xs">Nueva página</span>
-                                        </Button>
-                                    </div>
+                        <aside className="w-52 bg-white border-l flex flex-col h-full">
+                            <div className="p-4 border-b bg-gray-50">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h3 className="font-medium text-sm text-gray-700 flex items-center gap-1.5">
+                                        <Book className="h-4 w-4 text-purple-600" />
+                                        Páginas
+                                    </h3>
+                                    <span className="text-xs text-gray-500 bg-white px-2 py-0.5 rounded-full border">
+                                        {pages.length} total
+                                    </span>
                                 </div>
+
+                          {/*      <div className="flex gap-1.5 mt-3">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={duplicateCurrentPage}
+                                        disabled={pages[currentPage]?.type !== "content"}
+                                        title={pages[currentPage]?.type !== "content" ? "Solo se pueden duplicar páginas de contenido" : "Duplicar página"}
+                                        className="h-7 w-7 rounded-md bg-white border shadow-sm hover:bg-gray-50"
+                                    >
+                                        <Copy className="h-3.5 w-3.5 text-gray-600" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={deleteCurrentPage}
+                                        disabled={pages.length <= 3 || pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"}
+                                        title={
+                                            pages[currentPage]?.type === "cover" || pages[currentPage]?.type === "final"
+                                                ? "No se puede eliminar la portada o contraportada"
+                                                : pages.length <= 3
+                                                    ? "Debe haber al menos una página de contenido"
+                                                    : "Eliminar página"
+                                        }
+                                        className="h-7 w-7 rounded-md bg-white border shadow-sm hover:bg-gray-50"
+                                    >
+                                        <Trash2 className="h-3.5 w-3.5 text-gray-600" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={addPage}
+                                        className="flex items-center h-7 ml-auto rounded-md border border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700"
+                                    >
+                                        <Plus className="h-3.5 w-3.5 mr-1" />
+                                        <span className="text-xs">Nueva página</span>
+                                    </Button>
+                                </div> */}
                             </div>
 
                             {/* Page thumbnails - scrollable */}
                             <div className="flex-1 overflow-y-auto p-3 custom-scroll">
-                                <div className="space-y-3">
-                                    {pages.map((page, index) => {
-                                        // Obtener título de página basado en el tipo
-                                        let pageTitle = "Página";
-                                        let pageIcon = "";
-                                        let pageColor = "bg-gray-100";
-
-                                        if (page.type === "cover") {
-                                            pageTitle = "Portada";
-                                            pageIcon = "📖";
-                                            pageColor = "bg-purple-100";
-                                        } else if (page.type === "content") {
-                                            pageTitle = `Pág. ${page.pageNumber}`;
-                                            pageIcon = "📄";
-                                            pageColor = "bg-blue-100";
-                                        } else if (page.type === "final") {
-                                            pageTitle = "Contraportada";
-                                            pageIcon = "📚";
-                                            pageColor = "bg-green-100";
-                                        }
-
-                                        return (
+                                {/* Sections for different page types */}
+                                <div className="space-y-4">
+                                    {/* Cover section */}
+                                    <div>
+                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-purple-400 mr-1.5"></div>
+                                            Portada
+                                        </div>
+                                        {pages.filter(page => page.type === "cover").map((page, index) => (
                                             <div
                                                 key={page.id}
-                                                className={`flex flex-col cursor-pointer hover:bg-gray-50 rounded-lg transition-colors ${currentPage === index ? "ring-2 ring-purple-400" : ""
-                                                    }`}
-                                                onClick={() => setCurrentPage(index)}
+                                                className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                            ${currentPage === pages.indexOf(page)
+                                                        ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
+                                                        : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
+                            mb-2`}
+                                                onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className={`relative ${pageColor} rounded-md overflow-hidden border mb-1 aspect-[4/3]`}>
-                                                    <div className="absolute top-1 left-1 right-1 flex justify-between items-start z-10">
-                                                        <span className="text-[10px] bg-white/90 px-1.5 py-0.5 rounded-full font-medium">
-                                                            {pageIcon} {pageTitle}
-                                                        </span>
-                                                        {page.type === "content" && (
-                                                            <span className="text-[10px] bg-blue-500 text-white px-1.5 py-0.5 rounded-full">
-                                                                Editable
-                                                            </span>
-                                                        )}
-                                                    </div>
-
+                                                <div className="relative bg-purple-50 rounded-md overflow-hidden border mb-1 aspect-[4/3]">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
-                                                            alt={`Miniatura página ${index + 1}`}
+                                                            alt="Portada"
                                                             className="w-full h-full object-contain"
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            <div
-                                                                className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
-                                                            >
-                                                                {Array.from({
-                                                                    length: getCurrentLayout().cells,
-                                                                }).map((_, i) => (
-                                                                    <div
-                                                                        key={i}
-                                                                        className="bg-gray-200 rounded-sm"
-                                                                    ></div>
-                                                                ))}
+                                                            <div className="text-purple-300">
+                                                                <Book className="h-8 w-8" />
                                                             </div>
                                                         </div>
                                                     )}
+
+                                                    {/* Overlay with info */}
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 group-hover:opacity-100 opacity-80 transition-opacity">
+                                                        <span className="text-[10px] text-white font-medium block">
+                                                            Portada
+                                                        </span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
+                                        ))}
+                                    </div>
+
+                                    {/* Content pages */}
+                                    <div>
+                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></div>
+                                            Páginas de contenido
+                                        </div>
+                                        <div className="space-y-2">
+                                            {pages.filter(page => page.type === "content").map((page, index) => (
+                                                <div
+                                                    key={page.id}
+                                                    className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                                ${currentPage === pages.indexOf(page)
+                                                            ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
+                                                            : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
+                                mb-1`}
+                                                    onClick={() => setCurrentPage(pages.indexOf(page))}
+                                                >
+                                                    <div className="relative bg-blue-50 rounded-md overflow-hidden border aspect-[4/3]">
+                                                        {pageThumbnails[page.id] ? (
+                                                            <img
+                                                                src={pageThumbnails[page.id]}
+                                                                alt={`Página ${page.pageNumber}`}
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        ) : (
+                                                            <div className="w-full h-full flex items-center justify-center">
+                                                                <div
+                                                                    className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
+                                                                >
+                                                                    {Array.from({
+                                                                        length: getCurrentLayout().cells,
+                                                                    }).map((_, i) => (
+                                                                        <div
+                                                                            key={i}
+                                                                            className="bg-gray-200 rounded-sm"
+                                                                        ></div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Page number badge */}
+                                                        <div className="absolute top-1 left-1 bg-white/90 rounded-full h-5 w-5 flex items-center justify-center text-[10px] font-bold shadow-sm">
+                                                            {page.pageNumber}
+                                                        </div>
+
+                                                        {/* Editable badge */}
+                                                        <div className="absolute top-1 right-1 bg-blue-500 text-white text-[9px] px-1.5 py-0.5 rounded-full opacity-80 group-hover:opacity-100">
+                                                            Editable
+                                                        </div>
+
+                                                        {/* Bottom gradient 
+                                                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/50 to-transparent p-1 pt-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <div className="flex justify-between items-center">
+                                                                <span className="text-[10px] text-white">
+                                                                    Página {page.pageNumber}
+                                                                </span>
+                                                                <div className="flex gap-1">
+                                                                    <button
+                                                                        className="text-white bg-white/20 p-0.5 rounded hover:bg-white/30"
+                                                                        onClick={(e) => {
+                                                                            e.stopPropagation();
+                                                                            setCurrentPage(pages.indexOf(page));
+                                                                            duplicateCurrentPage();
+                                                                        }}
+                                                                        title="Duplicar página"
+                                                                    >
+                                                                        <Copy className="h-2.5 w-2.5" />
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        </div>*/}
+                                                      
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Final page */}
+                                    <div>
+                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-green-400 mr-1.5"></div>
+                                            Contraportada
+                                        </div>
+                                        {pages.filter(page => page.type === "final").map((page, index) => (
+                                            <div
+                                                key={page.id}
+                                                className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                            ${currentPage === pages.indexOf(page)
+                                                        ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
+                                                        : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
+                            mb-2`}
+                                                onClick={() => setCurrentPage(pages.indexOf(page))}
+                                            >
+                                                <div className="relative bg-green-50 rounded-md overflow-hidden border mb-1 aspect-[4/3]">
+                                                    {pageThumbnails[page.id] ? (
+                                                        <img
+                                                            src={pageThumbnails[page.id]}
+                                                            alt="Contraportada"
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    ) : (
+                                                        <div className="w-full h-full flex items-center justify-center">
+                                                            <div className="text-green-300">
+                                                                <Book className="h-8 w-8" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Overlay with info */}
+                                                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 pt-6 group-hover:opacity-100 opacity-80 transition-opacity">
+                                                        <span className="text-[10px] text-white font-medium block">
+                                                            Contraportada
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         </aside>
