@@ -835,8 +835,15 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     );
                     if (pageElement) {
                         try {
+                            // Calcula el tamaño real del elemento
+                            const rect = pageElement.getBoundingClientRect();
+                            const width = Math.round(rect.width);
+                            const height = Math.round(rect.height);
+                            const scale = window.devicePixelRatio || 1;
                             const canvas = await html2canvas(pageElement, {
-                                scale: 0.2,
+                                scale,
+                                width,
+                                height,
                                 logging: false,
                                 useCORS: true,
                                 allowTaint: true,

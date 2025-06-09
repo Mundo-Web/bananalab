@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef } from "react";
 import Modal from "react-modal";
-import { X, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
-import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
-import PageRenderer from "../Elements/PageRendererClean";
+import { X, ChevronLeft, ChevronRight } from "lucide-react";
+import HTMLFlipBook from "react-pageflip";
 
 // Estilos para el modal
 const customStyles = {
@@ -24,27 +23,38 @@ const customStyles = {
     },
 };
 
-// Configurar el elemento raíz del modal de forma segura
-try {
-    const appElement = document.getElementById('app') || document.querySelector('main') || document.body;
-    Modal.setAppElement(appElement);
-} catch (e) {
-    console.warn('No se pudo configurar el appElement del modal:', e);
-}
+// Estilos CSS adicionales para eliminar márgenes del flipbook
+const flipbookStyles = `
+    .stf__wrapper {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .stf__block {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    .stf__page {
+        margin: 0 !important;
+        padding: 0 !important;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+    }
+    .page-container img {
+        display: block;
+        margin: 0;
+        padding: 0;
+        border: none;
+        outline: none;
+    }
+`;
 
-const BookPreviewModal = ({ isOpen, onRequestClose, pages, workspaceDimensions, getCurrentLayout, presetData, pageThumbnails = {} }) => {
-    const [currentPageIndex, setCurrentPageIndex] = useState(0);
-    const [isFlipping, setIsFlipping] = useState(false);
+Modal.setAppElement(document.body); // Ajusta esto según tu app
 
-    // Resetear estado cuando se abre el modal
-    useEffect(() => {
-        if (isOpen) {
-            setCurrentPageIndex(0);
-            setIsFlipping(false);
-        }
-    }, [isOpen]);
 
-    // Safety check for pages
+
+const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }) => {
+    const [currentPage, setCurrentPage] = useState(0);
+    const flipBook = useRef();
+
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
         return (
             <Modal
@@ -69,284 +79,214 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, workspaceDimensions, 
         );
     }
 
-    // Funciones de navegación flipbook
     const goToPrevPage = () => {
-        if (currentPageIndex > 0 && !isFlipping) {
-            setIsFlipping(true);
-            setTimeout(() => {
-                setCurrentPageIndex(currentPageIndex - 1);
-                setIsFlipping(false);
-            }, 300);
+        if (flipBook.current) {
+            flipBook.current.pageFlip().flipPrev();
         }
     };
-
     const goToNextPage = () => {
-        if (currentPageIndex < pages.length - 1 && !isFlipping) {
-            setIsFlipping(true);
-            setTimeout(() => {
-                setCurrentPageIndex(currentPageIndex + 1);
-                setIsFlipping(false);
-            }, 300);
+        if (flipBook.current) {
+            flipBook.current.pageFlip().flipNext();
         }
     };
 
-    const goToPage = (pageIndex) => {
-        if (pageIndex !== currentPageIndex && !isFlipping) {
-            setIsFlipping(true);
-            setTimeout(() => {
-                setCurrentPageIndex(pageIndex);
-                setIsFlipping(false);
-            }, 300);
-        }
-    };
+    // Tamaño base para la preview - aspect ratio 4:3 como las páginas reales
+    const aspectRatio = 4 / 3;
+    const previewHeight = 450; // Más alto para mejor visualización
+    const previewWidth = Math.round(previewHeight * aspectRatio);
 
-    // Calcular dimensiones optimizadas para flipbook
-    const calculateFlipbookDimensions = () => {
-        const baseWidth = workspaceDimensions?.width || 800;
-        const baseHeight = workspaceDimensions?.height || 600;
+    // Función para organizar páginas como libro real con frente y reverso
+    const createBookPages = () => {
+        const bookPages = [];
         
-        // Ajustar al viewport del modal manteniendo proporción
-        const maxModalWidth = Math.min(window.innerWidth * 0.85, 1200);
-        const maxModalHeight = Math.min(window.innerHeight * 0.8, 800);
-        
-        const aspectRatio = baseWidth / baseHeight;
-        let displayWidth, displayHeight;
-        
-        // Calcular para que quepa el libro completo (dos páginas lado a lado)
-        if ((maxModalWidth / 2) / aspectRatio <= maxModalHeight) {
-            displayWidth = maxModalWidth / 2;
-            displayHeight = (maxModalWidth / 2) / aspectRatio;
-        } else {
-            displayHeight = maxModalHeight;
-            displayWidth = maxModalHeight * aspectRatio;
+        // Todas las páginas en orden secuencial
+        const allPages = [
+            ...pages.filter(page => page.type === 'cover'),
+            ...pages.filter(page => page.type === 'content'),
+            ...pages.filter(page => page.type === 'final')
+        ];
+
+        // Para HTMLFlipBook, necesitamos duplicar las páginas para simular frente y reverso
+        // La primera página (portada) solo tiene frente
+        if (allPages.length > 0) {
+            bookPages.push(allPages[0]); // Portada (frente)
+            bookPages.push({ ...allPages[0], isBack: true }); // Portada (reverso - blanco o info)
         }
 
-        return { 
-            pageWidth: displayWidth, 
-            pageHeight: displayHeight,
-            bookWidth: displayWidth * 2,
-            bookHeight: displayHeight
-        };
-    };
-
-    const flipbookDimensions = calculateFlipbookDimensions();
-
-    // Renderizar página individual (usa thumbnails si están disponibles)
-    const renderPage = (page, pageIndex) => {
-        const thumbnailUrl = pageThumbnails[page.id];
-        
-        if (thumbnailUrl) {
-            // Usar thumbnail generado para máxima fidelidad visual
-            return (
-                <div 
-                    className="w-full h-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden flex items-center justify-center"
-                    style={{
-                        width: flipbookDimensions.pageWidth,
-                        height: flipbookDimensions.pageHeight
-                    }}
-                >
-                    <img 
-                        src={thumbnailUrl}
-                        alt={`Página ${pageIndex + 1}`}
-                        className="w-full h-full object-contain"
-                        style={{ imageRendering: 'crisp-edges' }}
-                    />
-                </div>
-            );
-        } else {
-            // Fallback: renderizar usando PageRenderer
-            return (
-                <div 
-                    className="w-full h-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden"
-                    style={{
-                        width: flipbookDimensions.pageWidth,
-                        height: flipbookDimensions.pageHeight
-                    }}
-                >
-                    <PageRenderer
-                        page={page}
-                        getCurrentLayout={getCurrentLayout}
-                        presetData={presetData}
-                        workspaceDimensions={{
-                            width: flipbookDimensions.pageWidth,
-                            height: flipbookDimensions.pageHeight
-                        }}
-                        showBackgroundLayer={true}
-                        isPreview={true}
-                        className="w-full h-full"
-                    />
-                </div>
-            );
+        // Páginas de contenido - cada página es frente y reverso de una hoja
+        for (let i = 1; i < allPages.length - 1; i++) {
+            bookPages.push(allPages[i]); // Frente de la hoja
+            if (i + 1 < allPages.length - 1) {
+                bookPages.push(allPages[i + 1]); // Reverso de la hoja (siguiente página)
+                i++; // Saltamos la siguiente porque ya la incluimos como reverso
+            } else {
+                // Si es la última página de contenido, el reverso puede estar en blanco
+                bookPages.push({ ...allPages[i], isBack: true, isEmpty: true });
+            }
         }
+
+        // Contraportada (si existe)
+        const finalPage = allPages.find(page => page.type === 'final');
+        if (finalPage) {
+            bookPages.push({ ...finalPage, isBack: true, isEmpty: true }); // Reverso blanco
+            bookPages.push(finalPage); // Contraportada
+        }
+
+        return bookPages;
     };
+
+    const bookPages = createBookPages();
 
     return (
         <Modal
             isOpen={isOpen}
             onRequestClose={onRequestClose}
             style={customStyles}
-            contentLabel="Vista previa del álbum - Flipbook"
+            contentLabel="Vista previa del álbum"
         >
-            <div 
-                className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden"
-                style={{
-                    width: flipbookDimensions.bookWidth + 100,
-                    height: flipbookDimensions.bookHeight + 180,
-                    minWidth: 600,
-                    minHeight: 500
-                }}
-            >
-                {/* Header del modal */}
-                <div className="flex justify-between items-center p-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                    <h2 className="text-lg font-bold">Vista previa del álbum - Flipbook</h2>
+            {/* Inyectar estilos CSS para eliminar márgenes */}
+            <style dangerouslySetInnerHTML={{ __html: flipbookStyles }} />
+            
+            <div className="relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-2xl">
+                {/* Botón de cerrar */}
+                <button
+                    onClick={onRequestClose}
+                    className="absolute top-4 right-4 p-2 rounded-full bg-white/80 hover:bg-white text-gray-700 shadow z-10"
+                >
+                    <X className="h-6 w-6" />
+                </button>
+
+                {/* Controles de navegación */}
+                <div className="flex items-center justify-center gap-8 mb-6 mt-2">
                     <button
-                        onClick={onRequestClose}
-                        className="p-2 rounded-full hover:bg-white/20 transition-colors"
+                        onClick={goToPrevPage}
+                        className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 shadow transition-colors"
                     >
-                        <X className="h-5 w-5" />
+                        <ChevronLeft className="h-6 w-6" />
+                    </button>
+
+                    <span className="flex items-center text-gray-700 text-base font-medium px-4 py-2 bg-gray-50 rounded-lg">
+                        {(() => {
+                            const currentPageData = bookPages[currentPage];
+                            if (!currentPageData) return 'Cargando...';
+                            
+                            // Manejo especial para reversos y páginas en blanco
+                            if (currentPageData.isBack && currentPageData.isEmpty) {
+                                return 'Reverso';
+                            }
+                            if (currentPageData.isBack) {
+                                return 'Reverso de la página';
+                            }
+                            
+                            if (currentPageData.type === 'cover') return 'Portada';
+                            if (currentPageData.type === 'final') return 'Contraportada';
+                            return `Página ${currentPageData.pageNumber || Math.ceil((currentPage + 1) / 2)}`;
+                        })()}
+                        <span className="mx-2 text-gray-400">•</span>
+                        {Math.ceil((currentPage + 1) / 2)} / {Math.ceil(bookPages.length / 2)} hojas
+                    </span>
+
+                    <button
+                        onClick={goToNextPage}
+                        className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 shadow transition-colors"
+                    >
+                        <ChevronRight className="h-6 w-6" />
                     </button>
                 </div>
 
-                {/* Contador de páginas y navegación rápida */}
-                <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm z-20 flex items-center gap-4">
-                    <span>{currentPageIndex + 1} / {pages.length}</span>
-                    <div className="flex gap-1">
-                        {pages.map((_, index) => (
-                            <button
-                                key={index}
-                                onClick={() => goToPage(index)}
-                                className={`w-2 h-2 rounded-full transition-colors ${
-                                    index === currentPageIndex ? 'bg-white' : 'bg-white/40 hover:bg-white/60'
-                                }`}
-                            />
-                        ))}
-                    </div>
-                </div>
-
-                {/* Contenedor principal del flipbook */}
-                <div className="p-6 h-full">
-                    <div className="relative h-full">
-                        <TransformWrapper
-                            initialScale={1}
-                            minScale={0.3}
-                            maxScale={2}
-                            wheel={{ step: 0.1 }}
-                            doubleClick={{ mode: "toggle" }}
-                        >
-                            {({ zoomIn, zoomOut, resetTransform }) => (
-                                <>
-                                    {/* Controles de zoom */}
-                                    <div className="absolute top-2 right-2 flex gap-2 z-20">
-                                        <button
-                                            onClick={() => zoomOut()}
-                                            className="p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors"
-                                            title="Alejar"
-                                        >
-                                            <ZoomOut className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => zoomIn()}
-                                            className="p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors"
-                                            title="Acercar"
-                                        >
-                                            <ZoomIn className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                            onClick={() => resetTransform()}
-                                            className="p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-colors text-xs"
-                                            title="Restablecer zoom"
-                                        >
-                                            <RotateCcw className="h-4 w-4" />
-                                        </button>
-                                    </div>
-
-                                    <TransformComponent
-                                        wrapperClass="h-full w-full"
-                                        contentClass="h-full w-full flex items-center justify-center"
-                                    >
-                                        {/* Flipbook Container */}
+                {/* Flipbook visual: thumbnails con efecto page flip como libro real */}
+                <div className="flex items-center justify-center">
+                    <HTMLFlipBook
+                        ref={flipBook}
+                        width={previewWidth}
+                        height={previewHeight}
+                        size="stretch"
+                        minWidth={previewWidth * 0.7}
+                        maxWidth={previewWidth * 1.3}
+                        minHeight={previewHeight * 0.7}
+                        maxHeight={previewHeight * 1.3}
+                        maxShadowOpacity={0.3}
+                        showCover={true}
+                        mobileScrollSupport={true}
+                        onFlip={(e) => setCurrentPage(e.data)}
+                        className="shadow-xl"
+                        usePortrait={false}
+                        startPage={0}
+                        drawShadow={true}
+                        flippingTime={600}
+                        useMouseEvents={true}
+                        swipeDistance={50}
+                        showPageCorners={true}
+                        disableFlipByClick={false}
+                        style={{
+                            margin: 0,
+                            padding: 0
+                        }}
+                    >
+                        {bookPages.map((page, pageIdx) => (
+                            <div 
+                                key={`page-${pageIdx}`}
+                                className="page-container"
+                                style={{
+                                    width: previewWidth,
+                                    height: previewHeight,
+                                    margin: 0,
+                                    padding: 0,
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#ffffff'
+                                }}
+                            >
+                                {/* Página individual con manejo de reversos */}
+                                <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {page.isEmpty || page.isBack ? (
+                                        // Página en blanco (reverso)
                                         <div 
-                                            className="relative flex items-center justify-center"
+                                            className="flex items-center justify-center text-gray-300 text-xs"
                                             style={{
-                                                width: flipbookDimensions.bookWidth,
-                                                height: flipbookDimensions.bookHeight
+                                                width: '100%',
+                                                height: '100%',
+                                                backgroundColor: '#ffffff',
+                                                border: '1px solid #f0f0f0'
                                             }}
                                         >
-                                            {/* Página actual con efecto flipbook */}
-                                            <div 
-                                                className={`transition-all duration-300 ease-in-out transform ${
-                                                    isFlipping ? 'scale-95 opacity-80' : 'scale-100 opacity-100'
-                                                }`}
-                                                style={{
-                                                    perspective: '1000px',
-                                                    transformStyle: 'preserve-3d'
-                                                }}
-                                            >
-                                                {/* Sombra del libro */}
-                                                <div 
-                                                    className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-2 bg-black/20 rounded-lg blur-sm"
-                                                    style={{
-                                                        width: flipbookDimensions.bookWidth + 20,
-                                                        height: 20
-                                                    }}
-                                                />
-                                                
-                                                {/* Página renderizada */}
-                                                <div className="relative bg-white shadow-2xl rounded-lg overflow-hidden border border-gray-300">
-                                                    {pages[currentPageIndex] && renderPage(pages[currentPageIndex], currentPageIndex)}
-                                                    
-                                                    {/* Efecto de lomo del libro */}
-                                                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-r from-gray-400 to-gray-300 opacity-60" />
-                                                </div>
-                                            </div>
+                                            {page.isBack ? 'Reverso' : ''}
                                         </div>
-                                    </TransformComponent>
-                                </>
-                            )}
-                        </TransformWrapper>
-
-                        {/* Botones de navegación estilo flipbook */}
-                        <button
-                            className="absolute left-4 top-1/2 transform -translate-y-1/2 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg z-10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                            onClick={goToPrevPage}
-                            disabled={currentPageIndex === 0 || isFlipping}
-                            title="Página anterior"
-                        >
-                            <ChevronLeft className="h-6 w-6" />
-                        </button>
-                        
-                        <button
-                            className="absolute right-4 top-1/2 transform -translate-y-1/2 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg z-10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                            onClick={goToNextPage}
-                            disabled={currentPageIndex === pages.length - 1 || isFlipping}
-                            title="Página siguiente"
-                        >
-                            <ChevronRight className="h-6 w-6" />
-                        </button>
-
-                        {/* Indicador de página actual */}
-                        <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-full text-sm">
-                            {pages[currentPageIndex]?.type === 'cover' && 'Portada'}
-                            {pages[currentPageIndex]?.type === 'content' && `Página ${pages[currentPageIndex]?.pageNumber || currentPageIndex + 1}`}
-                            {pages[currentPageIndex]?.type === 'final' && 'Contraportada'}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Footer con botones de acción */}
-                <div className="flex justify-center gap-4 p-4 bg-gray-50 border-t border-gray-200">
-                    <button
-                        onClick={onRequestClose}
-                        className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                        Seguir editando
-                    </button>
-                    <button
-                        onClick={() => alert('Funcionalidad de compra próximamente')}
-                        className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-medium transition-colors"
-                    >
-                        Comprar álbum
-                    </button>
+                                    ) : pageThumbnails[page.id] ? (
+                                        // Página con contenido
+                                        <img
+                                            src={pageThumbnails[page.id]}
+                                            alt={`${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : `Página ${page.pageNumber || pageIdx + 1}`}`}
+                                            style={{ 
+                                                width: '100%',
+                                                height: '100%',
+                                                objectFit: 'contain',
+                                                margin: 0,
+                                                padding: 0,
+                                                border: 'none',
+                                                imageRendering: 'crisp-edges',
+                                                backgroundColor: '#ffffff'
+                                            }}
+                                        />
+                                    ) : (
+                                        // Cargando
+                                        <div 
+                                            className="flex items-center justify-center text-gray-400 text-sm"
+                                            style={{
+                                                width: '100%',
+                                                height: '100%',
+                                                backgroundColor: '#f9fafb'
+                                            }}
+                                        >
+                                            Generando previsualización...
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </HTMLFlipBook>
                 </div>
             </div>
         </Modal>
