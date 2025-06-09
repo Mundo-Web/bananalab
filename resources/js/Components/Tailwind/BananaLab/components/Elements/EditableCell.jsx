@@ -14,6 +14,7 @@ export default function EditableCell({
     availableMasks = [],
     workspaceSize = { width: 800, height: 600 }, // Tamaño del workspace completo
     cellSize = "auto", // Tamaño específico de esta celda si se necesita
+    cellStyle = "", // Estilo dinámico del layout
 }) {
     const [{ isOver }, drop] = useDrop(() => ({
         accept: ["IMAGE_FILE", "TEXT_ELEMENT", "IMAGE_ELEMENT"],
@@ -108,7 +109,7 @@ export default function EditableCell({
     return (
         <div
             ref={drop}
-            className={`relative rounded-lg overflow-hidden w-full h-full ${
+            className={`relative w-full h-full ${cellStyle || 'rounded-lg overflow-hidden'} ${
                 isOver ? "ring-2 ring-purple-500 bg-transparent" : ""
             } ${
                 !hasContent 

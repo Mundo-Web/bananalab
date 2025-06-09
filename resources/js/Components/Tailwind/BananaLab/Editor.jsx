@@ -25,6 +25,7 @@ import Button from "./components/UI/Button";
 
 import Slider from "./components/UI/Slider";
 import EditableCell from "./components/Elements/EditableCell";
+import LayoutSelector from "./components/Elements/LayoutSelector";
 import { AdvancedSettings } from "./components/Editor/AdvancedSettings";
 import { FilterPresets } from "./components/Editor/FilterPresets";
 import { MaskSelector } from "./components/Elements/MaskSelector";
@@ -981,46 +982,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 {activeTab === "elements" && (
                                     <div className="space-y-4">
                                         <div>
-                                            <h3 className="font-medium mb-2">
-                                                Layouts
+                                            <h3 className="font-medium mb-3">
+                                                Layouts Disponibles
                                             </h3>
-                                            <div className="grid grid-cols-2 gap-3">
-                                                {layouts.map((layout) => (
-                                                    <div
-                                                        key={layout.id}
-                                                        className={`border rounded-md p-1 cursor-pointer hover:border-purple-500 ${
-                                                            pages[currentPage]
-                                                                .layout ===
-                                                            layout.id
-                                                                ? "border-purple-500 ring-1 ring-purple-200"
-                                                                : ""
-                                                        }`}
-                                                        onClick={() =>
-                                                            changeLayout(
-                                                                layout.id
-                                                            )
-                                                        }
-                                                    >
-                                                        <div
-                                                            className={`grid ${layout.template} gap-1 h-20`}
-                                                        >
-                                                            {Array.from({
-                                                                length: layout.cells,
-                                                            }).map((_, i) => (
-                                                                <div
-                                                                    key={i}
-                                                                    className="bg-gray-100 rounded-sm flex items-center justify-center"
-                                                                >
-                                                                    <ImageIcon className="h-3 w-3 text-gray-400" />
-                                                                </div>
-                                                            ))}
-                                                        </div>
-                                                        <p className="text-xs text-center mt-1 truncate">
-                                                            {layout.name}
-                                                        </p>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            <LayoutSelector
+                                                currentLayoutId={pages[currentPage]?.layout}
+                                                onLayoutChange={changeLayout}
+                                            />
                                         </div>
 
                                         <div>
@@ -1909,22 +1877,25 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             })()}
                                             {/* Celdas editables por encima del background */}
                                             <div
-                                                className={`grid ${getCurrentLayout().template} gap-4 p-4`}
+                                                className={`grid ${getCurrentLayout().template}`}
                                                 style={{ 
                                                     position: 'relative', 
                                                     zIndex: 1,
                                                     width: '100%',
                                                     height: '100%',
-                                                    boxSizing: 'border-box'
+                                                    boxSizing: 'border-box',
+                                                    gap: getCurrentLayout().style?.gap || '16px',
+                                                    padding: getCurrentLayout().style?.padding || '16px'
                                                 }}
                                             >
                                                 {pages[currentPage].cells.map(
-                                                    (cell) => (
+                                                    (cell, cellIndex) => (
                                                         <EditableCell
                                                             key={cell.id}
                                                             id={cell.id}
                                                             elements={cell.elements.filter(el => !el.locked)}
                                                             workspaceSize={workspaceDimensions}
+                                                            cellStyle={getCurrentLayout().cellStyles?.[cellIndex]}
                                                             selectedElement={
                                                                 selectedCell === cell.id ? selectedElement : null
                                                             }

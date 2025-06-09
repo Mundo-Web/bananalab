@@ -2856,7 +2856,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-DSv4YlOv.js",
+    "file": "assets/BananaLab-t7mhSnPI.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -3025,10 +3025,32 @@
       "_index-yBjzXJbu.js"
     ]
   },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/ImageElement_new.jsx": {
+    "file": "assets/ImageElement_new-Co_3lRRe.js",
+    "name": "ImageElement_new",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/ImageElement_new.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
+  },
   "resources/js/Components/Tailwind/BananaLab/components/Elements/LayerPanel.jsx": {
     "file": "assets/LayerPanel-Co_3lRRe.js",
     "name": "LayerPanel",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/LayerPanel.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/LayoutSelector.jsx": {
+    "file": "assets/LayoutSelector-Co_3lRRe.js",
+    "name": "LayoutSelector",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/LayoutSelector.jsx",
     "isEntry": true,
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
@@ -6334,7 +6356,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-Din2yf5i.js",
+    "file": "assets/System-IJMhXKH8.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
