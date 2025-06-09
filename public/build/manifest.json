@@ -664,19 +664,19 @@
     "file": "assets/index-yBjzXJbu.js",
     "name": "index"
   },
-  "_index.es-p8wkj5I3.js": {
-    "file": "assets/index.es-p8wkj5I3.js",
-    "name": "index.es",
-    "imports": [
-      "_index-BH53Isel.js"
-    ]
-  },
   "_index.esm-CveLAcri.js": {
     "file": "assets/index.esm-CveLAcri.js",
     "name": "index.esm",
     "imports": [
       "_index-BH53Isel.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js"
+    ]
+  },
+  "_index.esm-bVqN-6cW.js": {
+    "file": "assets/index.esm-bVqN-6cW.js",
+    "name": "index.esm",
+    "imports": [
+      "_index-BH53Isel.js"
     ]
   },
   "_login-CjATaXhS.js": {
@@ -2856,7 +2856,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-CkIDCuIG.js",
+    "file": "assets/BananaLab-tNDCJ2RQ.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -2919,26 +2919,26 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-DXckd8bb.js",
+    "file": "assets/Editor-BpIdB79N.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isEntry": true,
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
-      "_index.es-p8wkj5I3.js",
       "_index-Bv81MoWS.js",
+      "_index.esm-bVqN-6cW.js",
       "_x-DBMwyD6F.js",
+      "_createLucideIcon-Cy5Ya80P.js",
       "_chevron-left-B2s3ZsB7.js",
       "_chevron-right-Ckt5D2ka.js",
       "_index-yBjzXJbu.js",
       "_index-fNjTmf9T.js",
-      "_index-Chjiymov.js",
-      "_createLucideIcon-Cy5Ya80P.js"
+      "_index-Chjiymov.js"
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx": {
-    "file": "assets/V1Edit-B79bSHiR.js",
+    "file": "assets/V1Edit-BTfepTr2.js",
     "name": "V1Edit",
     "src": "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
     "isEntry": true,
@@ -2947,10 +2947,10 @@
       "_index-BH53Isel.js",
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
       "_index-yBjzXJbu.js",
-      "_index.es-p8wkj5I3.js",
       "_index-Bv81MoWS.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js",
+      "_index.esm-bVqN-6cW.js",
       "_x-DBMwyD6F.js",
       "_createLucideIcon-Cy5Ya80P.js",
       "_chevron-left-B2s3ZsB7.js",
@@ -2978,16 +2978,46 @@
       "_index-yBjzXJbu.js"
     ]
   },
+  "resources/js/Components/Tailwind/BananaLab/components/Editor/BookFlipbook.jsx": {
+    "file": "assets/BookFlipbook-BsFPv7db.js",
+    "name": "BookFlipbook",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/BookFlipbook.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-Bv81MoWS.js",
+      "_index.esm-bVqN-6cW.js",
+      "_index-yBjzXJbu.js",
+      "_index-fNjTmf9T.js",
+      "_index-Chjiymov.js"
+    ]
+  },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview .jsx": {
-    "file": "assets/BookPreview -CM0VbNfE.js",
+    "file": "assets/BookPreview -BHAq2ZxA.js",
     "name": "BookPreview ",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview .jsx",
     "isEntry": true,
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BH53Isel.js",
-      "_index.es-p8wkj5I3.js",
       "_index-Bv81MoWS.js",
+      "_index.esm-bVqN-6cW.js",
+      "_index-yBjzXJbu.js",
+      "_index-fNjTmf9T.js",
+      "_index-Chjiymov.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx": {
+    "file": "assets/BookPreview-BHAq2ZxA.js",
+    "name": "BookPreview",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-Bv81MoWS.js",
+      "_index.esm-bVqN-6cW.js",
       "_index-yBjzXJbu.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js"
@@ -3085,6 +3115,50 @@
     "name": "PageBackgroundSelector",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/PageBackgroundSelector.jsx",
     "isEntry": true
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRenderer.jsx": {
+    "file": "assets/PageRenderer-Co_3lRRe.js",
+    "name": "PageRenderer",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRenderer.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererClean.jsx": {
+    "file": "assets/PageRendererClean-Co_3lRRe.js",
+    "name": "PageRendererClean",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererClean.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererFixed.jsx": {
+    "file": "assets/PageRendererFixed-Co_3lRRe.js",
+    "name": "PageRendererFixed",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererFixed.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
+  },
+  "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererSimple.jsx": {
+    "file": "assets/PageRendererSimple-Co_3lRRe.js",
+    "name": "PageRendererSimple",
+    "src": "resources/js/Components/Tailwind/BananaLab/components/Elements/PageRendererSimple.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BH53Isel.js",
+      "_index-yBjzXJbu.js"
+    ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Elements/TextElement.jsx": {
     "file": "assets/TextElement-Co_3lRRe.js",
@@ -6245,7 +6319,7 @@
     ]
   },
   "resources/js/Pages/Editor.jsx": {
-    "file": "assets/Editor-C7MebObk.js",
+    "file": "assets/Editor-BPDZQkNe.js",
     "name": "Editor",
     "src": "resources/js/Pages/Editor.jsx",
     "isEntry": true,
@@ -6256,10 +6330,10 @@
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
       "_index-yBjzXJbu.js",
       "____vite-browser-external_commonjs-proxy-0zb4Agf2.js",
-      "_index.es-p8wkj5I3.js",
       "_index-Bv81MoWS.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js",
+      "_index.esm-bVqN-6cW.js",
       "_x-DBMwyD6F.js",
       "_createLucideIcon-Cy5Ya80P.js",
       "_chevron-left-B2s3ZsB7.js",
@@ -6367,7 +6441,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-DAkLpFxS.js",
+    "file": "assets/System-BvvAj_eG.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,

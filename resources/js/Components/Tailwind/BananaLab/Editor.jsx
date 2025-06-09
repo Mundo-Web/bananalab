@@ -34,7 +34,7 @@ import { FilterControls } from "./components/Editor/FilterControls";
 import { MaskSelector } from "./components/Elements/MaskSelector";
 import TextToolbar from "./components/Elements/TextToolbar";
 import WorkspaceControls from "./components/Elements/WorkspaceControls";
-import BookPreviewModal from "./components/Editor/BookPreview ";
+import BookPreviewModal from "./components/Editor/BookPreview";
 import Global from "../../../Utils/Global";
 
 // Componente principal del editor
@@ -908,6 +908,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             ...page,
                             layout: layouts.find((l) => l.id === page.layout) || layouts[0],
                         }))}
+                        workspaceDimensions={workspaceDimensions}
+                        getCurrentLayout={(page) => {
+                            if (!page) return layouts[0];
+                            return layouts.find((l) => l.id === page.layout) || layouts[0];
+                        }}
+                        presetData={presetData}
+                        pageThumbnails={pageThumbnails}
                     />
 
                     {/* Header - Top Bar */}
