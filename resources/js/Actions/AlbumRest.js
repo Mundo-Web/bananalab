@@ -112,6 +112,103 @@ class AlbumRest {
     };
 
     /**
+     * Update an existing album
+     * @param {string} uuid Album UUID
+     * @param {Object} albumData Album data to update
+     * @returns {Object} Response from the server
+     */
+    static updateAlbum = async (uuid, albumData) => {
+        try {
+            console.log('Actualizando álbum:', uuid, albumData);
+            
+            // Create FormData for file upload
+            const formData = new FormData();
+            
+            // Add all album fields to FormData
+            Object.keys(albumData).forEach(key => {
+                if (albumData[key] !== null && albumData[key] !== undefined) {
+                    if (key === 'custom_options' && typeof albumData[key] === 'object') {
+                        formData.append(key, JSON.stringify(albumData[key]));
+                    } else if (key === 'album_pages_data' && typeof albumData[key] === 'object') {
+                        formData.append(key, JSON.stringify(albumData[key]));
+                    } else {
+                        formData.append(key, albumData[key]);
+                    }
+                }
+            });
+
+            // Añadir campos requeridos por el backend (compatibilidad)
+            if (albumData.selected_pages !== undefined) {
+                formData.append('pages', albumData.selected_pages);
+            }
+            if (albumData.selected_cover_type !== undefined) {
+                formData.append('cover_type', albumData.selected_cover_type);
+            }
+            if (albumData.selected_finish !== undefined) {
+                formData.append('finish_type', albumData.selected_finish);
+            }
+
+            console.log('FormData preparada para actualización');
+
+            const response = await fetch(`./api/albums/${uuid}`, {
+                method: "PUT",
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                },
+                credentials: "include"
+            });
+
+            // Mostrar respuesta de error detallada en consola
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Respuesta RAW del backend:', errorText);
+                let errorJson;
+                try {
+                    errorJson = JSON.parse(errorText);
+                } catch (e) {
+                    errorJson = { message: errorText };
+                }
+                throw new Error(errorJson?.message || 'Error al actualizar el álbum');
+            }
+
+            const result = await response.json();
+            console.log('Respuesta del servidor (actualización):', result);
+
+            if (!response.ok || result.status !== 200) {
+                throw new Error(result?.message || "Error al actualizar el álbum");
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error en updateAlbum:', error);
+            throw error;
+        }
+    };
+
+    /**
+     * Auto-save album (silently, without notifications)
+     * @param {string} uuid Album UUID
+     * @param {Object} albumData Album data to update
+     * @returns {Object} Response from the server
+     */
+    static autoSaveAlbum = async (uuid, albumData) => {
+        try {
+            console.log('Auto-guardando álbum:', uuid);
+            
+            // Usar updateAlbum pero sin notificaciones
+            const result = await AlbumRest.updateAlbum(uuid, albumData);
+            
+            console.log('Auto-guardado exitoso');
+            return result;
+        } catch (error) {
+            console.error('Error en auto-guardado:', error);
+            throw error;
+        }
+    };
+
+    /**
      * Get user's albums
      * @returns {Array} List of user's albums
      */

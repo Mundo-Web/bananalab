@@ -39,13 +39,18 @@ import Global from "../../../Utils/Global";
 
 // Componente principal del editor
 export default function EditorLibro({ albumId, itemId, presetId, pages: initialPages }) {
+    // Clave única para localStorage basada en álbum y preset
+    const getStorageKey = () => {
+        const params = getParams();
+        return `editor_progress_album_${params.albumId}_preset_${params.presetId}`;
+    };
     // Estados para el álbum y preset
     const [albumData, setAlbumData] = useState(null);
     const [presetData, setPresetData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
 
-    // Estado inicial de páginas - se actualizará cuando carguemos el preset
+    // Estado inicial de páginas - se actualizará cuando carguemos el preset o desde localStorage
     const [pages, setPages] = useState([]);
 
     const [currentPage, setCurrentPage] = useState(0);
@@ -89,18 +94,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     };
 
     // Función para cargar datos del álbum y preset
-    const loadAlbumData = async () => {
+    // Si restoredProgress=true, solo carga datos pero NO crea páginas
+    const loadAlbumData = async (restoredProgress = false) => {
         try {
             setIsLoading(true);
             setLoadError(null);
-            const params = getParams();
 
-            console.log('🔍 Editor params:', params);
+            const params = getParams();
 
             if (!params.albumId || !params.presetId) {
                 throw new Error('Faltan parámetros requeridos: albumId y presetId');
             }
-
 
             // Determinar la URL base correcta
             const baseUrl = window.location.origin.includes('bananalab')
@@ -111,10 +115,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const albumEndpoint = `${baseUrl}/api/albums/${params.albumId}`;
             const presetEndpoint = `${baseUrl}/api/item-presets/${params.presetId}`;
 
-            console.log('🌐 Using endpoints:', { albumEndpoint, presetEndpoint, baseUrl });
-
             // Cargar datos del álbum
-            console.log('📚 Cargando álbum...');
             const albumResponse = await fetch(albumEndpoint, {
                 method: 'GET',
                 headers: {
@@ -123,25 +124,15 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 },
                 credentials: 'include'
             });
-
-            console.log('📚 Album response status:', albumResponse.status);
-
             if (!albumResponse.ok) {
                 const errorText = await albumResponse.text();
-                console.error('❌ Album response error:', errorText);
                 throw new Error(`Error al cargar álbum: ${albumResponse.status} ${albumResponse.statusText}`);
             }
-
             const albumResponseData = await albumResponse.json();
-            console.log('✅ Album response data:', albumResponseData);
-
-            // Extraer datos del álbum (puede estar en .data o directamente en la respuesta)
             const album = albumResponseData.data || albumResponseData;
-            console.log('📚 Album loaded:', album);
             setAlbumData(album);
 
             // Cargar datos del preset
-            console.log('🎨 Cargando preset...');
             const presetResponse = await fetch(presetEndpoint, {
                 method: 'GET',
                 headers: {
@@ -150,29 +141,20 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 },
                 credentials: 'include'
             });
-
-            console.log('🎨 Preset response status:', presetResponse.status);
-
             if (!presetResponse.ok) {
                 const errorText = await presetResponse.text();
-                console.error('❌ Preset response error:', errorText);
                 throw new Error(`Error al cargar preset: ${presetResponse.status} ${presetResponse.statusText}`);
             }
-
             const presetResponseData = await presetResponse.json();
-            console.log('✅ Preset response data:', presetResponseData);
-
-            // Extraer datos del preset (puede estar en .data o directamente en la respuesta)
             const preset = presetResponseData.data || presetResponseData;
-            console.log('🎨 Preset loaded:', preset);
             setPresetData(preset);
 
-            // Crear páginas basadas en el preset y álbum
-            console.log('📄 Creando páginas...');
-            await createPagesFromPreset(preset, album, params.pages);
+            // Solo crear páginas si NO restauramos progreso
+            if (!restoredProgress) {
+                await createPagesFromPreset(preset, album, params.pages);
+            }
 
         } catch (error) {
-            console.error('💥 Error loading album data:', error);
             setLoadError(error.message);
         } finally {
             setIsLoading(false);
@@ -312,7 +294,25 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     // Efecto para cargar datos al montar el componente
     useEffect(() => {
-        loadAlbumData();
+        // Intentar restaurar progreso desde localStorage
+        const params = getParams();
+        const storageKey = getStorageKey();
+        const saved = localStorage.getItem(storageKey);
+        let restored = false;
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                if (parsed && Array.isArray(parsed.pages)) {
+                    setPages(parsed.pages);
+                    setCurrentPage(parsed.currentPage || 0);
+                    restored = true;
+                }
+            } catch (e) {
+                // Si hay error, ignorar y cargar normalmente
+            }
+        }
+        // Solo crear desde cero si no restauramos progreso
+        loadAlbumData(restored);
     }, []);
 
     // Función para obtener el título de la página actual
@@ -425,7 +425,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         );
     };
 
-    // Actualizar el estado de las páginas
+    // Actualizar el estado de las páginas y guardar en localStorage
     const updatePages = (newPages) => {
         setPages(newPages);
         // Actualizar el historial
@@ -435,6 +435,29 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         ];
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
+        // Guardar en localStorage
+        const storageKey = getStorageKey();
+        localStorage.setItem(storageKey, JSON.stringify({
+            pages: newPages,
+            currentPage,
+            savedAt: Date.now(),
+        }));
+    };
+
+    // Guardar currentPage en localStorage cuando cambie
+    useEffect(() => {
+        const storageKey = getStorageKey();
+        localStorage.setItem(storageKey, JSON.stringify({
+            pages,
+            currentPage,
+            savedAt: Date.now(),
+        }));
+    }, [currentPage]);
+    // (Opcional) Botón para limpiar progreso guardado
+    const clearSavedProgress = () => {
+        const storageKey = getStorageKey();
+        localStorage.removeItem(storageKey);
+        window.location.reload();
     };
 
     // Cambiar el layout de la página actual
@@ -985,6 +1008,18 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 >
                                     Vista de Álbum
                                 </Button>
+                                {/* Botón para limpiar progreso guardado (opcional, visible solo en desarrollo) */}
+                                {process.env.NODE_ENV !== 'production' && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={clearSavedProgress}
+                                        icon={<Trash2 className="h-4 w-4" />}
+                                        className="border-red-400 text-red-600 hover:bg-red-50"
+                                    >
+                                        Limpiar progreso
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </header>

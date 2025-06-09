@@ -23,11 +23,13 @@ class Album extends Model
         'selected_cover_type',
         'selected_finish',
         'custom_options',
+        'album_pages_data',
         'status',
     ];
 
     protected $casts = [
         'custom_options' => 'array',
+        'album_pages_data' => 'array',
     ];
 
     protected static function boot()
