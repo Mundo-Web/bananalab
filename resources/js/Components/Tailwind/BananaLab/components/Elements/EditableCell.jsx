@@ -148,7 +148,7 @@ export default function EditableCell({
                     >
                         {element.type === "image" ? (
                             <ImageElement
-                                element={{...element, workspaceSize: workspaceSize}}
+                                element={element}
                                 isSelected={selectedElement === element.id}
                                 onSelect={() => onSelectElement(element.id, id)}
                                 onUpdate={(updates) =>
@@ -156,6 +156,7 @@ export default function EditableCell({
                                 }
                                 onDelete={() => onDeleteElement(element.id)}
                                 availableMasks={availableMasks}
+                                workspaceSize={workspaceSize}
                             />
                         ) : (
                             <TextElement

@@ -1,7 +1,6 @@
 import { useDrag } from "react-dnd";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { RotateCw, Trash2, Replace, Copy, CircleDot } from "lucide-react";
-import ContextMenu from "../UI/ContextMenu";
 import { imageMasks } from "../../constants/masks";
 
 export default function ImageElement({
@@ -11,6 +10,7 @@ export default function ImageElement({
     onUpdate,
     onDelete,
     availableMasks = [],
+    workspaceSize = { width: 800, height: 600 },
 }) {
     const [{ isDragging }, drag] = useDrag(() => ({
         type: "IMAGE_ELEMENT",
@@ -21,21 +21,34 @@ export default function ImageElement({
     }));
 
     const elementRef = useRef(null);
-    const [isDraggingInside, setIsDraggingInside] = useState(false);
-    const [startPos, setStartPos] = useState({ x: 0, y: 0 });
+    
+    // Estados para manipulación robusta de imagen
+    const [isManipulating, setIsManipulating] = useState(false);
+    const [manipulationType, setManipulationType] = useState(null); // 'move', 'resize'
+    const [resizeHandle, setResizeHandle] = useState(null);
+    const [startState, setStartState] = useState({
+        mouseX: 0,
+        mouseY: 0,
+        elementX: 0,
+        elementY: 0,
+        elementWidth: 0,
+        elementHeight: 0,
+    });
+    
+    // Estados para UI
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
 
-    // Aplicar filtros CSS
+    // Aplicar filtros CSS mejorados
     const filterStyle = {
         filter: `
-      brightness(${(element.filters?.brightness || 100) / 100})
-      contrast(${(element.filters?.contrast || 100) / 100})
-      saturate(${(element.filters?.saturation || 100) / 100})
-      sepia(${(element.filters?.tint || 0) / 100})
-      hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
-      blur(${element.filters?.blur || 0}px)
-    `,
+            brightness(${(element.filters?.brightness || 100) / 100})
+            contrast(${(element.filters?.contrast || 100) / 100})
+            saturate(${(element.filters?.saturation || 100) / 100})
+            sepia(${(element.filters?.tint || 0) / 100})
+            hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
+            blur(${element.filters?.blur || 0}px)
+        `,
         transform: `scale(${element.filters?.scale || 1}) rotate(${
             element.filters?.rotate || 0
         }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${
@@ -47,59 +60,283 @@ export default function ImageElement({
 
     const mask = imageMasks.find((m) => m.id === element.mask) || imageMasks[0];
 
-    const handleMouseDown = (e) => {
-        if (isSelected) {
-            e.stopPropagation();
-            setIsDraggingInside(true);
-            setStartPos({
-                x: e.clientX - element.position.x,
-                y: e.clientY - element.position.y,
-            });
+    // Funciones de conversión mejoradas
+    const toPixels = useCallback((val, total) => {
+        if (typeof val === 'number') {
+            return val <= 1 ? val * total : val;
         }
+        return 0;
+    }, []);
+    
+    const toRelative = useCallback((val, total) => {
+        if (typeof val === 'number' && total > 0) {
+            return val > 1 ? Math.min(val / total, 1) : val;
+        }
+        return 0;
+    }, []);
+
+    // Calcular posición y tamaño actuales con validación
+    const currentPosition = {
+        x: Math.max(0, toPixels(element.position?.x || 0, workspaceSize.width)),
+        y: Math.max(0, toPixels(element.position?.y || 0, workspaceSize.height)),
+    };
+    
+    const currentSize = {
+        width: Math.max(50, element.size?.width ? toPixels(element.size.width, workspaceSize.width) : 200),
+        height: Math.max(50, element.size?.height ? toPixels(element.size.height, workspaceSize.height) : 200),
     };
 
-    /*  const handleMouseMove = (e) => {
-        if (isDraggingInside && elementRef.current) {
-            const parentRect =
-                elementRef.current.parentElement.getBoundingClientRect();
-            const newX = e.clientX - startPos.x;
-            const newY = e.clientY - startPos.y;
+    // Función para iniciar manipulación (mover)
+    const handleStartMove = useCallback((e) => {
+        if (!isSelected) return;
+        
+        e.stopPropagation();
+        e.preventDefault();
+        
+        setIsManipulating(true);
+        setManipulationType('move');
+        setStartState({
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            elementX: currentPosition.x,
+            elementY: currentPosition.y,
+            elementWidth: currentSize.width,
+            elementHeight: currentSize.height,
+        });
+    }, [isSelected, currentPosition, currentSize]);
 
-            const maxX = parentRect.width - elementRef.current.offsetWidth;
-            const maxY = parentRect.height - elementRef.current.offsetHeight;
+    // Función para iniciar redimensionamiento
+    const handleStartResize = useCallback((e, handle) => {
+        if (!isSelected) return;
+        
+        e.stopPropagation();
+        e.preventDefault();
+        
+        setIsManipulating(true);
+        setManipulationType('resize');
+        setResizeHandle(handle);
+        setStartState({
+            mouseX: e.clientX,
+            mouseY: e.clientY,
+            elementX: currentPosition.x,
+            elementY: currentPosition.y,
+            elementWidth: currentSize.width,
+            elementHeight: currentSize.height,
+        });
+    }, [isSelected, currentPosition, currentSize]);
 
-            const boundedX = Math.max(0, Math.min(newX, maxX));
-            const boundedY = Math.max(0, Math.min(newY, maxY));
-
-            onUpdate({ position: { x: boundedX, y: boundedY } });
-        }
-    };*/
-    const handleMouseMove = (e) => {
-        if (isDraggingInside && elementRef.current) {
-            const newX = e.clientX - startPos.x;
-            const newY = e.clientY - startPos.y;
-
-            // Elimina por completo los límites
-            onUpdate({
+    // Función para manejar el movimiento durante la manipulación
+    const handleManipulate = useCallback((e) => {
+        if (!isManipulating) return;
+        
+        const deltaX = e.clientX - startState.mouseX;
+        const deltaY = e.clientY - startState.mouseY;
+        
+        if (manipulationType === 'move') {
+            // Movimiento con límites
+            const newX = Math.max(0, Math.min(
+                workspaceSize.width - currentSize.width,
+                startState.elementX + deltaX
+            ));
+            const newY = Math.max(0, Math.min(
+                workspaceSize.height - currentSize.height,
+                startState.elementY + deltaY
+            ));
+            
+            const updates = {
                 position: {
-                    x: newX,
-                    y: newY,
+                    x: toRelative(newX, workspaceSize.width),
+                    y: toRelative(newY, workspaceSize.height),
                 },
-            });
+            };
+            
+            onUpdate(updates);
+        } else if (manipulationType === 'resize') {
+            // Redimensionamiento con límites y proporciones
+            let newWidth = startState.elementWidth;
+            let newHeight = startState.elementHeight;
+            let newX = startState.elementX;
+            let newY = startState.elementY;
+            
+            const minSize = 50;
+            const aspectRatio = startState.elementWidth / startState.elementHeight;
+            
+            switch (resizeHandle) {
+                case "nw": // Esquina superior izquierda
+                    newWidth = Math.max(minSize, startState.elementWidth - deltaX);
+                    newHeight = Math.max(minSize, startState.elementHeight - deltaY);
+                    // Mantener proporción si se presiona Shift
+                    if (e.shiftKey) {
+                        newHeight = newWidth / aspectRatio;
+                    }
+                    newX = startState.elementX + (startState.elementWidth - newWidth);
+                    newY = startState.elementY + (startState.elementHeight - newHeight);
+                    break;
+                case "n": // Borde superior
+                    newHeight = Math.max(minSize, startState.elementHeight - deltaY);
+                    newY = startState.elementY + (startState.elementHeight - newHeight);
+                    break;
+                case "ne": // Esquina superior derecha
+                    newWidth = Math.max(minSize, startState.elementWidth + deltaX);
+                    newHeight = Math.max(minSize, startState.elementHeight - deltaY);
+                    if (e.shiftKey) {
+                        newHeight = newWidth / aspectRatio;
+                    }
+                    newY = startState.elementY + (startState.elementHeight - newHeight);
+                    break;
+                case "e": // Borde derecho
+                    newWidth = Math.max(minSize, startState.elementWidth + deltaX);
+                    break;
+                case "se": // Esquina inferior derecha
+                    newWidth = Math.max(minSize, startState.elementWidth + deltaX);
+                    newHeight = Math.max(minSize, startState.elementHeight + deltaY);
+                    if (e.shiftKey) {
+                        newHeight = newWidth / aspectRatio;
+                    }
+                    break;
+                case "s": // Borde inferior
+                    newHeight = Math.max(minSize, startState.elementHeight + deltaY);
+                    break;
+                case "sw": // Esquina inferior izquierda
+                    newWidth = Math.max(minSize, startState.elementWidth - deltaX);
+                    newHeight = Math.max(minSize, startState.elementHeight + deltaY);
+                    if (e.shiftKey) {
+                        newHeight = newWidth / aspectRatio;
+                    }
+                    newX = startState.elementX + (startState.elementWidth - newWidth);
+                    break;
+                case "w": // Borde izquierdo
+                    newWidth = Math.max(minSize, startState.elementWidth - deltaX);
+                    newX = startState.elementX + (startState.elementWidth - newWidth);
+                    break;
+            }
+            
+            // Validar límites del workspace
+            newX = Math.max(0, Math.min(workspaceSize.width - newWidth, newX));
+            newY = Math.max(0, Math.min(workspaceSize.height - newHeight, newY));
+            newWidth = Math.min(newWidth, workspaceSize.width - newX);
+            newHeight = Math.min(newHeight, workspaceSize.height - newY);
+            
+            const updates = {
+                position: { 
+                    x: toRelative(newX, workspaceSize.width), 
+                    y: toRelative(newY, workspaceSize.height) 
+                },
+                size: { 
+                    width: toRelative(newWidth, workspaceSize.width), 
+                    height: toRelative(newHeight, workspaceSize.height) 
+                },
+            };
+            
+            onUpdate(updates);
         }
-    };
+    }, [isManipulating, manipulationType, startState, resizeHandle, workspaceSize, currentSize, onUpdate, toRelative]);
 
-    const handleMouseUp = () => {
-        setIsDraggingInside(false);
-    };
+    // Función para terminar manipulación
+    const handleEndManipulation = useCallback(() => {
+        setIsManipulating(false);
+        setManipulationType(null);
+        setResizeHandle(null);
+    }, []);
 
+    // Funciones adicionales para manipulación avanzada
+    const handleDoubleClick = useCallback((e) => {
+        e.stopPropagation();
+        // Doble clic para ajustar al tamaño original o centrar
+        const naturalSize = {
+            width: 200,
+            height: 200,
+        };
+        
+        onUpdate({
+            size: {
+                width: toRelative(naturalSize.width, workspaceSize.width),
+                height: toRelative(naturalSize.height, workspaceSize.height),
+            },
+        });
+    }, [onUpdate, toRelative, workspaceSize]);
+
+    // Función para manejar atajos de teclado
+    const handleKeyDown = useCallback((e) => {
+        if (!isSelected) return;
+        
+        const step = e.shiftKey ? 10 : 1; // Movimiento más grande con Shift
+        let updates = {};
+        
+        switch (e.key) {
+            case 'ArrowLeft':
+                e.preventDefault();
+                updates.position = {
+                    x: Math.max(0, toRelative(currentPosition.x - step, workspaceSize.width)),
+                    y: toRelative(currentPosition.y, workspaceSize.height),
+                };
+                break;
+            case 'ArrowRight':
+                e.preventDefault();
+                updates.position = {
+                    x: Math.min(1, toRelative(currentPosition.x + step, workspaceSize.width)),
+                    y: toRelative(currentPosition.y, workspaceSize.height),
+                };
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                updates.position = {
+                    x: toRelative(currentPosition.x, workspaceSize.width),
+                    y: Math.max(0, toRelative(currentPosition.y - step, workspaceSize.height)),
+                };
+                break;
+            case 'ArrowDown':
+                e.preventDefault();
+                updates.position = {
+                    x: toRelative(currentPosition.x, workspaceSize.width),
+                    y: Math.min(1, toRelative(currentPosition.y + step, workspaceSize.height)),
+                };
+                break;
+            case 'Delete':
+            case 'Backspace':
+                e.preventDefault();
+                onDelete();
+                break;
+            case 'Escape':
+                e.preventDefault();
+                onSelect(); // Deseleccionar
+                break;
+        }
+        
+        if (Object.keys(updates).length > 0) {
+            onUpdate(updates);
+        }
+    }, [isSelected, currentPosition, workspaceSize, toRelative, onUpdate, onDelete, onSelect]);
+
+    // Efecto para atajos de teclado
     useEffect(() => {
-        if (isDraggingInside) {
-            window.addEventListener("mousemove", handleMouseMove);
-            window.addEventListener("mouseup", handleMouseUp);
+        if (isSelected) {
+            document.addEventListener('keydown', handleKeyDown);
+            return () => document.removeEventListener('keydown', handleKeyDown);
         }
+    }, [isSelected, handleKeyDown]);
 
-        // Manejador de clic global mejorado
+    // Función para limitar valores dentro de rangos
+    const clamp = (value, min, max) => Math.min(Math.max(value, min), max);
+
+    // Efectos para manejar eventos globales
+    useEffect(() => {
+        if (isManipulating) {
+            const handleMouseMove = (e) => handleManipulate(e);
+            const handleMouseUp = () => handleEndManipulation();
+            
+            document.addEventListener("mousemove", handleMouseMove);
+            document.addEventListener("mouseup", handleMouseUp);
+            
+            return () => {
+                document.removeEventListener("mousemove", handleMouseMove);
+                document.removeEventListener("mouseup", handleMouseUp);
+            };
+        }
+    }, [isManipulating, handleManipulate, handleEndManipulation]);
+
+    // Efecto para cerrar menú contextual
+    useEffect(() => {
         const handleGlobalClick = (e) => {
             if (showContextMenu && !e.target.closest(".context-menu")) {
                 setShowContextMenu(false);
@@ -107,13 +344,8 @@ export default function ImageElement({
         };
 
         document.addEventListener("click", handleGlobalClick);
-
-        return () => {
-            window.removeEventListener("mousemove", handleMouseMove);
-            window.removeEventListener("mouseup", handleMouseUp);
-            document.removeEventListener("click", handleGlobalClick);
-        };
-    }, [isDraggingInside, startPos, showContextMenu]);
+        return () => document.removeEventListener("click", handleGlobalClick);
+    }, [showContextMenu]);
 
     const ref = useCallback(
         (node) => {
@@ -154,199 +386,146 @@ export default function ImageElement({
             ...JSON.parse(JSON.stringify(element)),
             id: `img-${Date.now()}`,
             position: {
-                x: element.position.x + 20,
-                y: element.position.y + 20,
+                x: Math.min(0.9, (element.position?.x || 0) + 0.05),
+                y: Math.min(0.9, (element.position?.y || 0) + 0.05),
             },
         };
-        onUpdate(newElement, true); // true indica que es un duplicado
+        onUpdate(newElement, true);
         setShowContextMenu(false);
     };
 
-    // Estados para el redimensionamiento
-    const [isResizing, setIsResizing] = useState(false);
-    const [resizeDirection, setResizeDirection] = useState(null);
-    const [initialSize, setInitialSize] = useState({ width: 0, height: 0 });
-    const [initialMousePos, setInitialMousePos] = useState({ x: 0, y: 0 });
-
-    // Función para iniciar el redimensionamiento
-    const startResize = (e, direction) => {
-        e.stopPropagation();
-        e.preventDefault();
-
-        setIsResizing(true);
-        setResizeDirection(direction);
-        setInitialMousePos({ x: e.clientX, y: e.clientY });
-        setInitialSize({
-            width:
-                element.size?.width || elementRef.current?.offsetWidth || 200,
-            height:
-                element.size?.height || elementRef.current?.offsetHeight || 200,
-        });
+    // Cursor apropiado según el estado
+    const getCursor = () => {
+        if (isManipulating) {
+            if (manipulationType === 'move') return "grabbing";
+            if (manipulationType === 'resize') return getResizeCursor(resizeHandle);
+        }
+        if (isSelected) return "grab";
+        return "pointer";
     };
 
-    // Función para manejar el redimensionamiento
-    const handleResize = useCallback(
-        (e) => {
-            if (!isResizing || !elementRef.current) return;
-
-            const deltaX = e.clientX - initialMousePos.x;
-            const deltaY = e.clientY - initialMousePos.y;
-            const parentRect =
-                elementRef.current.parentElement.getBoundingClientRect();
-
-            let newWidth = initialSize.width;
-            let newHeight = initialSize.height;
-
-            // Calcula proporciones basadas en la dirección
-            switch (resizeDirection) {
-                case "right":
-                    newWidth = Math.max(50, initialSize.width + deltaX);
-                    break;
-                case "bottom":
-                    newHeight = Math.max(50, initialSize.height + deltaY);
-                    break;
-                case "bottomRight":
-                    newWidth = Math.max(50, initialSize.width + deltaX);
-                    newHeight = Math.max(50, initialSize.height + deltaY);
-                    break;
-            }
-
-            // Actualiza inmediatamente
-            onUpdate({
-                size: {
-                    width: newWidth,
-                    height:
-                        resizeDirection === "right"
-                            ? initialSize.height
-                            : newHeight,
-                },
-            });
-        },
-        [
-            isResizing,
-            initialMousePos,
-            initialSize,
-            resizeDirection,
-            element.position,
-        ]
-    );
-    // Función para terminar el redimensionamiento
-    const stopResize = useCallback(() => {
-        setIsResizing(false);
-        setResizeDirection(null);
-    }, []);
-
-    // Efecto para manejar el redimensionamiento
-    useEffect(() => {
-        if (isResizing) {
-            window.addEventListener("mousemove", handleResize);
-            window.addEventListener("mouseup", stopResize);
-        }
-        return () => {
-            window.removeEventListener("mousemove", handleResize);
-            window.removeEventListener("mouseup", stopResize);
+    const getResizeCursor = (handle) => {
+        const cursors = {
+            n: "n-resize",
+            ne: "ne-resize",
+            e: "e-resize",
+            se: "se-resize",
+            s: "s-resize",
+            sw: "sw-resize",
+            w: "w-resize",
+            nw: "nw-resize",
         };
-    }, [isResizing, handleResize, stopResize]);
-
-    // Adaptar a porcentaje si existen size/position en %
-    // Si el elemento tiene position/size en 0-1, se interpreta como porcentaje
-    const getPx = (val, total) => (val <= 1 ? val * total : val);
-    // Recibe el tamaño del workspace por prop (vía EditableCell)
-    const workspaceSize = element.workspaceSize || { width: 800, height: 600 };
-    const left = getPx(element.position.x, workspaceSize.width);
-    const top = getPx(element.position.y, workspaceSize.height);
-    const width = element.size?.width ? getPx(element.size.width, workspaceSize.width) : 200;
-    const height = element.size?.height ? getPx(element.size.height, workspaceSize.height) : 200;
-
-    return (
+        return cursors[handle] || "default";
+    };    return (
         <div
             ref={ref}
             className={`absolute ${mask.class} ${
-                isSelected ? "ring-2 ring-purple-500" : ""
+                isSelected ? "ring-2 ring-blue-500 ring-opacity-75" : ""
             } ${isDragging ? "opacity-50" : "opacity-100"}`}
             style={{
-                position: "absolute",
-                left,
-                top,
-                width,
-                height,
-                cursor: isSelected ? "move" : "pointer",
-                zIndex: isSelected ? 1 : 0,
-                opacity: isSelected ? 0.9 : 1,
-                transition: "opacity 0.2s, z-index 0.2s",
+                left: `${currentPosition.x}px`,
+                top: `${currentPosition.y}px`,
+                width: `${currentSize.width}px`,
+                height: `${currentSize.height}px`,
+                cursor: getCursor(),
+                zIndex: isSelected ? 1000 : element.zIndex || 1,
+                transition: isManipulating ? "none" : "all 0.1s ease-out",
                 pointerEvents: "all",
-                overflow: "visible",
+                userSelect: "none",
+                transformOrigin: "center",
             }}
             onClick={(e) => {
                 e.stopPropagation();
                 onSelect();
             }}
-            onMouseDown={(e) => {
-                e.stopPropagation();
-                handleMouseDown(e);
-                if (!isSelected) {
-                    onUpdate({
-                        zIndex:
-                            Math.max(...elements.map((el) => el.zIndex || 0)) +
-                            1,
-                    });
-                }
-            }}
+            onMouseDown={handleStartMove}
             onContextMenu={handleContextMenu}
+            onDoubleClick={handleDoubleClick}
         >
-            <div className="w-full h-full overflow-hidden relative">
+            {/* Contenedor de la imagen */}
+            <div className="w-full h-full overflow-hidden relative bg-transparent">
                 <img
                     src={element.content}
-                    alt="Imagen cargada"
-                    className="w-full h-full object-cover"
-                    style={{
-                        ...filterStyle,
-                        mixBlendMode: element.filters?.blendMode || "normal",
-                        opacity: (element.filters?.opacity || 100) / 100,
+                    alt="Imagen editada"
+                    className="w-full h-full object-cover select-none"
+                    style={filterStyle}
+                    draggable={false}
+                    onLoad={() => {
+                        // Asegurar que la imagen se renderice correctamente
+                        if (elementRef.current) {
+                            elementRef.current.style.visibility = 'visible';
+                        }
                     }}
                 />
 
-                {/* Controles de redimensionamiento */}
-                {isSelected && (
+                {/* Controles de redimensionamiento mejorados */}
+                {isSelected && !isDragging && (
                     <>
+                        {/* Esquinas de redimensionamiento */}
                         <div
-                            className="absolute bottom-0 right-0 w-3 h-3 bg-purple-500 rounded-full cursor-se-resize"
-                            style={{ transform: "translate(50%, 50%)" }}
-                            onMouseDown={(e) => {
-                                e.stopPropagation();
-                                startResize(e, "bottomRight");
-                            }}
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-nw-resize"
+                            style={{ top: -8, left: -8 }}
+                            onMouseDown={(e) => handleStartResize(e, "nw")}
+                            title="Redimensionar desde esquina superior izquierda"
                         />
                         <div
-                            className="absolute bottom-0 w-3 h-3 bg-purple-500 rounded-full cursor-s-resize"
-                            style={{
-                                left: "50%",
-                                transform: "translateX(-50%) translateY(50%)",
-                            }}
-                            onMouseDown={(e) => {
-                                e.stopPropagation();
-                                startResize(e, "bottom");
-                            }}
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-ne-resize"
+                            style={{ top: -8, right: -8 }}
+                            onMouseDown={(e) => handleStartResize(e, "ne")}
+                            title="Redimensionar desde esquina superior derecha"
                         />
                         <div
-                            className="absolute right-0 w-3 h-3 bg-purple-500 rounded-full cursor-e-resize"
-                            style={{
-                                top: "50%",
-                                transform: "translateY(-50%) translateX(50%)",
-                            }}
-                            onMouseDown={(e) => {
-                                e.stopPropagation();
-                                startResize(e, "right");
-                            }}
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-se-resize"
+                            style={{ bottom: -8, right: -8 }}
+                            onMouseDown={(e) => handleStartResize(e, "se")}
+                            title="Redimensionar desde esquina inferior derecha"
                         />
+                        <div
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-sw-resize"
+                            style={{ bottom: -8, left: -8 }}
+                            onMouseDown={(e) => handleStartResize(e, "sw")}
+                            title="Redimensionar desde esquina inferior izquierda"
+                        />
+                        
+                        {/* Controles de los bordes */}
+                        <div
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-n-resize"
+                            style={{ top: -8, left: "calc(50% - 8px)" }}
+                            onMouseDown={(e) => handleStartResize(e, "n")}
+                            title="Redimensionar verticalmente"
+                        />
+                        <div
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-e-resize"
+                            style={{ right: -8, top: "calc(50% - 8px)" }}
+                            onMouseDown={(e) => handleStartResize(e, "e")}
+                            title="Redimensionar horizontalmente"
+                        />
+                        <div
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-s-resize"
+                            style={{ bottom: -8, left: "calc(50% - 8px)" }}
+                            onMouseDown={(e) => handleStartResize(e, "s")}
+                            title="Redimensionar verticalmente"
+                        />
+                        <div
+                            className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-w-resize"
+                            style={{ left: -8, top: "calc(50% - 8px)" }}
+                            onMouseDown={(e) => handleStartResize(e, "w")}
+                            title="Redimensionar horizontalmente"
+                        />
+
+                        {/* Indicador visual de manipulación */}
+                        {isManipulating && (
+                            <div className="absolute -inset-2 border-2 border-blue-300 border-dashed rounded animate-pulse" />
+                        )}
                     </>
                 )}
             </div>
 
-            {isSelected && (
-                <div className="absolute top-2 right-2 flex gap-2">
+            {/* Botones de acción mejorados */}
+            {isSelected && !isManipulating && (
+                <div className="absolute -top-12 right-0 flex gap-1 bg-white rounded-lg shadow-lg px-2 py-1">
                     <button
-                        className="bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
+                        className="bg-white rounded-md p-1.5 shadow-sm hover:bg-gray-100 transition-colors"
                         onClick={(e) => {
                             e.stopPropagation();
                             onUpdate({
@@ -356,41 +535,40 @@ export default function ImageElement({
                                 },
                             });
                         }}
+                        title="Rotar 90°"
                     >
                         <RotateCw className="h-4 w-4 text-gray-700" />
                     </button>
                     <button
-                        className="bg-white rounded-full p-1 shadow-md hover:bg-gray-100"
+                        className="bg-white rounded-md p-1.5 shadow-sm hover:bg-red-100 transition-colors"
                         onClick={(e) => {
                             e.stopPropagation();
                             onDelete();
                         }}
+                        title="Eliminar imagen"
                     >
-                        <Trash2 className="h-4 w-4 text-gray-700" />
+                        <Trash2 className="h-4 w-4 text-red-600" />
                     </button>
                 </div>
             )}
 
+            {/* Menú contextual mejorado */}
             {showContextMenu && (
                 <>
-                    {/* Overlay para cerrar el menú al hacer clic en cualquier parte */}
                     <div
                         className="fixed inset-0 z-40"
                         onClick={() => setShowContextMenu(false)}
                     />
-
-                    {/* Menú contextual con botón de cerrar */}
                     <div
-                        className="fixed bg-white shadow-lg rounded-md z-50 py-1 w-48 context-menu"
+                        className="fixed bg-white shadow-xl rounded-lg z-50 py-2 w-56 context-menu border border-gray-200"
                         style={{
-                            left: `${contextMenuPos.x}px`,
-                            top: `${contextMenuPos.y}px`,
+                            left: `${Math.min(contextMenuPos.x, window.innerWidth - 240)}px`,
+                            top: `${Math.min(contextMenuPos.y, window.innerHeight - 200)}px`,
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >
-                        {/* Botón de cerrar */}
                         <button
-                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100 text-gray-500"
+                            className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md hover:bg-gray-100 text-gray-500 z-10"
                             onClick={() => setShowContextMenu(false)}
                         >
                             <svg
@@ -407,32 +585,34 @@ export default function ImageElement({
                             </svg>
                         </button>
 
-                        {/* Opciones del menú */}
+                        <div className="px-3 py-2 border-b border-gray-100">
+                            <h3 className="text-sm font-medium text-gray-900">Opciones de imagen</h3>
+                        </div>
+
                         <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 hover:bg-blue-50 flex items-center gap-3 text-sm text-gray-700 hover:text-blue-700 transition-colors"
                             onClick={replaceImage}
                         >
                             <Replace className="h-4 w-4" />
                             Reemplazar imagen
                         </button>
                         <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 hover:bg-green-50 flex items-center gap-3 text-sm text-gray-700 hover:text-green-700 transition-colors"
                             onClick={duplicateElement}
                         >
                             <Copy className="h-4 w-4" />
-                            Duplicar
+                            Duplicar elemento
                         </button>
+                        
+                        <div className="border-t border-gray-100 my-1" />
+                        
                         <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 hover:bg-yellow-50 flex items-center gap-3 text-sm text-gray-700 hover:text-yellow-700 transition-colors"
                             onClick={() => {
                                 onUpdate({
                                     filters: {
                                         ...element.filters,
-                                        opacity: Math.max(
-                                            0,
-                                            (element.filters?.opacity || 100) -
-                                                10
-                                        ),
+                                        opacity: Math.max(0, (element.filters?.opacity || 100) - 20),
                                     },
                                 });
                                 setShowContextMenu(false);
@@ -441,18 +621,46 @@ export default function ImageElement({
                             <CircleDot className="h-4 w-4" />
                             Reducir opacidad
                         </button>
+                        
                         <button
-                            className="w-full text-left px-4 py-2 hover:bg-gray-100 flex items-center gap-2"
+                            className="w-full text-left px-4 py-2 hover:bg-purple-50 flex items-center gap-3 text-sm text-gray-700 hover:text-purple-700 transition-colors"
+                            onClick={() => {
+                                onUpdate({
+                                    filters: {
+                                        ...element.filters,
+                                        scale: Math.max(0.1, (element.filters?.scale || 1) - 0.1),
+                                    },
+                                });
+                                setShowContextMenu(false);
+                            }}
+                        >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM13 10H7" />
+                            </svg>
+                            Reducir escala
+                        </button>
+                        
+                        <div className="border-t border-gray-100 my-1" />
+                        
+                        <button
+                            className="w-full text-left px-4 py-2 hover:bg-red-50 flex items-center gap-3 text-sm text-gray-700 hover:text-red-700 transition-colors"
                             onClick={() => {
                                 onDelete();
                                 setShowContextMenu(false);
                             }}
                         >
                             <Trash2 className="h-4 w-4" />
-                            Eliminar
+                            Eliminar imagen
                         </button>
                     </div>
                 </>
+            )}
+
+            {/* Información de estado para debugging (solo en desarrollo) */}
+            {process.env.NODE_ENV === 'development' && isSelected && (
+                <div className="absolute -bottom-8 left-0 text-xs bg-black text-white px-2 py-1 rounded">
+                    {`${Math.round(currentPosition.x)}, ${Math.round(currentPosition.y)} | ${Math.round(currentSize.width)}×${Math.round(currentSize.height)}`}
+                </div>
             )}
         </div>
     );
