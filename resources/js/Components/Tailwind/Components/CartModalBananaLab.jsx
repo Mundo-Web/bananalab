@@ -7,6 +7,7 @@ import { ShoppingBag, X, ArrowRight, ShoppingCart } from "lucide-react";
 import { Local } from "sode-extend-react";
 import Global from "../../../Utils/Global";
 import CartItemRowBananaLab from "./CartItemRowBananaLab";
+import CardItem from "../Checkouts/Components/CardItem";
 
 ReactModal.setAppElement("#app");
 
@@ -69,27 +70,6 @@ const CartModalBananaLab = ({
         }
     }, [modalOpen, setCart]);
 
-    // Escuchar eventos de actualización del carrito
-    useEffect(() => {
-        const handleCartUpdate = (event) => {
-            console.log('📢 CartModal: Carrito actualizado:', event.detail);
-            // Recargar carrito desde localStorage para sincronizar
-            const updatedCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
-            setCart(updatedCart);
-            
-            // Si el modal está cerrado y se agregó algo, activar shake
-            if (!modalOpen && event.detail.action === 'add') {
-                triggerShake();
-            }
-        };
-
-        window.addEventListener('cartUpdated', handleCartUpdate);
-        
-        return () => {
-            window.removeEventListener('cartUpdated', handleCartUpdate);
-        };
-    }, [modalOpen, setCart]);
-
     const handleClose = () => {
         setIsClosing(true);
         setTimeout(() => {
@@ -99,11 +79,24 @@ const CartModalBananaLab = ({
     };
 
     const totalPrice = cart.reduce((acc, item) => {
-        return acc + item.final_price * item.quantity;
+        const finalPrice = item.final_price || item.price || 0;
+        const quantity = item.quantity || 1;
+        return acc + (finalPrice * quantity);
     }, 0);
 
     const itemCount = cart.reduce((acc, item) => {
-        return acc + item.quantity;
+        return acc + (item.quantity || 1);
+    }, 0);
+
+    // Calcular ahorro total
+    const totalSavings = cart.reduce((acc, item) => {
+        const basePrice = item.price || 0;
+        const finalPrice = item.final_price || item.price || 0;
+        const quantity = item.quantity || 1;
+        if (basePrice > finalPrice) {
+            return acc + ((basePrice - finalPrice) * quantity);
+        }
+        return acc;
     }, 0);
 
     const triggerShake = () => {
@@ -223,7 +216,7 @@ const CartModalBananaLab = ({
                             >
                                 <AnimatePresence>
                                     {cart.map((item, index) => (
-                                        <motion.table
+                                        <motion.div
                                             key={`${item.id}-${index}`}
                                             custom={index}
                                             initial="hidden"
@@ -233,12 +226,28 @@ const CartModalBananaLab = ({
                                             layout
                                             className="mb-4"
                                         >
-                                            <CartItemRowBananaLab
+                                            <CardItem
                                                 {...item}
-                                                setCart={setCart}
-                                                triggerShake={triggerShake}
+                                                setCart={(newCartOrFunction) => {
+                                                    // Actualizar el estado local
+                                                    if (typeof newCartOrFunction === 'function') {
+                                                        setCart(oldCart => {
+                                                            const newCart = newCartOrFunction(oldCart);
+                                                            // Actualizar localStorage
+                                                            Local.set(`${Global.APP_CORRELATIVE}_cart`, newCart);
+                                                            console.log('🛒 CartModal: Carrito actualizado:', newCart.length, 'items');
+                                                            return newCart;
+                                                        });
+                                                    } else {
+                                                        setCart(newCartOrFunction);
+                                                        // Actualizar localStorage
+                                                        Local.set(`${Global.APP_CORRELATIVE}_cart`, newCartOrFunction);
+                                                        console.log('🛒 CartModal: Carrito actualizado:', newCartOrFunction.length, 'items');
+                                                    }
+                                                }}
+                                                isModal={true}
                                             />
-                                        </motion.table>
+                                        </motion.div>
                                     ))}
                                 </AnimatePresence>
                             </motion.div>
@@ -275,6 +284,17 @@ const CartModalBananaLab = ({
                                 animate={{ opacity: 1, y: 0 }}
                                 transition={{ delay: 0.4 }}
                             >
+                                {totalSavings > 0 && (
+                                    <div className="flex justify-between items-center mb-2 text-green-600">
+                                        <span className="font-medium text-sm">
+                                            Ahorros totales
+                                        </span>
+                                        <span className="font-bold text-sm">
+                                            -S/. {Number2Currency(totalSavings)}
+                                        </span>
+                                    </div>
+                                )}
+                                
                                 <div className="flex justify-between items-center mb-6">
                                     <span className="text-gray-700 font-medium">
                                         Subtotal

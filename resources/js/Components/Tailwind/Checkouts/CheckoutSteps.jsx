@@ -85,7 +85,7 @@ export default function CheckoutSteps({ cart, setCart, user }) {
         return null; // No renderiza nada, solo carga Culqi en el contexto de la app
     }, []);
     return (
-        <div className="min-h-screen bg-[#F7F9FB] py-12 px-primary 2xl:px-0 2xl:max-w-7xl mx-auto">
+        <div className="min-h-screen  py-12 px-primary 2xl:px-0 2xl:max-w-7xl mx-auto">
             <div className="bg-white   p-8 rounded-xl">
                 {/* Steps indicator */}
                 <div className="mb-8">

@@ -9,7 +9,7 @@ import CardItem from "./CardItem";
 
 export default function CartStep({ cart, setCart, onContinue, subTotal, envio, igv, totalFinal }) {
 
-    console.log(cart)
+    console.log('🛒 CartStep: Cart received:', cart)
 
     // Función wrapper para setCart que también actualiza localStorage
     const updateCart = (newCartOrFunction) => {
@@ -29,6 +29,17 @@ export default function CartStep({ cart, setCart, onContinue, subTotal, envio, i
         }
     };
 
+    // Calcular ahorros totales
+    const totalSavings = cart.reduce((acc, item) => {
+        const basePrice = item.price || 0;
+        const finalPrice = item.final_price || item.price || 0;
+        const quantity = item.quantity || 1;
+        if (basePrice > finalPrice) {
+            return acc + ((basePrice - finalPrice) * quantity);
+        }
+        return acc;
+    }, 0);
+
 
     return (
         <div className="grid lg:grid-cols-5 gap-8">
@@ -45,6 +56,12 @@ export default function CartStep({ cart, setCart, onContinue, subTotal, envio, i
             <div className="bg-[#F7F9FB] rounded-xl shadow-lg p-6 col-span-2 h-max">
                 <h3 className="text-2xl font-bold pb-6">Resumen de compra</h3>
                 <div className="space-y-4">
+                    {totalSavings > 0 && (
+                        <div className="flex justify-between">
+                            <span className="text-green-600 font-medium">Ahorros totales</span>
+                            <span className="font-semibold text-green-600">-S/ {Number2Currency(totalSavings)}</span>
+                        </div>
+                    )}
                     <div className="flex justify-between">
                         <span className="customtext-neutral-dark">Subtotal</span>
                         <span className="font-semibold">S/ {Number2Currency(subTotal)}</span>
