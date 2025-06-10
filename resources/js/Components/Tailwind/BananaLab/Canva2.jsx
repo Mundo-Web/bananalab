@@ -1,8 +1,99 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronDown, ArrowRight, Sparkles, BookOpen, Palette, Layers, Upload, Image as ImageIcon } from "lucide-react";
+import { ChevronLeft, ChevronDown, ArrowRight, Sparkles, BookOpen, Palette, Layers, Upload, Image as ImageIcon, LogIn } from "lucide-react";
 import ItemPresetsRest from "../../../Actions/Admin/ItemPresetsRest";
 import AlbumRest from "../../../Actions/AlbumRest";
+
+// Componente CustomSelect para selects suaves y profesionales
+const CustomSelect = ({ value, onChange, placeholder, options = [], disabled = false }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [selectedLabel, setSelectedLabel] = useState('');
+
+    useEffect(() => {
+        if (value && options.length > 0) {
+            const selected = options.find(opt => (opt.value || opt) === value);
+            setSelectedLabel(selected ? (selected.label || selected) : value);
+        } else {
+            setSelectedLabel('');
+        }
+    }, [value, options]);
+
+    const handleSelect = (optionValue, optionLabel) => {
+        onChange(optionValue);
+        setSelectedLabel(optionLabel);
+        setIsOpen(false);
+    };
+
+    if (disabled || options.length === 0) {
+        return (
+            <div className="w-full p-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-400 cursor-not-allowed flex items-center justify-between">
+                <span>{placeholder}</span>
+                <ChevronDown size={16} className="text-gray-400" />
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-full p-3 border border-gray-300 rounded-lg bg-white text-left cursor-pointer 
+                         hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent 
+                         transition-all duration-200 ease-out flex items-center justify-between"
+            >
+                <span className={selectedLabel ? "text-gray-900" : "text-gray-400"}>
+                    {selectedLabel || placeholder}
+                </span>
+                <ChevronDown 
+                    size={16} 
+                    className={`text-gray-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} 
+                />
+            </button>
+            
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                        transition={{ duration: 0.15, ease: "easeOut" }}
+                        className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-auto"
+                    >
+                        {options.map((option, index) => {
+                            const optionValue = option.value || option;
+                            const optionLabel = option.label || option;
+                            const isSelected = optionValue === value;
+                            return (
+                                <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => handleSelect(optionValue, optionLabel)}
+                                    className={`w-full px-3 py-2.5 text-left transition-colors duration-150 
+                                              first:rounded-t-lg last:rounded-b-lg focus:outline-none
+                                              ${isSelected 
+                                                ? 'bg-purple-50 text-purple-700 font-medium' 
+                                                : 'hover:bg-gray-50 hover:text-gray-900'
+                                              }`}
+                                >
+                                    {optionLabel}
+                                </button>
+                            );
+                        })}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            
+            {/* Overlay para cerrar al hacer click fuera */}
+            {isOpen && (
+                <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+        </div>
+    );
+};
 
 const animations = {
   container: {
@@ -308,14 +399,20 @@ export default function Canva2() {
             };
             reader.readAsDataURL(file);
         }
-    };
-
-    // Manejar clic en "Crear proyecto"
-    const handleCrearProyecto = async () => {
+    };    // Manejar clic en "Crear proyecto"
+    const handleCrearProyecto = async (e) => {
+        // Prevenir comportamiento por defecto
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        // Verificar autenticación primero
         if (!isAuthenticated) {
-            // Mostrar modal de login o redirigir a login
+            console.log('Usuario no autenticado, mostrando modal de login');
+            // Mostrar modal de login sin redirigir
             setShowLoginModal(true);
-            return;
+            return false; // Retornar false explícitamente
         }
 
         // Validar que se hayan seleccionado todas las opciones
@@ -460,14 +557,24 @@ Información de debug:
     };
 
     // Manejar redirección a login
-    const handleLoginRedirect = () => {
-        const currentUrl = encodeURIComponent(window.location.href);
-        window.location.href = `/login?redirect=${currentUrl}`;
-    };
-
     // Cerrar modal de login
     const handleCloseLoginModal = () => {
+        console.log('Cerrando modal de login');
         setShowLoginModal(false);
+    };
+
+    // Manejo de login redirect con prevención de navegación inmediata
+    const handleLoginRedirect = (e) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        console.log('Redirigiendo a login');
+        const currentUrl = encodeURIComponent(window.location.href);
+        // Usar setTimeout para evitar conflictos con el estado del modal
+        setTimeout(() => {
+            window.location.href = `/iniciar-sesion?redirect=${currentUrl}`;
+        }, 100);
     };
 
     return (
@@ -630,151 +737,104 @@ Información de debug:
                         {/* Título */}
                         <motion.div 
                             className="space-y-2"
-                            variants={animations.formItem}
-                            whileHover="hover"
+                            
                         >
                             <label className="block text-sm font-medium text-gray-700">Título del Libro</label>
-                            <motion.div className="relative">
-                                <motion.input
+                            <div className="relative">
+                                <input
                                     type="text"
                                     value={formData.titulo}
                                     onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
-                                    className="w-full p-4 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100"
+                                    className="w-full p-3 bg-white rounded-lg border border-gray-300 text-sm 
+                                             focus:ring-2 focus:ring-purple-600 focus:border-transparent focus:outline-none 
+                                             hover:border-gray-400 transition-all duration-200 ease-out
+                                             placeholder:text-gray-400"
                                     placeholder={`${preset?.name || preset?.item?.name || "Libro Personalizado"} (personaliza tu título)`}
-                                    whileFocus={{ 
-                                        scale: 1.02,
-                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                    }}
                                 />
-                                <motion.span 
-                                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-purple-400"
-                                    animate={{ scale: [1, 1.1, 1] }}
-                                    transition={{ repeat: Infinity, duration: 2 }}
-                                >
-                                    <Sparkles size={18} />
-                                </motion.span>
-                            </motion.div>
+                                <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400">
+                                    <Sparkles size={16} />
+                                </div>
+                            </div>
                         </motion.div>
 
                         {/* Páginas */}
                         <motion.div 
                             className="space-y-2"
-                            variants={animations.formItem}
-                            whileHover="hover"
+                         
                         >
                             <label className="block text-sm font-medium text-gray-700">Cantidad de Páginas</label>
-                            <motion.div className="relative">
-                                <motion.select
-                                    value={formData.paginas}
-                                    onChange={(e) => setFormData({ ...formData, paginas: e.target.value })}
-                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                    whileFocus={{ 
-                                        scale: 1.02,
-                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                    }}
-                                >
-                                    {preset?.pages_options && Array.isArray(preset.pages_options) ? (
-                                        preset.pages_options.map((option, index) => (
-                                            <option key={index} value={option.label || option.value || option}>
-                                                {option.label || option.value || option}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <>
-                                            <option value="24 páginas">24 páginas</option>
-                                            <option value="50 páginas">50 páginas</option>
-                                            <option value="100 páginas">100 páginas</option>
-                                        </>
-                                    )}
-                                </motion.select>
-                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                            </motion.div>
+                            <CustomSelect
+                                value={formData.paginas}
+                                onChange={(value) => setFormData({ ...formData, paginas: value })}
+                                placeholder="Selecciona páginas"
+                                options={preset?.pages_options && Array.isArray(preset.pages_options) 
+                                    ? preset.pages_options 
+                                    : [
+                                        { value: "24 páginas", label: "24 páginas" },
+                                        { value: "50 páginas", label: "50 páginas" },
+                                        { value: "100 páginas", label: "100 páginas" }
+                                    ]
+                                }
+                            />
                         </motion.div>
 
                         {/* Tipo de Tapa */}
                         <motion.div 
                             className="space-y-2"
-                            variants={animations.formItem}
-                            whileHover="hover"
+                          
                         >
                             <label className="block text-sm font-medium text-gray-700">Tipo de Tapa</label>
-                            <motion.div className="relative">
-                                <motion.select
-                                    value={formData.tapa}
-                                    onChange={(e) => setFormData({ ...formData, tapa: e.target.value })}
-                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                    whileFocus={{ 
-                                        scale: 1.02,
-                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                    }}
-                                >
-                                    {preset?.cover_options && Array.isArray(preset.cover_options) ? (
-                                        preset.cover_options.map((option, index) => (
-                                            <option key={index} value={option.label || option.value || option}>
-                                                {option.label || option.value || option}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <>
-                                            <option value="Tapa Dura Personalizable">Tapa Dura Personalizable</option>
-                                            <option value="Tapa Blanda">Tapa Blanda</option>
-                                        </>
-                                    )}
-                                </motion.select>
-                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                            </motion.div>
+                            <CustomSelect
+                                value={formData.tapa}
+                                onChange={(value) => setFormData({ ...formData, tapa: value })}
+                                placeholder="Selecciona tipo de tapa"
+                                options={preset?.cover_options && Array.isArray(preset.cover_options) 
+                                    ? preset.cover_options 
+                                    : [
+                                        { value: "Tapa Dura Personalizable", label: "Tapa Dura Personalizable" },
+                                        { value: "Tapa Blanda", label: "Tapa Blanda" }
+                                    ]
+                                }
+                            />
                         </motion.div>
 
                         {/* Tipo de Acabado */}
                         <motion.div 
                             className="space-y-2"
-                            variants={animations.formItem}
-                            whileHover="hover"
+                           
                         >
                             <label className="block text-sm font-medium text-gray-700">Tipo de Acabado</label>
-                            <motion.div className="relative">
-                                <motion.select
-                                    value={formData.acabado}
-                                    onChange={(e) => setFormData({ ...formData, acabado: e.target.value })}
-                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                    whileFocus={{ 
-                                        scale: 1.02,
-                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                    }}
-                                >
-                                    {preset?.finish_options && Array.isArray(preset.finish_options) ? (
-                                        preset.finish_options.map((option, index) => (
-                                            <option key={index} value={option.label || option.value || option}>
-                                                {option.label || option.value || option}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        <>
-                                            <option value="Limado">Limado</option>
-                                            <option value="Brillante">Brillante</option>
-                                            <option value="Mate">Mate</option>
-                                        </>
-                                    )}
-                                </motion.select>
-                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                            </motion.div>
+                            <CustomSelect
+                                value={formData.acabado}
+                                onChange={(value) => setFormData({ ...formData, acabado: value })}
+                                placeholder="Selecciona tipo de acabado"
+                                options={preset?.finish_options && Array.isArray(preset.finish_options) 
+                                    ? preset.finish_options 
+                                    : [
+                                        { value: "Limado", label: "Limado" },
+                                        { value: "Brillante", label: "Brillante" },
+                                        { value: "Mate", label: "Mate" }
+                                    ]
+                                }
+                            />
                         </motion.div>
 
                         {/* Botón Crear proyecto */}
                         <motion.div className="pt-4">
                             <motion.button
-                                onClick={handleCrearProyecto}
-                                disabled={saving}
+                                type="button"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    handleCrearProyecto(e);
+                                }}
+                                disabled={saving }
                                 className={`block text-center w-full py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all relative overflow-hidden group ${
                                     saving 
                                         ? 'bg-gray-400 cursor-not-allowed' 
                                         : isAuthenticated
                                             ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white'
-                                            : 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                                            : 'bg-gradient-to-r from-purple-600 to-pink-500 text-white'
                                 }`}
                                 whileHover={!saving ? { 
                                     scale: 1.02,
@@ -800,7 +860,7 @@ Información de debug:
                                         </>
                                     ) : (
                                         <>
-                                            <span>🔐</span>
+                                            
                                             Inicia sesión para crear
                                             <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
                                         </>
@@ -811,7 +871,7 @@ Información de debug:
                                         className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
                                             isAuthenticated 
                                                 ? 'bg-gradient-to-r from-pink-600 to-purple-700'
-                                                : 'bg-gradient-to-r from-red-600 to-orange-700'
+                                                : 'bg-gradient-to-r from-pink-600 to-purple-700'
                                         }`}
                                     />
                                 )}
@@ -885,7 +945,7 @@ Información de debug:
 
                                             {/* Badge de imagen personalizada */}
                                             <motion.div 
-                                                className="absolute top-4 right-4 bg-green-500 text-white px-3 py-2 rounded-full shadow-lg flex items-center gap-2"
+                                                className="absolute top-4 right-4 bg-purple-500 text-white px-3 py-2 rounded-full shadow-lg flex items-center gap-2"
                                                 initial={{ scale: 0, opacity: 0 }}
                                                 animate={{ scale: 1, opacity: 1 }}
                                                 transition={{ delay: 0.5, type: "spring" }}
@@ -971,7 +1031,7 @@ Información de debug:
                                             </span>
                                         </div>
                                         
-                                        {coverImage && (
+                                        {/*{coverImage && (
                                             <motion.div 
                                                 className="text-sm text-green-600 font-medium flex items-center gap-1"
                                                 initial={{ opacity: 0, x: 20 }}
@@ -980,7 +1040,7 @@ Información de debug:
                                                 <span>✓</span>
                                                 {coverImage.name}
                                             </motion.div>
-                                        )}
+                                        )} */}
                                     </div>
                                 </motion.div>
                             </>
@@ -1007,16 +1067,9 @@ Información de debug:
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="text-center">
-                                <motion.div 
-                                    className="w-16 h-16 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center mx-auto mb-4"
-                                    initial={{ scale: 0 }}
-                                    animate={{ scale: 1 }}
-                                    transition={{ delay: 0.2, type: "spring" }}
-                                >
-                                    <span className="text-2xl">🔐</span>
-                                </motion.div>
+                               
                                 
-                                <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                                <h3 className="text-2xl font-bold customtext-neutral-dark mb-2">
                                     ¡Inicia sesión para continuar!
                                 </h3>
                                 
@@ -1026,8 +1079,9 @@ Información de debug:
 
                                 <div className="space-y-3">
                                     <motion.button
+                                        type="button"
                                         onClick={handleLoginRedirect}
-                                        className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all"
+                                        className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-pink-500 text-white rounded-xl font-bold shadow-lg hover:shadow-xl transition-all cursor-pointer block text-center"
                                         whileHover={{ scale: 1.02 }}
                                         whileTap={{ scale: 0.98 }}
                                     >
@@ -1035,6 +1089,7 @@ Información de debug:
                                     </motion.button>
                                     
                                     <motion.button
+                                        type="button"
                                         onClick={handleCloseLoginModal}
                                         className="w-full py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-all"
                                         whileHover={{ scale: 1.02 }}
