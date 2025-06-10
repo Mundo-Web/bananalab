@@ -117,6 +117,45 @@ export default function Canva2() {
 
     const itemPresetsRest = new ItemPresetsRest();
 
+    // Función para generar features dinámicos basados en preset y formData
+    const getDynamicFeatures = () => {
+        const dynamicFeatures = [];
+        
+        // Feature de páginas - siempre muestra la cantidad actual
+        const paginasTexto =  `${formData.paginas} páginas` || 
+            (preset?.default_pages ? `${preset.default_pages} páginas` : "50 páginas");
+        dynamicFeatures.push({
+            icon: <BookOpen size={20} />,
+            text: paginasTexto
+        });
+
+        // Feature personalizable - siempre presente
+        dynamicFeatures.push({
+            icon: <Palette size={20} />,
+            text: "Personalizable"
+        });
+
+        // Feature de tapa - basado en selección del usuario o default del preset
+        const tapaTexto = `Tapa ${formData.tapa}` || `Tapa ${preset?.default_cover}` || "Tapa dura premium";
+        dynamicFeatures.push({
+            icon: <Layers size={20} />,
+            text: tapaTexto
+        });
+
+        return dynamicFeatures;
+    };
+
+    // Función para obtener el título dinámico
+    const getDynamicTitle = () => {
+        // Si el usuario ha escrito un título, usar ese
+        if (formData.titulo && formData.titulo.trim() !== "") {
+            return formData.titulo;
+        }
+        
+        // Si no, usar el nombre del preset o el nombre del item
+        return preset?.name || preset?.item?.name || "Libro Personalizado";
+    };
+
     // Cargar datos del preset desde la URL
     useEffect(() => {
         const loadPresetData = async () => {
@@ -138,20 +177,67 @@ export default function Canva2() {
                     if (data.success) {
                         const presetData = data.data;
                         console.log('Preset data:', presetData);
-                        setPreset(presetData);
+                        
+                        // Parsear las opciones JSON si vienen como strings
+                        let parsedPresetData = { ...presetData };
+                        
+                        // Parsear pages_options si es string
+                        if (typeof presetData.pages_options === 'string') {
+                            try {
+                                parsedPresetData.pages_options = JSON.parse(presetData.pages_options);
+                            } catch (e) {
+                                console.warn('Error parsing pages_options:', e);
+                                parsedPresetData.pages_options = [];
+                            }
+                        }
+                        
+                        // Parsear cover_options si es string
+                        if (typeof presetData.cover_options === 'string') {
+                            try {
+                                parsedPresetData.cover_options = JSON.parse(presetData.cover_options);
+                            } catch (e) {
+                                console.warn('Error parsing cover_options:', e);
+                                parsedPresetData.cover_options = [];
+                            }
+                        }
+                        
+                        // Parsear finish_options si es string
+                        if (typeof presetData.finish_options === 'string') {
+                            try {
+                                parsedPresetData.finish_options = JSON.parse(presetData.finish_options);
+                            } catch (e) {
+                                console.warn('Error parsing finish_options:', e);
+                                parsedPresetData.finish_options = [];
+                            }
+                        }
+                        
+                        setPreset(parsedPresetData);
                         
                         // Configurar datos iniciales del formulario basados en el preset
                         setFormData(prev => ({
                             ...prev,
-                            titulo: presetData.name || "Momentos que no quiero olvidar",
-                            paginas: presetData.default_pages || (presetData.pages_options && presetData.pages_options[0]) || "",
-                            tapa: presetData.default_cover || (presetData.cover_options && presetData.cover_options[0]) || "",
-                            acabado: presetData.default_finish || (presetData.finish_options && presetData.finish_options[0]) || ""
+                            titulo: "", // Empezar vacío para que muestre el nombre del preset por defecto
+                            paginas: parsedPresetData.default_pages || 
+                                    (parsedPresetData.pages_options && Array.isArray(parsedPresetData.pages_options) && 
+                                     parsedPresetData.pages_options[0]?.label) || 
+                                    "50 páginas",
+                            tapa: parsedPresetData.default_cover || 
+                                  (parsedPresetData.cover_options && Array.isArray(parsedPresetData.cover_options) && 
+                                   parsedPresetData.cover_options[0]?.label) || 
+                                  "Tapa Dura Personalizable",
+                            acabado: parsedPresetData.default_finish || 
+                                    (parsedPresetData.finish_options && Array.isArray(parsedPresetData.finish_options) && 
+                                     parsedPresetData.finish_options[0]?.label) || 
+                                    "Limado"
                         }));
                         
                         // Si el preset tiene imagen, mostrarla como cover actual
-                        if (presetData.image) {
-                            setCoverImagePreview(presetData.image);
+                        if (presetData.image && typeof presetData.image === 'string') {
+                            // Asegurar que la imagen tenga la ruta correcta
+                            const imagePath = presetData.image.startsWith('/') ? 
+                                presetData.image : 
+                                `/storage/images/item_preset/${presetData.image}`;
+                            setCoverImagePreview(imagePath);
                         }
                     } else {
                         console.error('Error al cargar preset:', data.message);
@@ -458,26 +544,24 @@ Información de debug:
             </motion.div>
 
             {/* Botón Regresar con efecto premium */}
-            <motion.button 
-                className="flex items-center customtext-primary mb-6 p-3 rounded-xl bg-white shadow-sm hover:shadow-md transition-all z-10 relative"
+             <motion.button 
+                      className="flex items-center  mb-6 p-3 rounded-xl transition-all z-10 relative"
                 variants={animations.button}
                 whileHover="hover"
                 whileTap="tap"
                 initial={{ x: -50, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 transition={{ delay: 0.2, type: "spring" }}
-            >
-                <ChevronLeft className="h-5 w-5" />
-                <span className="ml-2 font-medium">Regresar</span>
-                <motion.span
-                    className="absolute -z-10 inset-0 bg-gradient-to-r from-purple-50 to-white rounded-xl opacity-0"
-                    whileHover={{ opacity: 1 }}
-                />
-            </motion.button>
+                      onClick={() => window.history.back()}
+                    >
+                      <ChevronLeft className="h-6 w-6" />
+                      <span className="ml-1 font-medium">Regresar</span>
+                    </motion.button>
+          
 
             {/* Contenedor principal */}
             <div className="md:flex md:gap-10 md:items-start relative z-10">
-                {/* Columna de información y formulario */}
+                {/* Columna izquierda - Información y todas las opciones */}
                 <div className="md:w-1/2">
                     {/* Título y descripción */}
                     <motion.div 
@@ -503,8 +587,7 @@ Información de debug:
                                         stiffness: 100
                                     }}
                                 >
-                                    {preset?.name || "Libro Personalizado"} <br className="hidden lg:block" /> 
-                                    «Buenos Deseos de Matrimonio»
+                                    {getDynamicTitle()}
                                 </motion.h1>
                                 
                                 <motion.p 
@@ -520,7 +603,7 @@ Información de debug:
                         
                         {/* Características destacadas */}
                         <motion.div className="mt-6 flex flex-wrap gap-3">
-                            {features.map((feature, i) => (
+                            {getDynamicFeatures().map((feature, i) => (
                                 <motion.div
                                     key={i}
                                     className="flex items-center gap-2 px-4 py-2 bg-white rounded-full shadow-sm"
@@ -537,7 +620,7 @@ Información de debug:
                         </motion.div>
                     </motion.div>
 
-                    {/* Formulario solo con título */}
+                    {/* Formulario con todas las opciones */}
                     <motion.form 
                         className="space-y-6 bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white"
                         variants={animations.container}
@@ -557,7 +640,7 @@ Información de debug:
                                     value={formData.titulo}
                                     onChange={(e) => setFormData({ ...formData, titulo: e.target.value })}
                                     className="w-full p-4 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100"
-                                    placeholder="Escribe el título de tu libro..."
+                                    placeholder={`${preset?.name || preset?.item?.name || "Libro Personalizado"} (personaliza tu título)`}
                                     whileFocus={{ 
                                         scale: 1.02,
                                         boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
@@ -573,320 +656,335 @@ Información de debug:
                                 </motion.span>
                             </motion.div>
                         </motion.div>
+
+                        {/* Páginas */}
+                        <motion.div 
+                            className="space-y-2"
+                            variants={animations.formItem}
+                            whileHover="hover"
+                        >
+                            <label className="block text-sm font-medium text-gray-700">Cantidad de Páginas</label>
+                            <motion.div className="relative">
+                                <motion.select
+                                    value={formData.paginas}
+                                    onChange={(e) => setFormData({ ...formData, paginas: e.target.value })}
+                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
+                                    whileFocus={{ 
+                                        scale: 1.02,
+                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
+                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
+                                    }}
+                                >
+                                    {preset?.pages_options && Array.isArray(preset.pages_options) ? (
+                                        preset.pages_options.map((option, index) => (
+                                            <option key={index} value={option.label || option.value || option}>
+                                                {option.label || option.value || option}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <option value="24 páginas">24 páginas</option>
+                                            <option value="50 páginas">50 páginas</option>
+                                            <option value="100 páginas">100 páginas</option>
+                                        </>
+                                    )}
+                                </motion.select>
+                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                            </motion.div>
+                        </motion.div>
+
+                        {/* Tipo de Tapa */}
+                        <motion.div 
+                            className="space-y-2"
+                            variants={animations.formItem}
+                            whileHover="hover"
+                        >
+                            <label className="block text-sm font-medium text-gray-700">Tipo de Tapa</label>
+                            <motion.div className="relative">
+                                <motion.select
+                                    value={formData.tapa}
+                                    onChange={(e) => setFormData({ ...formData, tapa: e.target.value })}
+                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
+                                    whileFocus={{ 
+                                        scale: 1.02,
+                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
+                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
+                                    }}
+                                >
+                                    {preset?.cover_options && Array.isArray(preset.cover_options) ? (
+                                        preset.cover_options.map((option, index) => (
+                                            <option key={index} value={option.label || option.value || option}>
+                                                {option.label || option.value || option}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <option value="Tapa Dura Personalizable">Tapa Dura Personalizable</option>
+                                            <option value="Tapa Blanda">Tapa Blanda</option>
+                                        </>
+                                    )}
+                                </motion.select>
+                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                            </motion.div>
+                        </motion.div>
+
+                        {/* Tipo de Acabado */}
+                        <motion.div 
+                            className="space-y-2"
+                            variants={animations.formItem}
+                            whileHover="hover"
+                        >
+                            <label className="block text-sm font-medium text-gray-700">Tipo de Acabado</label>
+                            <motion.div className="relative">
+                                <motion.select
+                                    value={formData.acabado}
+                                    onChange={(e) => setFormData({ ...formData, acabado: e.target.value })}
+                                    className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
+                                    whileFocus={{ 
+                                        scale: 1.02,
+                                        boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
+                                        backgroundColor: "rgba(245, 243, 255, 0.8)"
+                                    }}
+                                >
+                                    {preset?.finish_options && Array.isArray(preset.finish_options) ? (
+                                        preset.finish_options.map((option, index) => (
+                                            <option key={index} value={option.label || option.value || option}>
+                                                {option.label || option.value || option}
+                                            </option>
+                                        ))
+                                    ) : (
+                                        <>
+                                            <option value="Limado">Limado</option>
+                                            <option value="Brillante">Brillante</option>
+                                            <option value="Mate">Mate</option>
+                                        </>
+                                    )}
+                                </motion.select>
+                                <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
+                            </motion.div>
+                        </motion.div>
+
+                        {/* Botón Crear proyecto */}
+                        <motion.div className="pt-4">
+                            <motion.button
+                                onClick={handleCrearProyecto}
+                                disabled={saving}
+                                className={`block text-center w-full py-4 px-6 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all relative overflow-hidden group ${
+                                    saving 
+                                        ? 'bg-gray-400 cursor-not-allowed' 
+                                        : isAuthenticated
+                                            ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white'
+                                            : 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
+                                }`}
+                                whileHover={!saving ? { 
+                                    scale: 1.02,
+                                    boxShadow: "0 10px 25px -5px rgba(139, 92, 246, 0.4)"
+                                } : {}}
+                                whileTap={!saving ? { scale: 0.98 } : {}}
+                            >
+                                <span className="relative z-10 flex items-center justify-center gap-2">
+                                    {saving ? (
+                                        <>
+                                            <motion.div 
+                                                className="w-5 h-5 border-2 border-white border-t-transparent rounded-full"
+                                                animate={{ rotate: 360 }}
+                                                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                                            />
+                                            Guardando...
+                                        </>
+                                    ) : isAuthenticated ? (
+                                        <>
+                                            <Sparkles size={20} />
+                                            Crear proyecto
+                                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    ) : (
+                                        <>
+                                            <span>🔐</span>
+                                            Inicia sesión para crear
+                                            <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
+                                        </>
+                                    )}
+                                </span>
+                                {!saving && (
+                                    <motion.span
+                                        className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                                            isAuthenticated 
+                                                ? 'bg-gradient-to-r from-pink-600 to-purple-700'
+                                                : 'bg-gradient-to-r from-red-600 to-orange-700'
+                                        }`}
+                                    />
+                                )}
+                            </motion.button>
+                        </motion.div>
                     </motion.form>
                 </div>
 
-                {/* Columna de configuración y imagen */}
+                {/* Columna derecha - Zona de drag & drop para imagen */}
                 <motion.div 
-                    className="mt-8 md:mt-0 md:w-1/2 sticky top-6 space-y-6"
+                    className="mt-8 md:mt-0 md:w-1/2 sticky top-6"
                     variants={animations.image}
                     whileHover="hover"
                 >
-                    {/* Panel de configuración */}
+                    {/* Zona de drag & drop grande */}
                     <motion.div 
-                        className="bg-white/80 backdrop-blur-sm p-6 rounded-2xl shadow-lg border border-white"
-                        initial={{ y: 20, opacity: 0 }}
-                        animate={{ y: 0, opacity: 1 }}
-                        transition={{ delay: 0.3 }}
+                        className="bg-white rounded-2xl shadow-2xl border-2 border-white relative overflow-hidden min-h-[600px] flex flex-col"
+                        initial={{ rotate: -1, scale: 0.95 }}
+                        animate={{ rotate: 0, scale: 1 }}
+                        whileHover={{ 
+                            scale: 1.02,
+                            boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.15)"
+                        }}
                     >
-                        <h3 className="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-2">
-                            <motion.span
-                                animate={{ rotate: [0, 5, -5, 0] }}
-                                transition={{ repeat: Infinity, duration: 2 }}
-                            >
-                                ⚙️
-                            </motion.span>
-                            Configuración
-                        </h3>
-                        
-                        <div className="space-y-4">
-                            {/* Imagen de Portada */}
-                            <motion.div 
-                                className="space-y-2"
-                                variants={animations.formItem}
-                                whileHover="hover"
-                            >
-                                <label className="block text-sm font-medium text-gray-700">Imagen de Portada</label>
-                                
-                                {/* Zona de preview de imagen actual */}
-                                {coverImagePreview && (
-                                    <motion.div 
-                                        className="mb-3 relative group"
-                                        initial={{ opacity: 0, scale: 0.95 }}
-                                        animate={{ opacity: 1, scale: 1 }}
-                                        whileHover={{ scale: 1.02 }}
-                                    >
-                                        <img 
-                                            src={coverImagePreview} 
-                                            alt="Vista previa de portada"
-                                            className="w-full max-w-[150px] h-[150px] object-cover rounded-lg border-2 border-purple-100 shadow-sm mx-auto"
-                                        />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-center pb-2">
-                                            <span className="text-white text-xs font-medium">Portada actual</span>
-                                        </div>
-                                    </motion.div>
-                                )}
-                                
-                                {/* Input de archivo con diseño compacto */}
+                        {loading ? (
+                            // Estado de carga
+                            <div className="animate-pulse flex-1 flex items-center justify-center">
+                                <div className="w-full h-[500px] bg-gray-200 rounded-lg m-6"></div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* Zona de drop principal */}
                                 <motion.div
-                                    className="relative border-2 border-dashed border-purple-300 rounded-xl p-4 hover:border-purple-400 transition-colors cursor-pointer bg-purple-50/30"
-                                    whileHover={{ backgroundColor: "rgba(245, 243, 255, 0.5)" }}
+                                    className="flex-1 relative cursor-pointer group"
+                                    whileHover={{ backgroundColor: "rgba(245, 243, 255, 0.3)" }}
                                     whileTap={{ scale: 0.98 }}
                                 >
                                     <input
                                         type="file"
                                         accept="image/*"
                                         onChange={handleCoverImageUpload}
-                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                                     />
-                                    <div className="text-center">
-                                        <motion.div
-                                            className="mx-auto w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mb-2"
-                                            whileHover={{ scale: 1.1 }}
-                                        >
-                                            <Upload className="w-4 h-4 text-purple-600" />
-                                        </motion.div>
-                                        <p className="text-xs text-gray-600 mb-1">
-                                            <span className="font-medium text-purple-600">Subir imagen</span>
-                                        </p>
-                                        <p className="text-xs text-gray-500">PNG, JPG, JPEG</p>
-                                        {coverImage && (
-                                            <motion.p 
-                                                className="text-xs text-green-600 mt-2 font-medium"
+                                    
+                                    {coverImagePreview ? (
+                                        // Imagen cargada
+                                        <div className="relative h-full min-h-[500px] flex items-center justify-center p-6">
+                                            <motion.img
+                                                src={coverImagePreview}
+                                                alt="Portada personalizada"
+                                                className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                                                initial={{ opacity: 0, scale: 0.9 }}
+                                                animate={{ opacity: 1, scale: 1 }}
+                                                transition={{ delay: 0.2 }}
+                                                onError={(e) => {
+                                                    console.warn('Error al cargar imagen:', coverImagePreview);
+                                                    e.target.src = "/assets/img/backgrounds/resources/default-image.png";
+                                                }}
+                                            />
+                                            
+                                            {/* Overlay para reemplazar imagen */}
+                                            <motion.div 
+                                                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
                                                 initial={{ opacity: 0 }}
-                                                animate={{ opacity: 1 }}
                                             >
-                                                ✓ {coverImage.name}
-                                            </motion.p>
+                                                <div className="bg-white/90 backdrop-blur px-6 py-3 rounded-full shadow-lg flex items-center gap-3">
+                                                    <Upload className="w-5 h-5 text-purple-600" />
+                                                    <span className="font-medium text-gray-800">Cambiar imagen</span>
+                                                </div>
+                                            </motion.div>
+
+                                            {/* Badge de imagen personalizada */}
+                                            <motion.div 
+                                                className="absolute top-4 right-4 bg-green-500 text-white px-3 py-2 rounded-full shadow-lg flex items-center gap-2"
+                                                initial={{ scale: 0, opacity: 0 }}
+                                                animate={{ scale: 1, opacity: 1 }}
+                                                transition={{ delay: 0.5, type: "spring" }}
+                                            >
+                                                <span className="text-sm font-medium">✓ Imagen personalizada</span>
+                                            </motion.div>
+                                        </div>
+                                    ) : (
+                                        // Zona de drop vacía
+                                        <div className="h-full min-h-[500px] flex flex-col items-center justify-center p-8 border-4 border-dashed border-purple-200 m-6 rounded-2xl bg-gradient-to-br from-purple-50/50 to-pink-50/50">
+                                            <motion.div
+                                                className="text-center"
+                                                initial={{ y: 20, opacity: 0 }}
+                                                animate={{ y: 0, opacity: 1 }}
+                                                transition={{ delay: 0.3 }}
+                                            >
+                                                <motion.div
+                                                    className="w-20 h-20 bg-gradient-to-br from-purple-100 to-pink-100 rounded-full flex items-center justify-center mb-6 mx-auto"
+                                                    whileHover={{ scale: 1.1, rotate: 5 }}
+                                                    animate={{ y: [0, -5, 0] }}
+                                                    transition={{ repeat: Infinity, duration: 2 }}
+                                                >
+                                                    <Upload className="w-10 h-10 text-purple-600" />
+                                                </motion.div>
+                                                
+                                                <h3 className="text-2xl font-bold text-gray-800 mb-4">
+                                                    Arrastra tu imagen aquí
+                                                </h3>
+                                                
+                                                <p className="text-gray-600 mb-6 max-w-md">
+                                                    O haz clic para seleccionar una imagen desde tu dispositivo. 
+                                                    Esta será la portada de tu libro personalizado.
+                                                </p>
+                                                
+                                                <motion.div 
+                                                    className="bg-gradient-to-r from-purple-500 to-pink-500 text-white px-6 py-3 rounded-full font-semibold shadow-lg"
+                                                    whileHover={{ scale: 1.05 }}
+                                                    whileTap={{ scale: 0.95 }}
+                                                >
+                                                    Seleccionar imagen
+                                                </motion.div>
+                                                
+                                                <p className="text-sm text-gray-500 mt-4">
+                                                    Formatos soportados: PNG, JPG, JPEG
+                                                </p>
+                                                
+                                                {/* Vista previa de preset si existe */}
+                                                {preset?.image && (
+                                                    <motion.div 
+                                                        className="mt-6 p-4 bg-white/50 rounded-xl"
+                                                        initial={{ opacity: 0 }}
+                                                        animate={{ opacity: 1 }}
+                                                        transition={{ delay: 0.8 }}
+                                                    >
+                                                        <p className="text-sm text-gray-600 mb-2">Vista previa del diseño:</p>
+                                                        <img 
+                                                            src={preset.image} 
+                                                            alt="Diseño preset" 
+                                                            className="w-24 h-24 object-cover rounded-lg mx-auto opacity-60"
+                                                            onError={(e) => {
+                                                                e.target.style.display = 'none';
+                                                            }}
+                                                        />
+                                                    </motion.div>
+                                                )}
+                                            </motion.div>
+                                        </div>
+                                    )}
+                                </motion.div>
+
+                                {/* Footer con información */}
+                                <motion.div 
+                                    className="p-6 bg-gradient-to-r from-purple-50 to-pink-50 border-t border-purple-100"
+                                    initial={{ y: 20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ delay: 0.6 }}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Sparkles size={18} className="text-purple-500" />
+                                            <span className="font-medium text-gray-800">
+                                                {preset?.name || "Diseño Personalizado"}
+                                            </span>
+                                        </div>
+                                        
+                                        {coverImage && (
+                                            <motion.div 
+                                                className="text-sm text-green-600 font-medium flex items-center gap-1"
+                                                initial={{ opacity: 0, x: 20 }}
+                                                animate={{ opacity: 1, x: 0 }}
+                                            >
+                                                <span>✓</span>
+                                                {coverImage.name}
+                                            </motion.div>
                                         )}
                                     </div>
                                 </motion.div>
-                            </motion.div>
-
-                            {/* Páginas */}
-                            <motion.div 
-                                className="space-y-2"
-                                variants={animations.formItem}
-                                whileHover="hover"
-                            >
-                                <label className="block text-sm font-medium text-gray-700">Cantidad de Páginas</label>
-                                <motion.div className="relative">
-                                    <motion.select
-                                        value={formData.paginas}
-                                        onChange={(e) => setFormData({ ...formData, paginas: e.target.value })}
-                                        className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                        whileFocus={{ 
-                                            scale: 1.02,
-                                            boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                            backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                        }}
-                                    >
-                                        {preset?.pages_options ? (
-                                            preset.pages_options.map((option, index) => (
-                                                <option key={index} value={option}>{option}</option>
-                                            ))
-                                        ) : (
-                                            <>
-                                                <option value="24 páginas">24 páginas</option>
-                                                <option value="50 páginas">50 páginas</option>
-                                                <option value="100 páginas">100 páginas</option>
-                                            </>
-                                        )}
-                                    </motion.select>
-                                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                                </motion.div>
-                            </motion.div>
-
-                            {/* Tipo de Tapa */}
-                            <motion.div 
-                                className="space-y-2"
-                                variants={animations.formItem}
-                                whileHover="hover"
-                            >
-                                <label className="block text-sm font-medium text-gray-700">Tipo de Tapa</label>
-                                <motion.div className="relative">
-                                    <motion.select
-                                        value={formData.tapa}
-                                        onChange={(e) => setFormData({ ...formData, tapa: e.target.value })}
-                                        className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                        whileFocus={{ 
-                                            scale: 1.02,
-                                            boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                            backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                        }}
-                                    >
-                                        {preset?.cover_options ? (
-                                            preset.cover_options.map((option, index) => (
-                                                <option key={index} value={option}>{option}</option>
-                                            ))
-                                        ) : (
-                                            <>
-                                                <option value="Tapa Dura Personalizable">Tapa Dura Personalizable</option>
-                                                <option value="Tapa Blanda">Tapa Blanda</option>
-                                            </>
-                                        )}
-                                    </motion.select>
-                                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                                </motion.div>
-                            </motion.div>
-
-                            {/* Tipo de Acabado */}
-                            <motion.div 
-                                className="space-y-2"
-                                variants={animations.formItem}
-                                whileHover="hover"
-                            >
-                                <label className="block text-sm font-medium text-gray-700">Tipo de Acabado</label>
-                                <motion.div className="relative">
-                                    <motion.select
-                                        value={formData.acabado}
-                                        onChange={(e) => setFormData({ ...formData, acabado: e.target.value })}
-                                        className="w-full p-3 bg-purple-50/50 rounded-xl text-sm focus:ring-2 focus:ring-primary focus:outline-none transition-all border border-purple-100 appearance-none"
-                                        whileFocus={{ 
-                                            scale: 1.02,
-                                            boxShadow: "0 0 0 3px rgba(139, 92, 246, 0.2)",
-                                            backgroundColor: "rgba(245, 243, 255, 0.8)"
-                                        }}
-                                    >
-                                        {preset?.finish_options ? (
-                                            preset.finish_options.map((option, index) => (
-                                                <option key={index} value={option}>{option}</option>
-                                            ))
-                                        ) : (
-                                            <>
-                                                <option value="Limado">Limado</option>
-                                                <option value="Brillante">Brillante</option>
-                                                <option value="Mate">Mate</option>
-                                            </>
-                                        )}
-                                    </motion.select>
-                                    <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-purple-400 pointer-events-none" />
-                                </motion.div>
-                            </motion.div>
-
-                            {/* Botón Crear proyecto */}
-                            <motion.div className="pt-4">
-                                <motion.button
-                                    onClick={handleCrearProyecto}
-                                    disabled={saving}
-                                    className={`block text-center w-full py-3 px-4 rounded-xl font-bold text-sm shadow-lg hover:shadow-xl transition-all relative overflow-hidden group ${
-                                        saving 
-                                            ? 'bg-gray-400 cursor-not-allowed' 
-                                            : isAuthenticated
-                                                ? 'bg-gradient-to-r from-purple-600 to-pink-500 text-white'
-                                                : 'bg-gradient-to-r from-orange-500 to-red-500 text-white'
-                                    }`}
-                                    whileHover={!saving ? { 
-                                        scale: 1.02,
-                                        boxShadow: "0 10px 25px -5px rgba(139, 92, 246, 0.4)"
-                                    } : {}}
-                                    whileTap={!saving ? { scale: 0.98 } : {}}
-                                >
-                                    <span className="relative z-10 flex items-center justify-center gap-2">
-                                        {saving ? (
-                                            <>
-                                                <motion.div 
-                                                    className="w-4 h-4 border-2 border-white border-t-transparent rounded-full"
-                                                    animate={{ rotate: 360 }}
-                                                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                                                />
-                                                Guardando...
-                                            </>
-                                        ) : isAuthenticated ? (
-                                            <>
-                                                <Sparkles size={16} />
-                                                Crear proyecto
-                                                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        ) : (
-                                            <>
-                                                <span>🔐</span>
-                                                Inicia sesión para crear
-                                                <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                                            </>
-                                        )}
-                                    </span>
-                                    {!saving && (
-                                        <motion.span
-                                            className={`absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
-                                                isAuthenticated 
-                                                    ? 'bg-gradient-to-r from-pink-600 to-purple-700'
-                                                    : 'bg-gradient-to-r from-red-600 to-orange-700'
-                                            }`}
-                                        />
-                                    )}
-                                </motion.button>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-
-                    {/* Vista previa del libro */}
-                    <motion.div 
-                        className="bg-white rounded-2xl p-6 flex flex-col items-center justify-center shadow-2xl border-2 border-white relative overflow-hidden"
-                        initial={{ rotate: -2, scale: 0.95 }}
-                        animate={{ rotate: 0, scale: 1 }}
-                        whileHover={{ 
-                            scale: 1.03,
-                            boxShadow: "0 20px 40px -10px rgba(0, 0, 0, 0.15)"
-                        }}
-                    >
-                        {loading ? (
-                            // Estado de carga
-                            <div className="animate-pulse">
-                                <div className="w-full h-[300px] bg-gray-200 rounded-lg"></div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Imagen principal */}
-                                <motion.img
-                                    src={coverImagePreview || preset?.image || "/assets/img/backgrounds/resources/default-image.png"}
-                                    alt="Vista previa del libro personalizado"
-                                    className="max-w-full h-auto max-h-[400px] rounded-lg shadow-md transform transition-transform group-hover:scale-105"
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                    transition={{ delay: 0.2 }}
-                                />
-                                
-                                {/* Overlay para mostrar que se puede personalizar */}
-                                {!coverImagePreview && (
-                                    <motion.div 
-                                        className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-pink-500/10 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center"
-                                        initial={{ opacity: 0 }}
-                                        whileHover={{ opacity: 1 }}
-                                    >
-                                        <div className="bg-white/90 backdrop-blur px-4 py-2 rounded-full shadow-sm flex items-center gap-2">
-                                            <ImageIcon size={16} className="text-purple-500" />
-                                            <span className="text-sm font-medium">Sube tu portada</span>
-                                        </div>
-                                    </motion.div>
-                                )}
-                                
-                                {/* Indicador de imagen personalizada */}
-                                {coverImagePreview && (
-                                    <motion.div 
-                                        className="absolute top-4 right-4 bg-green-500 text-white px-2 py-1 rounded-full shadow-sm flex items-center gap-1"
-                                        initial={{ scale: 0, opacity: 0 }}
-                                        animate={{ scale: 1, opacity: 1 }}
-                                        transition={{ delay: 0.5, type: "spring" }}
-                                    >
-                                        <span className="text-xs font-medium">✓ Personalizada</span>
-                                    </motion.div>
-                                )}
                             </>
                         )}
-                        
-                        {/* Badge de información */}
-                        <motion.div 
-                            className="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 rounded-full shadow-sm flex items-center gap-2"
-                            initial={{ y: 20, opacity: 0 }}
-                            animate={{ y: 0, opacity: 1 }}
-                            transition={{ delay: 0.8 }}
-                        >
-                            <Sparkles size={14} className="text-purple-500" />
-                            <span className="text-xs font-medium">
-                                {preset?.name || "Edición Especial"}
-                            </span>
-                        </motion.div>
                     </motion.div>
                 </motion.div>
             </div>

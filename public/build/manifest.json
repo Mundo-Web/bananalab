@@ -817,8 +817,8 @@
       "signup.png"
     ]
   },
-  "_sparkles-CvIuWYkt.js": {
-    "file": "assets/sparkles-CvIuWYkt.js",
+  "_sparkles-DvmvZ6mJ.js": {
+    "file": "assets/sparkles-DvmvZ6mJ.js",
     "name": "sparkles",
     "imports": [
       "_createLucideIcon-DfjclApS.js"
@@ -3003,7 +3003,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-6gxdZhQ8.js",
+    "file": "assets/BananaLab-DyxFkzqs.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -6819,7 +6819,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-C5ChLRk9.js",
+    "file": "assets/System-D02WjPSt.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
