@@ -686,8 +686,8 @@ const Items = ({ categories, brands, collections }) => {
                     caption: "Precio Final",
                     width: "100px",
                     cellTemplate: (container, options) => {
-                        const finalPrice = options.data.discount > 0 
-                            ? options.data.price - options.data.discount 
+                        const finalPrice = options.data.discount > 0 && options.data.price > options.data.discount
+                            ?  options.data.discount
                             : options.data.price;
                         container.html(
                             `<span class="fw-bold text-success">S/. ${Number2Currency(finalPrice)}</span>`
@@ -1780,11 +1780,11 @@ const Items = ({ categories, brands, collections }) => {
                                                     <InputFormGroup
                                                         eRef={presetDiscountRef}
                                                         name="discount"
-                                                        label="Descuento (%)"
+                                                        label="Precio con Descuento"
                                                         type="number"
                                                         step="0.01"
                                                         min="0"
-                                                        max="100"
+                                                       
                                                     />
                                                 </div>
                                             </div>

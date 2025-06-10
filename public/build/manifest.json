@@ -754,6 +754,13 @@
       "resources/js/Components/Tailwind/Blogs/BlogCarousel.jsx"
     ]
   },
+  "_palette-BTxIxfA-.js": {
+    "file": "assets/palette-BTxIxfA-.js",
+    "name": "palette",
+    "imports": [
+      "_createLucideIcon-DfjclApS.js"
+    ]
+  },
   "_phone-ZNY-sPqk.js": {
     "file": "assets/phone-ZNY-sPqk.js",
     "name": "phone",
@@ -810,8 +817,8 @@
       "signup.png"
     ]
   },
-  "_sparkles-Drm7bo-z.js": {
-    "file": "assets/sparkles-Drm7bo-z.js",
+  "_sparkles-CvIuWYkt.js": {
+    "file": "assets/sparkles-CvIuWYkt.js",
     "name": "sparkles",
     "imports": [
       "_createLucideIcon-DfjclApS.js"
@@ -1585,7 +1592,7 @@
     ]
   },
   "resources/js/Admin/Items.jsx": {
-    "file": "assets/Items-4ryy_kwx.js",
+    "file": "assets/Items-DoaFzPUI.js",
     "name": "Items",
     "src": "resources/js/Admin/Items.jsx",
     "isEntry": true,
@@ -2996,7 +3003,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-Xu3_3OvH.js",
+    "file": "assets/BananaLab-6gxdZhQ8.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -6812,7 +6819,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-Dl8uFWWe.js",
+    "file": "assets/System-C5ChLRk9.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
