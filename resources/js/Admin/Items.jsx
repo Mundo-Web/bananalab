@@ -75,6 +75,14 @@ const Items = ({ categories, brands, collections }) => {
     const contentOpacityRef = useRef();
     const contentFitModeRef = useRef();
     
+    // Product options refs
+    const pagesOptionsRef = useRef();
+    const defaultPagesRef = useRef();
+    const coverOptionsRef = useRef();
+    const defaultCoverRef = useRef();
+    const finishOptionsRef = useRef();
+    const defaultFinishRef = useRef();
+    
     const [isEditingPreset, setIsEditingPreset] = useState(false);
     const [activePresetTab, setActivePresetTab] = useState('basic');
     const [isLoadingPresets, setIsLoadingPresets] = useState(false);
@@ -455,14 +463,115 @@ const Items = ({ categories, brands, collections }) => {
         canvasHeightRef.current.value = canvasCfg.height || 1000;
         canvasDpiRef.current.value = canvasCfg.dpi || 300;
         canvasBackgroundColorRef.current.value = canvasCfg.background_color || '#ffffff';
-        // Content area config
-        contentXRef.current.value = preset?.content_layer_config?.x || 0;
-        contentYRef.current.value = preset?.content_layer_config?.y || 0;
-        contentWidthRef.current.value = preset?.content_layer_config?.width || 1000;
-        contentHeightRef.current.value = preset?.content_layer_config?.height || 1000;
-        contentRotationRef.current.value = preset?.content_layer_config?.rotation || 0;
-        contentOpacityRef.current.value = preset?.content_layer_config?.opacity || 1;
-        contentFitModeRef.current.value = preset?.content_layer_config?.fit_mode || 'cover';
+        
+        // Content area config (convertir JSON si es string)
+        let contentCfg = {};
+        if (preset?.content_layer_config) {
+            contentCfg = typeof preset.content_layer_config === 'string'
+                ? JSON.parse(preset.content_layer_config)
+                : preset.content_layer_config;
+        }
+        contentXRef.current.value = contentCfg.x || 0;
+        contentYRef.current.value = contentCfg.y || 0;
+        contentWidthRef.current.value = contentCfg.width || 1000;
+        contentHeightRef.current.value = contentCfg.height || 1000;
+        contentRotationRef.current.value = contentCfg.rotation || 0;
+        contentOpacityRef.current.value = contentCfg.opacity || 1;
+        contentFitModeRef.current.value = contentCfg.fit_mode || 'cover';
+        
+        // Product options config
+        console.log("Loading preset data:", preset);
+        console.log("Pages options from preset:", preset?.pages_options, typeof preset?.pages_options);
+        console.log("Cover options from preset:", preset?.cover_options, typeof preset?.cover_options);
+        console.log("Finish options from preset:", preset?.finish_options, typeof preset?.finish_options);
+        
+        // Parse pages options (puede venir como string JSON o array)
+        if (preset?.pages_options) {
+            let pagesOptions;
+            if (typeof preset.pages_options === 'string') {
+                try {
+                    pagesOptions = JSON.parse(preset.pages_options);
+                } catch (e) {
+                    pagesOptions = [];
+                }
+            } else {
+                pagesOptions = preset.pages_options;
+            }
+            
+            if (Array.isArray(pagesOptions)) {
+                pagesOptionsRef.current.value = pagesOptions.map(opt => 
+                    typeof opt === 'object' ? `${opt.value}:${opt.label}` : opt
+                ).join(',');
+                console.log("Pages options set to:", pagesOptionsRef.current.value);
+            } else {
+                pagesOptionsRef.current.value = '';
+            }
+        } else {
+            pagesOptionsRef.current.value = '';
+        }
+        defaultPagesRef.current.value = preset?.default_pages || '';
+        
+        // Parse cover options (puede venir como string JSON o array)
+        if (preset?.cover_options) {
+            let coverOptions;
+            if (typeof preset.cover_options === 'string') {
+                try {
+                    coverOptions = JSON.parse(preset.cover_options);
+                } catch (e) {
+                    coverOptions = [];
+                }
+            } else {
+                coverOptions = preset.cover_options;
+            }
+            
+            if (Array.isArray(coverOptions)) {
+                coverOptionsRef.current.value = coverOptions.map(opt => 
+                    typeof opt === 'object' ? `${opt.value}:${opt.label}` : opt
+                ).join(',');
+                console.log("Cover options set to:", coverOptionsRef.current.value);
+            } else {
+                coverOptionsRef.current.value = '';
+            }
+        } else {
+            coverOptionsRef.current.value = '';
+        }
+        defaultCoverRef.current.value = preset?.default_cover || '';
+        
+        // Parse finish options (puede venir como string JSON o array)
+        if (preset?.finish_options) {
+            let finishOptions;
+            if (typeof preset.finish_options === 'string') {
+                try {
+                    finishOptions = JSON.parse(preset.finish_options);
+                } catch (e) {
+                    finishOptions = [];
+                }
+            } else {
+                finishOptions = preset.finish_options;
+            }
+            
+            if (Array.isArray(finishOptions)) {
+                finishOptionsRef.current.value = finishOptions.map(opt => 
+                    typeof opt === 'object' ? `${opt.value}:${opt.label}` : opt
+                ).join(',');
+                console.log("Finish options set to:", finishOptionsRef.current.value);
+            } else {
+                finishOptionsRef.current.value = '';
+            }
+        } else {
+            finishOptionsRef.current.value = '';
+        }
+        defaultFinishRef.current.value = preset?.default_finish || '';
+        
+        // Si es un preset nuevo, limpiar todos los campos de opciones
+        if (!preset || !preset.id) {
+            pagesOptionsRef.current.value = '';
+            defaultPagesRef.current.value = '';
+            coverOptionsRef.current.value = '';
+            defaultCoverRef.current.value = '';
+            finishOptionsRef.current.value = '';
+            defaultFinishRef.current.value = '';
+        }
         
         // Verificación final antes de mostrar el modal
         console.log("onPresetModalOpen - antes de mostrar modal, selectedItemForPresets:", selectedItemForPresets, "targetItem:", targetItem);
@@ -754,6 +863,76 @@ const Items = ({ categories, brands, collections }) => {
                 allowed_formats: ['jpg', 'jpeg', 'png', 'gif']
             };
             formData.append("content_layer_config", JSON.stringify(contentLayerConfig));
+            
+            // Debug: Log content layer config
+            console.log("Content Layer Config being sent:", contentLayerConfig);
+            
+            // Product options
+            // Parse pages options
+            if (pagesOptionsRef.current?.value?.trim()) {
+                try {
+                    const pagesOptions = pagesOptionsRef.current.value.split(',').map(option => {
+                        const parts = option.trim().split(':');
+                        if (parts.length === 2) {
+                            return { value: parts[0].trim(), label: parts[1].trim() };
+                        } else {
+                            return { value: parts[0].trim(), label: parts[0].trim() };
+                        }
+                    });
+                    formData.append("pages_options", JSON.stringify(pagesOptions));
+                    console.log("Pages Options being sent:", pagesOptions);
+                } catch (error) {
+                    throw new Error("Error al procesar las opciones de páginas");
+                }
+            }
+            if (defaultPagesRef.current?.value?.trim()) {
+                formData.append("default_pages", defaultPagesRef.current.value.trim());
+                console.log("Default Pages being sent:", defaultPagesRef.current.value.trim());
+            }
+            
+            // Parse cover options
+            if (coverOptionsRef.current?.value?.trim()) {
+                try {
+                    const coverOptions = coverOptionsRef.current.value.split(',').map(option => {
+                        const parts = option.trim().split(':');
+                        if (parts.length === 2) {
+                            return { value: parts[0].trim(), label: parts[1].trim() };
+                        } else {
+                            return { value: parts[0].trim(), label: parts[0].trim() };
+                        }
+                    });
+                    formData.append("cover_options", JSON.stringify(coverOptions));
+                    console.log("Cover Options being sent:", coverOptions);
+                } catch (error) {
+                    throw new Error("Error al procesar las opciones de tapa");
+                }
+            }
+            if (defaultCoverRef.current?.value?.trim()) {
+                formData.append("default_cover", defaultCoverRef.current.value.trim());
+                console.log("Default Cover being sent:", defaultCoverRef.current.value.trim());
+            }
+            
+            // Parse finish options
+            if (finishOptionsRef.current?.value?.trim()) {
+                try {
+                    const finishOptions = finishOptionsRef.current.value.split(',').map(option => {
+                        const parts = option.trim().split(':');
+                        if (parts.length === 2) {
+                            return { value: parts[0].trim(), label: parts[1].trim() };
+                        } else {
+                            return { value: parts[0].trim(), label: parts[0].trim() };
+                        }
+                    });
+                    formData.append("finish_options", JSON.stringify(finishOptions));
+                    console.log("Finish Options being sent:", finishOptions);
+                } catch (error) {
+                    throw new Error("Error al procesar las opciones de acabado");
+                }
+            }
+            if (defaultFinishRef.current?.value?.trim()) {
+                formData.append("default_finish", defaultFinishRef.current.value.trim());
+                console.log("Default Finish being sent:", defaultFinishRef.current.value.trim());
+            }
 
             if (isEditingPreset && presetIdRef.current?.value) {
                 // Asegurarse de que el campo 'id' esté presente y actualizado en el FormData
@@ -1551,13 +1730,22 @@ const Items = ({ categories, brands, collections }) => {
                                             Configuración Canvas
                                         </a>
                                     </li>
-                                    <li className="nav-item" role="presentation">
+                                   <li className="nav-item" role="presentation">
                                         <a 
                                             className={`nav-link ${activePresetTab === 'content' ? 'active' : ''}`}
                                             onClick={() => setActivePresetTab('content')}
                                             href="#"
                                         >
                                             Área de Contenido
+                                        </a>
+                                    </li>
+                                    <li className="nav-item" role="presentation">
+                                        <a 
+                                            className={`nav-link ${activePresetTab === 'options' ? 'active' : ''}`}
+                                            onClick={() => setActivePresetTab('options')}
+                                            href="#"
+                                        >
+                                            Opciones de Producto
                                         </a>
                                     </li>
                                 </ul>
@@ -1867,6 +2055,98 @@ const Items = ({ categories, brands, collections }) => {
                                                     </div>
                                                 </div>
                                             </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Product Options Tab */}
+                                <div 
+                                    className={`tab-pane fade ${activePresetTab === 'options' ? 'show active' : ''}`}
+                                    style={{ display: activePresetTab === 'options' ? 'block' : 'none' }}
+                                >
+                                    <div className="row">
+                                        <div className="col-md-6">
+                                            <h5 className="mb-3">Opciones de Páginas</h5>
+                                            <div className="form-group mb-3">
+                                                <label className="form-label">Cantidad de Páginas Disponibles</label>
+                                                <textarea 
+                                                    ref={pagesOptionsRef}
+                                                    className="form-control"
+                                                    rows="3"
+                                                    placeholder="Ej: 20,30,40,50 o 20:20 páginas,30:30 páginas,40:40 páginas"
+                                                    title="Formato: valor:etiqueta separados por comas. Ej: 20:20 páginas,30:30 páginas"
+                                                ></textarea>
+                                                <small className="form-text text-muted">
+                                                    Formato: valor:etiqueta separados por comas. Ej: 20:20 páginas,30:30 páginas
+                                                </small>
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Cantidad de Páginas por Defecto</label>
+                                                <input 
+                                                    ref={defaultPagesRef}
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="Ej: 20"
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="col-md-6">
+                                            <h5 className="mb-3">Opciones de Tapa</h5>
+                                            <div className="form-group mb-3">
+                                                <label className="form-label">Tipos de Tapa Disponibles</label>
+                                                <textarea 
+                                                    ref={coverOptionsRef}
+                                                    className="form-control"
+                                                    rows="3"
+                                                    placeholder="Ej: dura:Tapa Dura,blanda:Tapa Blanda,premium:Tapa Premium"
+                                                    title="Formato: valor:etiqueta separados por comas"
+                                                ></textarea>
+                                                <small className="form-text text-muted">
+                                                    Formato: valor:etiqueta separados por comas. Ej: dura:Tapa Dura,blanda:Tapa Blanda
+                                                </small>
+                                            </div>
+                                            <div className="form-group">
+                                                <label className="form-label">Tipo de Tapa por Defecto</label>
+                                                <input 
+                                                    ref={defaultCoverRef}
+                                                    type="text"
+                                                    className="form-control"
+                                                    placeholder="Ej: dura"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="row mt-4">
+                                        <div className="col-md-12">
+                                            <h5 className="mb-3">Opciones de Acabado</h5>
+                                            <div className="row">
+                                                <div className="col-md-6">
+                                                    <div className="form-group mb-3">
+                                                        <label className="form-label">Tipos de Acabado Disponibles</label>
+                                                        <textarea 
+                                                            ref={finishOptionsRef}
+                                                            className="form-control"
+                                                            rows="3"
+                                                            placeholder="Ej: mate:Acabado Mate,brillante:Acabado Brillante,satinado:Acabado Satinado"
+                                                            title="Formato: valor:etiqueta separados por comas"
+                                                        ></textarea>
+                                                        <small className="form-text text-muted">
+                                                            Formato: valor:etiqueta separados por comas. Ej: mate:Acabado Mate,brillante:Acabado Brillante
+                                                        </small>
+                                                    </div>
+                                                </div>
+                                                <div className="col-md-6">
+                                                    <div className="form-group">
+                                                        <label className="form-label">Tipo de Acabado por Defecto</label>
+                                                        <input 
+                                                            ref={defaultFinishRef}
+                                                            type="text"
+                                                            className="form-control"
+                                                            placeholder="Ej: mate"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>

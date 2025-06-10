@@ -80,18 +80,43 @@ const System = ({
     }, [favorites]);
 
     useEffect(() => {
-        itemsRest.verifyStock(cart.map((x) => x.id)).then((items) => {
-            const newCart = items.map((item) => {
-                const found = cart.find((x) => x.id == item.id);
-                if (!found) return;
-                found.price = item.price;
-                found.discount = item.discount;
-                found.name = item.name;
-                return found;
+        // Solo verificar stock si hay items en el carrito
+        if (cart.length === 0) return;
+        
+        // Separar álbumes personalizados de productos regulares
+        const regularProducts = cart.filter((x) => x.type !== 'custom_album');
+        const customAlbums = cart.filter((x) => x.type === 'custom_album');
+        
+        console.log('🔍 System.jsx verifyStock - Productos regulares:', regularProducts.length, 'Álbumes personalizados:', customAlbums.length);
+        
+        if (regularProducts.length > 0) {
+            itemsRest.verifyStock(regularProducts.map((x) => x.id)).then((items) => {
+                const updatedRegularProducts = items.map((item) => {
+                    const found = regularProducts.find((x) => x.id == item.id);
+                    if (!found) return null;
+                    found.price = item.price;
+                    found.discount = item.discount;
+                    found.name = item.name;
+                    return found;
+                }).filter(Boolean);
+                
+                // Combinar productos actualizados con álbumes personalizados
+                const combinedCart = [...updatedRegularProducts, ...customAlbums];
+                console.log('🔄 System.jsx: Carrito actualizado manteniendo álbumes personalizados:', combinedCart);
+                
+                // Solo actualizar si el carrito realmente cambió
+                if (JSON.stringify(combinedCart) !== JSON.stringify(cart)) {
+                    setCart(combinedCart);
+                }
+            }).catch((error) => {
+                console.error('❌ Error verificando stock:', error);
+                // En caso de error, mantener el carrito original
             });
-            setCart(newCart);
-        });
-    }, [null]);
+        } else if (customAlbums.length > 0) {
+            // Si solo hay álbumes personalizados, no hacer nada
+            console.log('📦 System.jsx: Solo álbumes personalizados en carrito, no verificar stock');
+        }
+    }, []); // Solo ejecutar una vez al montar el componente
 
     const getSystem = ({ component, value, data, itemsId, visible }) => {
         if (visible == 0) return <></>;

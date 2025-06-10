@@ -1,1 +1,0 @@
-import{j as s}from"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import"./index-yBjzXJbu.js";const m=({data:e})=>s.jsx("img",{className:"w-full object-cover object-center aspect-square",src:e==null?void 0:e.image,style:{aspectRatio:(e==null?void 0:e.aspect_ratio)??1}});export{m as default};

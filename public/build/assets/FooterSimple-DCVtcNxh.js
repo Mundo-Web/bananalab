@@ -1,0 +1,1 @@
+import"./AboutSimple-Cf8x2fCZ.js";import"./index-BOnQTV8N.js";import{R as p}from"./index-BtQtP3Fl.js";import"./index-yBjzXJbu.js";import"./_commonjsHelpers-D6-XlEtG.js";import"./index-fNjTmf9T.js";import"./index-Chjiymov.js";p.setAppElement("#app");

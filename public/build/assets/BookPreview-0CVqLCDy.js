@@ -1,1 +1,0 @@
-import"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import{R as o}from"./index-Bv81MoWS.js";import"./index.es-p8wkj5I3.js";import"./index-yBjzXJbu.js";import"./index-fNjTmf9T.js";import"./index-Chjiymov.js";o.setAppElement(document.body);

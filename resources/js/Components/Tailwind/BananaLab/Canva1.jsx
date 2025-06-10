@@ -63,89 +63,7 @@ const animations = {
   }
 };
 
-// Datos de ejemplo mejorados
-const productos = [
-  {
-    id: 1,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },  {
-    id: 2,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 3,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 4,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 5,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 6,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 8,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  {
-    id: 9,
-    imagen: "/assets/img/backgrounds/resources/default-image.png",
-    titulo: "Poster Fotográfico 75×108 Vertical",
-    descripcion: "Impresión de alta calidad en papel fotográfico brillante. Perfecto para decorar tus espacios.",
-    precio: 89.90,
-    descuento: 15,
-    colores: ["#FF5733", "#33FF57", "#3357FF"],
-    tags: ["Popular", "Nuevo"]
-  },
-  // ... (otros productos con estructura similar)
-];
+
 
 const CardBanana = ({ producto, onClick }) => {
   const [isHovered, setIsHovered] = useState(false);
@@ -185,7 +103,8 @@ const CardBanana = ({ producto, onClick }) => {
       {/* Imagen del producto */}
       <div className="aspect-square bg-gray-100 relative overflow-hidden">
         <motion.img 
-          src={producto.imagen} 
+        
+          src={producto.imagen}
           alt={producto.titulo}
           className="w-full h-full object-cover"
           initial={{ scale: 1 }}
@@ -402,7 +321,7 @@ export default function Canva1({ data, filteredData }) {
       loadItemPresets(itemId);
     } else {
       // Si no hay item seleccionado, usar datos estáticos como fallback
-      setPresets(productos);
+      //setPresets(productos);
       setLoading(false);
     }
   }, []);
@@ -421,7 +340,7 @@ export default function Canva1({ data, filteredData }) {
         // Transformar los presets al formato esperado por el componente
         const transformedPresets = response.data.map(preset => ({
           id: preset.id,
-          imagen: preset.preview_image ? `/storage/images/item_presets/${preset.preview_image}` : "/assets/img/backgrounds/resources/default-image.png",
+          imagen: `/storage/images/item_preset/${preset.image}`,
           titulo: preset.name || `Preset ${preset.id}`,
           descripcion: preset.description || "Diseño predefinido personalizable",
           precio: 0, // Los presets no tienen precio individual

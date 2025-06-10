@@ -143,6 +143,14 @@ class ItemPresetReactController extends BasicController
      */
     public function save(Request $request, \App\Models\Item $item = null, \App\Models\ItemPreset $preset = null): \Illuminate\Http\Response|\Illuminate\Routing\ResponseFactory
     {
+        // Debug: Log all incoming data
+        \Log::info('ItemPresetReactController::save - Datos recibidos', [
+            'all_data' => $request->all(),
+            'files' => $request->allFiles(),
+            'item_id' => $item ? $item->id : null,
+            'preset_id' => $preset ? $preset->id : null
+        ]);
+        
         try {
             // Si la ruta es anidada, el $item y $preset ya son modelos inyectados
             if ($item) {
@@ -154,6 +162,10 @@ class ItemPresetReactController extends BasicController
             // Llamar al método save del padre (create o update según 'id' en el request)
             return parent::save($request);
         } catch (\Exception $e) {
+            \Log::error('ItemPresetReactController::save - Error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
             return response([
                 'success' => false,
                 'message' => 'Error al guardar el preset: ' . $e->getMessage()

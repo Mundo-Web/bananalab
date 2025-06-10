@@ -73,6 +73,7 @@ use App\Http\Controllers\ScrapController;
 Route::post('/albums', [App\Http\Controllers\AlbumController::class, 'store']);
 Route::get('/albums', [App\Http\Controllers\AlbumController::class, 'index']);
 Route::get('/albums/{uuid}', [App\Http\Controllers\AlbumController::class, 'show']);
+Route::post('/albums/{uuid}/finalize-design', [App\Http\Controllers\AlbumController::class, 'finalizeDesign']);
 
 // Item Preset routes (public)
 Route::get('/item-presets/{preset}', [App\Http\Controllers\Admin\ItemPresetReactController::class, 'getByIdPublic']);

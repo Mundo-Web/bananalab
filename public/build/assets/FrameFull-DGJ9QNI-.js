@@ -1,1 +1,0 @@
-import{j as o}from"./AboutSimple-Cf8x2fCZ.js";import"./index-BH53Isel.js";import{H as r}from"./HtmlContent-FTivcJrM.js";import"./index-yBjzXJbu.js";const i=({data:m})=>o.jsx("section",{className:"w-full",children:o.jsx(r,{html:(m==null?void 0:m["code:html"])??""})});export{i as default};

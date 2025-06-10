@@ -47,12 +47,11 @@ const flipbookStyles = `
     }
 `;
 
-Modal.setAppElement(document.body); // Ajusta esto según tu app
-
-
+Modal.setAppElement('#app'); // Configurar elemento raíz para accesibilidad
 
 const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }) => {
     const [currentPage, setCurrentPage] = useState(0);
+    const [isProcessing, setIsProcessing] = useState(false);
     const flipBook = useRef();
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
@@ -62,18 +61,26 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
                 onRequestClose={onRequestClose}
                 style={customStyles}
                 contentLabel="Vista previa del álbum"
+                ariaHideApp={true}
+                shouldCloseOnOverlayClick={true}
+                shouldCloseOnEsc={true}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-title"
+                aria-describedby="modal-description"
             >
                 <div className="bg-white p-8 rounded-lg shadow-lg max-w-md mx-auto">
                     <div className="flex justify-between items-center mb-4">
-                        <h2 className="text-xl font-bold">Vista previa del álbum</h2>
+                        <h2 id="modal-title" className="text-xl font-bold">Vista previa del álbum</h2>
                         <button
                             onClick={onRequestClose}
                             className="text-gray-500 hover:text-gray-700"
+                            aria-label="Cerrar vista previa"
                         >
                             <X size={24} />
                         </button>
                     </div>
-                    <p className="text-gray-600">No hay páginas disponibles para mostrar.</p>
+                    <p id="modal-description" className="text-gray-600">No hay páginas disponibles para mostrar.</p>
                 </div>
             </Modal>
         );
@@ -143,15 +150,30 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
             onRequestClose={onRequestClose}
             style={customStyles}
             contentLabel="Vista previa del álbum"
+            ariaHideApp={true}
+            shouldCloseOnOverlayClick={true}
+            shouldCloseOnEsc={true}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-title"
+            aria-describedby="modal-description"
         >
             {/* Inyectar estilos CSS para eliminar márgenes */}
             <style dangerouslySetInnerHTML={{ __html: flipbookStyles }} />
             
             <div className="relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-2xl">
+                {/* Título del modal (oculto visualmente pero accesible) */}
+                <h2 id="modal-title" className="sr-only">Vista previa del álbum</h2>
+                <p id="modal-description" className="sr-only">
+                    Navegue por las páginas de su álbum usando los controles de navegación o teclado. 
+                    Puede cerrar esta ventana presionando Escape o el botón de cerrar.
+                </p>
+                
                 {/* Botón de cerrar */}
                 <button
                     onClick={onRequestClose}
                     className="absolute top-4 right-4 p-2 rounded-full bg-white/80 hover:bg-white text-gray-700 shadow z-10"
+                    aria-label="Cerrar vista previa del álbum"
                 >
                     <X className="h-6 w-6" />
                 </button>
@@ -161,11 +183,12 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
                     <button
                         onClick={goToPrevPage}
                         className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 shadow transition-colors"
+                        aria-label="Página anterior"
                     >
                         <ChevronLeft className="h-6 w-6" />
                     </button>
 
-                    <span className="flex items-center text-gray-700 text-base font-medium px-4 py-2 bg-gray-50 rounded-lg">
+                    <span className="flex items-center text-gray-700 text-base font-medium px-4 py-2 bg-gray-50 rounded-lg" aria-live="polite">
                         {(() => {
                             const currentPageData = bookPages[currentPage];
                             if (!currentPageData) return 'Cargando...';
@@ -189,6 +212,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
                     <button
                         onClick={goToNextPage}
                         className="p-3 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-700 shadow transition-colors"
+                        aria-label="Página siguiente"
                     >
                         <ChevronRight className="h-6 w-6" />
                     </button>
@@ -288,6 +312,65 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
                         ))}
                     </HTMLFlipBook>
                 </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-md mx-auto">
+                <button
+                    className={`flex-1 py-3 px-4 rounded-lg font-semibold shadow transition flex items-center justify-center ${
+                        isProcessing 
+                            ? 'bg-purple-400 text-white cursor-not-allowed' 
+                            : 'bg-purple-600 text-white hover:bg-purple-700'
+                    }`}
+                    onClick={async () => {
+                        if (isProcessing) return;
+                        
+                        setIsProcessing(true);
+                        
+                        try {
+                            // Llamar a la función para finalizar el diseño y guardarlo
+                            if (typeof window.finalizeAlbumDesign === 'function') {
+                                const success = await window.finalizeAlbumDesign();
+                                if (success) {
+                                    // Determinar la URL base correcta para el checkout
+                                    const baseUrl = window.location.origin.includes('bananalab')
+                                        ? '/projects/bananalab/public'
+                                        : '';
+                                    
+                                    // Redirigir al checkout
+                                    window.location.href = `${baseUrl}/checkout`;
+                                }
+                            } else {
+                                alert('Funcionalidad de finalización de diseño pendiente de implementar.');
+                            }
+                        } catch (error) {
+                            console.error('Error durante el proceso de compra:', error);
+                            alert('Error durante el proceso. Inténtelo nuevamente.');
+                        } finally {
+                            setIsProcessing(false);
+                        }
+                    }}
+                    disabled={isProcessing}
+                >
+                    {isProcessing ? (
+                        <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Procesando...
+                        </>
+                    ) : (
+                        'Comprar ahora'
+                    )}
+                </button>
+                <button
+                    className="flex-1 py-3 px-4 rounded-lg bg-gray-200 text-gray-700 font-semibold shadow hover:bg-gray-300 transition"
+                    onClick={onRequestClose}
+                    disabled={isProcessing}
+                >
+                    Continuar editando
+                </button>
             </div>
         </Modal>
     );

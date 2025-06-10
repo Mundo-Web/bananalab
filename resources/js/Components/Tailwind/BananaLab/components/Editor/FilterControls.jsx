@@ -76,16 +76,16 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
     }, [selectedElement?.type, activeFilterTab]);
 
     return (
-        <div className="space-y-4">
-            {/* Filter tabs */}
-            <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="space-y-3">
+            {/* Filter tabs - formato vertical compacto */}
+            <div className="grid grid-cols-1 gap-1 bg-gray-100 rounded-lg p-1">
                 {filterTabs.map(tab => {
                     const Icon = tab.icon;
                     return (
                         <button
                             key={tab.id}
                             onClick={() => setActiveFilterTab(tab.id)}
-                            className={`flex-1 flex items-center justify-center gap-1 py-2 px-3 rounded-md text-xs font-medium transition-colors ${
+                            className={`flex items-center gap-2 py-2 px-3 rounded-md text-xs font-medium transition-colors ${
                                 activeFilterTab === tab.id
                                     ? 'bg-white text-purple-600 shadow-sm'
                                     : 'text-gray-600 hover:text-gray-800'
@@ -96,25 +96,22 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                         </button>
                     );
                 })}
-            </div>            {/* Reset button */}
+            </div>
+
+            {/* Reset button - más compacto */}
             <div className="flex justify-between items-center">
                 <div className="flex flex-col">
-                    <h4 className="text-sm font-medium text-gray-800">
-                        {activeFilterTab === "basic" && "Controles básicos"}
-                        {activeFilterTab === "presets" && "Filtros predefinidos"}
-                        {activeFilterTab === "advanced" && "Configuración avanzada"}
-                    </h4>
-                    {selectedElement && (
-                        <span className="text-xs text-gray-500">
-                            {selectedElement.type === "image" ? "Imagen" : "Texto"} seleccionado
-                        </span>
-                    )}
+                    <span className="text-xs font-medium text-gray-700">
+                        {activeFilterTab === "basic" && "Básico"}
+                        {activeFilterTab === "presets" && "Presets"}
+                        {activeFilterTab === "advanced" && "Avanzado"}
+                    </span>
                 </div>
                 <Button
                     variant="ghost"
                     size="sm"
                     onClick={resetFilters}
-                    className="text-xs"
+                    className="text-xs h-6 px-2"
                     icon={<RotateCcw className="h-3 w-3" />}
                 >
                     Reset
@@ -122,23 +119,23 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
             </div>
 
             {/* Filter content */}
-            <div className="space-y-4">
+            <div className="space-y-3">
                 {activeFilterTab === "basic" && (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                         {/* Basic adjustments */}
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-700">Ajustes básicos</span>
+                                <span className="text-xs font-medium text-gray-700">Ajustes básicos</span>
                                 <button
                                     onClick={() => toggleSection("basic")}
                                     className="text-gray-400 hover:text-gray-600"
                                 >
-                                    {expandedSections.basic ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    {expandedSections.basic ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                 </button>
                             </div>
                             
                             {expandedSections.basic && (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <Slider
                                         label="Brillo"
                                         value={defaultFilters.brightness}
@@ -180,19 +177,19 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                         </div>
 
                         {/* Color adjustments */}
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-700">Color</span>
+                                <span className="text-xs font-medium text-gray-700">Color</span>
                                 <button
                                     onClick={() => toggleSection("color")}
                                     className="text-gray-400 hover:text-gray-600"
                                 >
-                                    {expandedSections.color ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    {expandedSections.color ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                 </button>
                             </div>
                             
                             {expandedSections.color && (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <Slider
                                         label="Matiz"
                                         value={defaultFilters.hue}
@@ -216,19 +213,19 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                         </div>
 
                         {/* Transform */}
-                        <div className="space-y-3">
+                        <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <span className="text-sm font-medium text-gray-700">Transformar</span>
+                                <span className="text-xs font-medium text-gray-700">Transformar</span>
                                 <button
                                     onClick={() => toggleSection("transform")}
                                     className="text-gray-400 hover:text-gray-600"
                                 >
-                                    {expandedSections.transform ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    {expandedSections.transform ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
                                 </button>
                             </div>
                             
                             {expandedSections.transform && (
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                     <Slider
                                         label="Escala"
                                         value={defaultFilters.scale}
@@ -258,12 +255,12 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                                     />
                                     
                                     {/* Flip controls */}
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-2 gap-1">
                                         <Button
                                             variant={defaultFilters.flipHorizontal ? "default" : "outline"}
                                             size="sm"
                                             onClick={() => updateFilter("flipHorizontal", !defaultFilters.flipHorizontal)}
-                                            className="text-xs"
+                                            className="text-xs h-7"
                                         >
                                             Voltear H
                                         </Button>
@@ -271,7 +268,7 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                                             variant={defaultFilters.flipVertical ? "default" : "outline"}
                                             size="sm"
                                             onClick={() => updateFilter("flipVertical", !defaultFilters.flipVertical)}
-                                            className="text-xs"
+                                            className="text-xs h-7"
                                         >
                                             Voltear V
                                         </Button>
@@ -280,14 +277,18 @@ export const FilterControls = ({ filters = {}, onFilterChange, selectedElement }
                             )}
                         </div>
                     </div>
-                )}                {activeFilterTab === "presets" && (
+                )}
+
+                {activeFilterTab === "presets" && (
                     <FilterPresets
                         onSelectPreset={(presetFilters) => {
                             onFilterChange({ ...defaultFilters, ...presetFilters });
                         }}
                         selectedImage={selectedElement || null}
                     />
-                )}                {activeFilterTab === "advanced" && (
+                )}
+
+                {activeFilterTab === "advanced" && (
                     <AdvancedSettings
                         filters={defaultFilters}
                         onFilterChange={onFilterChange}

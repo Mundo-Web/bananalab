@@ -5,6 +5,7 @@ import CartItemRow from "./CartItemRow";
 import Number2Currency from "../../../Utils/Number2Currency";
 import { ShoppingBag, X, ArrowRight, ShoppingCart } from "lucide-react";
 import { Local } from "sode-extend-react";
+import Global from "../../../Utils/Global";
 import CartItemRowBananaLab from "./CartItemRowBananaLab";
 
 ReactModal.setAppElement("#app");
@@ -28,6 +29,66 @@ const CartModalBananaLab = ({
             document.documentElement.classList.remove("overflow-hidden");
         }
     }, [modalOpen]);
+
+    // Escuchar eventos de actualización del carrito
+    useEffect(() => {
+        const handleCartUpdate = (event) => {
+            console.log('📢 CartModal: Carrito actualizado:', event.detail);
+            // Recargar carrito desde localStorage para sincronizar
+            const updatedCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            console.log('🔄 CartModal: Cargando carrito desde localStorage:', updatedCart);
+            
+            // Solo actualizar si el carrito realmente cambió
+            if (JSON.stringify(updatedCart) !== JSON.stringify(cart)) {
+                console.log('✅ CartModal: Actualizando carrito con datos diferentes');
+                setCart(updatedCart);
+            } else {
+                console.log('ℹ️ CartModal: Carrito sin cambios, no actualizar');
+            }
+            
+            // Si el modal está cerrado y se agregó algo, activar shake
+            if (!modalOpen && event.detail.action === 'add') {
+                triggerShake();
+            }
+        };
+
+        window.addEventListener('cartUpdated', handleCartUpdate);
+        
+        return () => {
+            window.removeEventListener('cartUpdated', handleCartUpdate);
+        };
+    }, [modalOpen, setCart, cart]); // Agregar cart como dependencia
+
+    // También sincronizar cuando se abre el modal
+    useEffect(() => {
+        if (modalOpen) {
+            console.log('🔄 CartModal: Modal abierto, sincronizando carrito...');
+            const currentCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            console.log('📦 CartModal: Carrito desde localStorage:', currentCart);
+            setCart(currentCart);
+        }
+    }, [modalOpen, setCart]);
+
+    // Escuchar eventos de actualización del carrito
+    useEffect(() => {
+        const handleCartUpdate = (event) => {
+            console.log('📢 CartModal: Carrito actualizado:', event.detail);
+            // Recargar carrito desde localStorage para sincronizar
+            const updatedCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            setCart(updatedCart);
+            
+            // Si el modal está cerrado y se agregó algo, activar shake
+            if (!modalOpen && event.detail.action === 'add') {
+                triggerShake();
+            }
+        };
+
+        window.addEventListener('cartUpdated', handleCartUpdate);
+        
+        return () => {
+            window.removeEventListener('cartUpdated', handleCartUpdate);
+        };
+    }, [modalOpen, setCart]);
 
     const handleClose = () => {
         setIsClosing(true);

@@ -17,9 +17,14 @@ import {
     Book,
     Lock,
     Pencil,
+    CheckCircleIcon,
 } from "lucide-react";
 import { saveAs } from "file-saver";
 import html2canvas from "html2canvas";
+import jsPDF from "jspdf";
+import { toast, Toaster } from "sonner";
+import { Local } from "sode-extend-react";
+
 import { layouts } from "./constants/layouts";
 import { imageMasks } from "./constants/masks";
 import { filterPresets } from "./constants/filters";
@@ -31,6 +36,7 @@ import LayoutSelector from "./components/Elements/LayoutSelector";
 import { AdvancedSettings } from "./components/Editor/AdvancedSettings";
 import { FilterPresets } from "./components/Editor/FilterPresets";
 import { FilterControls } from "./components/Editor/FilterControls";
+
 import { MaskSelector } from "./components/Elements/MaskSelector";
 import TextToolbar from "./components/Elements/TextToolbar";
 import WorkspaceControls from "./components/Elements/WorkspaceControls";
@@ -49,6 +55,16 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     const [presetData, setPresetData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
+
+    // Estado del carrito - igual que en System.jsx
+    const [cart, setCart] = useState(
+        Local.get(`${Global.APP_CORRELATIVE}_cart`) ?? []
+    );
+
+    // Sincronizar carrito con localStorage
+    useEffect(() => {
+        Local.set(`${Global.APP_CORRELATIVE}_cart`, cart);
+    }, [cart]);
 
     // Estado inicial de páginas - se actualizará cuando carguemos el preset o desde localStorage
     const [pages, setPages] = useState([]);
@@ -895,6 +911,479 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         return () => clearTimeout(debouncedGenerate);
     }, [pages, currentPage]);
 
+
+
+    // --- Función para agregar álbum al carrito ---
+    const addAlbumToCart = () => {
+        try {
+            console.log('🛒 Iniciando addAlbumToCart...');
+            console.log('📊 Datos disponibles:', { 
+                albumData: albumData?.id, 
+                presetData: presetData?.id, 
+                cartLength: cart.length 
+            });
+
+            if (!albumData || !presetData) {
+                console.error('❌ Datos del álbum o preset no disponibles');
+                console.log('albumData:', albumData);
+                console.log('presetData:', presetData);
+                toast.error("Error", {
+                    description: "Faltan datos del álbum o preset.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+
+            // Generar ID único para el álbum que incluya timestamp para evitar duplicados
+            const timestamp = Date.now();
+            const albumId = `album_${albumData.id}_${timestamp}`;
+
+            // Obtener thumbnail de la portada si está disponible
+            let albumThumbnail = presetData.cover_image;
+            if (pageThumbnails && pageThumbnails['page-cover']) {
+                albumThumbnail = pageThumbnails['page-cover'];
+            }
+
+            // Crear el producto del álbum para el carrito
+            const albumProduct = {
+                id: albumId, // ID único para el álbum
+                name: albumData.title || `Álbum Personalizado - ${presetData.name}`,
+                image: albumThumbnail, // Usar thumbnail si está disponible, sino imagen del preset
+                price: presetData.price || 0,
+                final_price: presetData.final_price || presetData.price || 0,
+                discount: presetData.discount || null,
+                slug: `album-${albumData.id}-${timestamp}`,
+                quantity: 1,
+                type: 'custom_album', // Identificar que es un álbum personalizado
+                album_data: {
+                    album_id: albumData.id,
+                    preset_id: presetData.id,
+                    pages_count: pages.length,
+                    title: albumData.title,
+                    description: albumData.description,
+                    selected_pages: albumData.selected_pages,
+                    selected_cover_type: albumData.selected_cover_type,
+                    selected_finish: albumData.selected_finish,
+                    created_at: new Date().toISOString()
+                },
+                preset_data: {
+                    id: presetData.id,
+                    name: presetData.name,
+                    cover_image: presetData.cover_image,
+                    price: presetData.price,
+                    final_price: presetData.final_price
+                }
+            };
+
+            console.log('📦 Producto del álbum creado:', albumProduct);
+
+            // Obtener carrito actual directamente de localStorage para asegurar sincronización
+            const currentCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            console.log('🛒 Carrito actual desde localStorage:', currentCart);
+
+            // Agregar al carrito (siempre como nuevo item para álbumes personalizados)
+            const newCart = [...currentCart, albumProduct];
+            
+            console.log('🛒 Nuevo carrito:', newCart);
+
+            // Actualizar tanto el estado local como localStorage
+            setCart(newCart);
+            Local.set(`${Global.APP_CORRELATIVE}_cart`, newCart);
+
+            console.log('✅ Carrito actualizado en localStorage');
+
+            // Verificar que se guardó correctamente
+            const verifyCart = Local.get(`${Global.APP_CORRELATIVE}_cart`);
+            console.log('🔍 Verificación del carrito guardado:', verifyCart);
+
+            // Mostrar notificación de éxito
+            toast.success("Álbum agregado al carrito", {
+                description: `${albumProduct.name} se ha añadido al carrito.`,
+                icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+                duration: 3000,
+                position: "bottom-center",
+            });
+
+            // Disparar evento personalizado para notificar otros componentes
+            window.dispatchEvent(new CustomEvent('cartUpdated', { 
+                detail: { cart: newCart, action: 'add', product: albumProduct }
+            }));
+
+            return true;
+        } catch (error) {
+            console.error('❌ Error al agregar álbum al carrito:', error);
+            toast.error("Error al agregar al carrito", {
+                description: "No se pudo agregar el álbum al carrito. Inténtelo nuevamente.",
+                duration: 3000,
+                position: "bottom-center",
+            });
+            return false;
+        }
+    };
+
+    // --- Finalizar diseño del álbum ---
+    // Guarda el estado completo del diseño en la base de datos (optimizado)
+    window.finalizeAlbumDesign = async () => {
+        try {
+            const params = getParams();
+            if (!params.albumId) {
+                alert('Error: No se encontró el ID del álbum');
+                return false;
+            }
+
+            // Optimizar y comprimir los datos del diseño
+            const optimizePages = (pages) => {
+                return pages.map(page => ({
+                    id: page.id,
+                    type: page.type,
+                    pageNumber: page.pageNumber,
+                    layout: page.layout,
+                    cells: page.cells.map(cell => ({
+                        id: cell.id,
+                        elements: cell.elements.map(element => {
+                            const optimizedElement = {
+                                id: element.id,
+                                type: element.type,
+                                position: element.position,
+                                zIndex: element.zIndex || 1
+                            };
+
+                            // Solo incluir propiedades necesarias según el tipo
+                            if (element.type === 'image') {
+                                // Para imágenes base64, guardar solo un hash o identificador
+                                if (element.content.startsWith('data:image/')) {
+                                    // Crear un hash simple de la imagen para identificarla
+                                    const imageHash = btoa(element.content.substring(0, 100)).substring(0, 20);
+                                    optimizedElement.content = `[BASE64_IMAGE_${imageHash}]`;
+                                    optimizedElement.contentType = element.content.split(';')[0].split(':')[1];
+                                    optimizedElement.originalSize = element.content.length;
+                                } else {
+                                    optimizedElement.content = element.content;
+                                }
+                                
+                                // Solo incluir filtros no vacíos
+                                if (element.filters) {
+                                    const activeFilters = Object.entries(element.filters)
+                                        .filter(([key, value]) => value !== 0 && value !== false && value !== null)
+                                        .reduce((acc, [key, value]) => {
+                                            acc[key] = value;
+                                            return acc;
+                                        }, {});
+                                    
+                                    if (Object.keys(activeFilters).length > 0) {
+                                        optimizedElement.filters = activeFilters;
+                                    }
+                                }
+                                
+                                if (element.mask && element.mask !== 'none') {
+                                    optimizedElement.mask = element.mask;
+                                }
+                                if (element.size) {
+                                    optimizedElement.size = element.size;
+                                }
+                                if (element.locked) {
+                                    optimizedElement.locked = element.locked;
+                                }
+                            } else if (element.type === 'text') {
+                                optimizedElement.content = element.content;
+                                if (element.style) {
+                                    // Solo incluir estilos no por defecto
+                                    const nonDefaultStyles = Object.entries(element.style)
+                                        .filter(([key, value]) => {
+                                            // Filtrar valores por defecto comunes
+                                            if (key === 'fontSize' && value === '16px') return false;
+                                            if (key === 'color' && value === '#000000') return false;
+                                            if (key === 'fontFamily' && value === 'Arial') return false;
+                                            return true;
+                                        })
+                                        .reduce((acc, [key, value]) => {
+                                            acc[key] = value;
+                                            return acc;
+                                        }, {});
+                                    
+                                    if (Object.keys(nonDefaultStyles).length > 0) {
+                                        optimizedElement.style = nonDefaultStyles;
+                                    }
+                                }
+                            }
+
+                            return optimizedElement;
+                        })
+                    }))
+                }));
+            };
+
+            // Preparar los datos del diseño optimizados
+            const designData = {
+                pages: optimizePages(pages),
+                albumInfo: {
+                    id: albumData?.id,
+                    title: albumData?.title,
+                    preset_id: presetData?.id
+                },
+                presetInfo: {
+                    id: presetData?.id,
+                    name: presetData?.name,
+                    cover_image: presetData?.cover_image,
+                    content_layer_image: presetData?.content_layer_image,
+                    final_layer_image: presetData?.final_layer_image
+                },
+                workspace: {
+                    width: workspaceDimensions.width,
+                    height: workspaceDimensions.height,
+                    scale: workspaceDimensions.scale
+                },
+                meta: {
+                    finalizedAt: new Date().toISOString(),
+                    version: '1.2'
+                }
+            };
+
+            // Verificar el tamaño del payload
+            const dataString = JSON.stringify({ design_data: designData });
+            const dataSizeKB = Math.round(dataString.length / 1024);
+            const dataSizeMB = Math.round(dataSizeKB / 1024 * 100) / 100;
+            
+            console.log(`Tamaño del payload: ${dataSizeKB} KB (${dataSizeMB} MB)`);
+            
+            // Mostrar información detallada sobre el contenido
+            let base64Images = 0;
+            let totalBase64Size = 0;
+            
+            pages.forEach(page => {
+                page.cells?.forEach(cell => {
+                    cell.elements?.forEach(element => {
+                        if (element.type === 'image' && element.content && element.content.startsWith('data:image/')) {
+                            base64Images++;
+                            totalBase64Size += element.content.length;
+                        }
+                    });
+                });
+            });
+            
+            const base64SizeMB = Math.round(totalBase64Size / (1024 * 1024) * 100) / 100;
+            console.log(`Imágenes base64 encontradas: ${base64Images}, Tamaño total: ${base64SizeMB} MB`);
+            
+            // Advertir si el payload es muy grande
+            if (dataSizeKB > 1024) { // Más de 1MB
+                const proceed = confirm(
+                    `El diseño contiene ${base64Images} imágenes (${base64SizeMB} MB en imágenes). ` +
+                    `Payload completo: ${dataSizeMB} MB. ` +
+                    `Esto podría causar problemas al guardarlo. ` +
+                    `¿Desea continuar de todos modos?`
+                );
+                if (!proceed) {
+                    return false;
+                }
+            }
+
+            // Determinar la URL base correcta
+            const baseUrl = window.location.origin.includes('bananalab')
+                ? '/projects/bananalab/public'
+                : '';
+
+            // Enviar al backend
+            const response = await fetch(`${baseUrl}/api/albums/${params.albumId}/finalize-design`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include',
+                body: dataString
+            });
+
+            if (!response.ok) {
+                let errorMessage = 'Error al finalizar el diseño';
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.message || errorMessage;
+                } catch (e) {
+                    // Si no se puede parsear la respuesta como JSON
+                    if (response.status === 413) {
+                        errorMessage = 'El diseño es demasiado grande para ser guardado. Intente simplificar las imágenes.';
+                    } else if (response.status >= 500) {
+                        errorMessage = 'Error del servidor. Intente nuevamente más tarde.';
+                    }
+                }
+                throw new Error(errorMessage);
+            }
+
+            const result = await response.json();
+            
+            // Agregar el álbum al carrito después de finalizar exitosamente
+            const addedToCart = addAlbumToCart();
+            
+            if (addedToCart) {
+                alert('¡Diseño finalizado exitosamente! El álbum se ha agregado al carrito. Redirigiendo al checkout...');
+            } else {
+                alert('¡Diseño finalizado exitosamente! Redirigiendo al checkout...');
+            }
+            
+            return true;
+
+        } catch (error) {
+            console.error('Error al finalizar diseño:', error);
+            let userMessage = error.message;
+            
+            // Mejorar mensajes de error específicos
+            if (error.message.includes('Failed to fetch')) {
+                userMessage = 'Error de conexión. Verifique su conexión a internet e intente nuevamente.';
+            } else if (error.message.includes('NetworkError') || error.message.includes('net::')) {
+                userMessage = 'Error de red. Intente nuevamente más tarde.';
+            }
+            
+            alert('Error al finalizar el diseño: ' + userMessage);
+            return false;
+        }
+    };
+
+    // --- Generar PDF del álbum (fiel al render del editor) ---
+    // Renderiza cada página usando el mismo componente React en un contenedor oculto
+    window.generateAlbumPDF = async () => {
+        // 1. Crear un contenedor oculto React en el DOM
+        let hiddenContainer = document.getElementById('pdf-hidden-pages');
+        if (!hiddenContainer) {
+            hiddenContainer = document.createElement('div');
+            hiddenContainer.id = 'pdf-hidden-pages';
+            hiddenContainer.style.position = 'fixed';
+            hiddenContainer.style.left = '-99999px';
+            hiddenContainer.style.top = '0';
+            hiddenContainer.style.width = '800px';
+            hiddenContainer.style.zIndex = '-1';
+            document.body.appendChild(hiddenContainer);
+        }
+        hiddenContainer.innerHTML = '';
+
+        // 2. Renderizar cada página usando React (idéntico al editor)
+        // Creamos un mini-app React temporal para renderizar las páginas
+        const renderPage = (page, idx) => {
+            const layout = layouts.find(l => l.id === page.layout) || layouts[0];
+            return (
+                <div
+                    key={page.id}
+                    id={`pdf-page-${page.id}`}
+                    style={{
+                        width: 800,
+                        height: 600,
+                        background: '#fff',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                        margin: 0,
+                        padding: 0,
+                    }}
+                >
+                    <div
+                        className={`grid ${layout.template}`}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            gap: layout.style?.gap || '16px',
+                            padding: layout.style?.padding || '16px',
+                            boxSizing: 'border-box',
+                        }}
+                    >
+                        {page.cells.map((cell, cellIdx) => (
+                            <div
+                                key={cell.id}
+                                style={{
+                                    position: 'relative',
+                                    width: '100%',
+                                    height: '100%',
+                                    background: '#f9fafb',
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {cell.elements.map((element) =>
+                                    element.type === 'image' ? (
+                                        <div
+                                            key={element.id}
+                                            className={imageMasks.find(m => m.id === element.mask)?.class || ''}
+                                            style={{
+                                                position: 'absolute',
+                                                left: element.position.x,
+                                                top: element.position.y,
+                                                width: '100%',
+                                                height: '100%',
+                                                zIndex: element.zIndex || 1,
+                                            }}
+                                        >
+                                            <img
+                                                src={element.content}
+                                                alt=""
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    filter: `brightness(${(element.filters?.brightness || 100) / 100}) contrast(${(element.filters?.contrast || 100) / 100}) saturate(${(element.filters?.saturation || 100) / 100}) sepia(${(element.filters?.tint || 0) / 100}) hue-rotate(${(element.filters?.hue || 0) * 3.6}deg) blur(${element.filters?.blur || 0}px)`,
+                                                    transform: `scale(${element.filters?.scale || 1}) rotate(${element.filters?.rotate || 0}deg)${element.filters?.flipHorizontal ? ' scaleX(-1)' : ''}${element.filters?.flipVertical ? ' scaleY(-1)' : ''}`,
+                                                    mixBlendMode: element.filters?.blendMode || 'normal',
+                                                    opacity: (element.filters?.opacity || 100) / 100,
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div
+                                            key={element.id}
+                                            style={{
+                                                position: 'absolute',
+                                                left: element.position.x,
+                                                top: element.position.y,
+                                                fontFamily: element.style?.fontFamily,
+                                                fontSize: element.style?.fontSize,
+                                                fontWeight: element.style?.fontWeight,
+                                                fontStyle: element.style?.fontStyle,
+                                                textDecoration: element.style?.textDecoration,
+                                                color: element.style?.color,
+                                                textAlign: element.style?.textAlign,
+                                                background: element.style?.backgroundColor || 'transparent',
+                                                padding: element.style?.padding || '8px',
+                                                borderRadius: element.style?.borderRadius || '0px',
+                                                border: element.style?.border || 'none',
+                                                opacity: element.style?.opacity || 1,
+                                            }}
+                                        >
+                                            {element.content}
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Renderizar usando ReactDOM
+        const ReactDOM = await import('react-dom');
+        await new Promise((resolve) => {
+            ReactDOM.render(
+                <div>
+                    {pages.map((page, idx) => renderPage(page, idx))}
+                </div>,
+                hiddenContainer,
+                resolve
+            );
+        });
+
+        // 3. Capturar cada página y agregar al PDF
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [800, 600] });
+        for (let i = 0; i < pages.length; i++) {
+            const pageDiv = document.getElementById(`pdf-page-${pages[i].id}`);
+            const canvas = await html2canvas(pageDiv, { backgroundColor: '#fff', scale: 2 });
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            if (i > 0) pdf.addPage([800, 600], 'landscape');
+            pdf.addImage(imgData, 'JPEG', 0, 0, 800, 600);
+        }
+        pdf.save('album.pdf');
+        // 4. Limpiar el DOM
+        hiddenContainer.innerHTML = '';
+    };
+
     return (
         <DndProvider backend={HTML5Backend}>
             {isLoading ? (
@@ -1008,6 +1497,15 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 >
                                     Vista de Álbum
                                 </Button>
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    onClick={addAlbumToCart}
+                                    icon={<Plus className="h-4 w-4" />}
+                                    className="bg-green-600 hover:bg-green-700 text-white"
+                                >
+                                    Agregar al Carrito
+                                </Button>
                                 {/* Botón para limpiar progreso guardado (opcional, visible solo en desarrollo) */}
                                 {process.env.NODE_ENV !== 'production' && (
                                     <Button
@@ -1015,7 +1513,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                         size="sm"
                                         onClick={clearSavedProgress}
                                         icon={<Trash2 className="h-4 w-4" />}
-                                        className="border-red-400 text-red-600 hover:bg-red-50"
+                                        className="text-white hover:bg-red-500"
                                     >
                                         Limpiar progreso
                                     </Button>
@@ -1161,15 +1659,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 )}
 
                                 {activeTab === "filters" && (
-                                    <div className="space-y-4">
+                                    <div className="space-y-3 max-h-full">
                                         {(() => {
                                             const currentElement = getSelectedElement();
-                                            console.log('🔍 Filter tab - Current element:', currentElement);
-                                            console.log('🔍 Filter tab - Selected element ID:', selectedElement);
-                                            console.log('🔍 Filter tab - Selected cell ID:', selectedCell);
 
                                             return currentElement ? (
                                                 <>
+                                                    {/* Element preview */}
                                                     {currentElement.type === "image" && (
                                                         <div className="p-3 bg-gray-50 rounded-lg">
                                                             <div className="flex items-center gap-2 mb-2">
@@ -1186,17 +1682,46 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         </div>
                                                     )}
 
-                                                    <FilterControls
-                                                        filters={currentElement.filters || {}}
-                                                        onFilterChange={(newFilters) => {
-                                                            updateElementInCell(
-                                                                selectedCell,
-                                                                selectedElement,
-                                                                { filters: newFilters }
-                                                            );
-                                                        }}
-                                                        selectedElement={currentElement}
-                                                    />
+                                                    {/* Masks section for images */}
+                                                    {currentElement.type === "image" && (
+                                                        <div className="border-t pt-3">
+                                                            <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
+                                                                Máscaras
+                                                            </h3>
+                                                            <MaskSelector
+                                                                selectedMask={currentElement.mask || "none"}
+                                                                onSelect={(maskId) => {
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        { mask: maskId }
+                                                                    );
+                                                                }}
+                                                                availableMasks={imageMasks.map(m => m.id)}
+                                                                selectedImage={currentElement}
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {/* Filters section */}
+                                                    <div className="border-t pt-3">
+                                                        <h3 className="font-medium text-xs uppercase customtext-neutral-dark mb-2">
+                                                            Filtros y efectos
+                                                        </h3>
+                                                        <div className="">
+                                                            <FilterControls
+                                                                filters={currentElement.filters || {}}
+                                                                onFilterChange={(newFilters) => {
+                                                                    updateElementInCell(
+                                                                        selectedCell,
+                                                                        selectedElement,
+                                                                        { filters: newFilters }
+                                                                    );
+                                                                }}
+                                                                selectedElement={currentElement}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </>
                                             ) : (
                                                 <div className="text-center py-8 px-2">
@@ -1209,9 +1734,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                     <p className="text-xs customtext-neutral-dark mt-1">
                                                         Para aplicar filtros y efectos, primero selecciona una imagen o texto en el lienzo
                                                     </p>
-                                                    <div className="mt-2 text-xs text-gray-400">
-                                                        Debug: selectedElement={selectedElement}, selectedCell={selectedCell}
-                                                    </div>
                                                 </div>
                                             );
                                         })()}
@@ -1696,14 +2218,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                         {pages.filter(page => page.type === "cover").map((page, index) => (
                                             <div
                                                 key={page.id}
-                                                className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                                                className={`relative group flex flex-col cursor-pointer  transition-all duration-200 transform 
                             ${currentPage === pages.indexOf(page)
                                                         ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
                                                         : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className="relative bg-purple-50 rounded-md overflow-hidden border mb-1 aspect-[4/3]">
+                                                <div className="relative bg-purple-50  overflow-hidden border  ">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
@@ -1739,14 +2261,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             {pages.filter(page => page.type === "content").map((page, index) => (
                                                 <div
                                                     key={page.id}
-                                                    className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                                                    className={`relative group flex flex-col cursor-pointer  transition-all duration-200 transform 
                                 ${currentPage === pages.indexOf(page)
                                                             ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
                                                             : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
                                 mb-1`}
                                                     onClick={() => setCurrentPage(pages.indexOf(page))}
                                                 >
-                                                    <div className="relative bg-blue-50 rounded-md overflow-hidden border aspect-[4/3]">
+                                                    <div className="relative  overflow-hidden border aspect-[4/3]">
                                                         {pageThumbnails[page.id] ? (
                                                             <img
                                                                 src={pageThumbnails[page.id]}
@@ -1756,7 +2278,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
                                                                 <div
-                                                                    className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full p-1`}
+                                                                    className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full `}
                                                                 >
                                                                     {Array.from({
                                                                         length: getCurrentLayout().cells,
@@ -1817,14 +2339,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                         {pages.filter(page => page.type === "final").map((page, index) => (
                                             <div
                                                 key={page.id}
-                                                className={`relative group flex flex-col cursor-pointer rounded-lg transition-all duration-200 transform 
+                                                className={`relative group flex flex-col cursor-pointer  transition-all duration-200 transform 
                             ${currentPage === pages.indexOf(page)
                                                         ? "ring-2 ring-purple-400 scale-[1.02] shadow-md"
                                                         : "hover:bg-gray-50 border border-transparent hover:border-gray-200"}
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className="relative bg-green-50 rounded-md overflow-hidden border mb-1 aspect-[4/3]">
+                                                <div className="relative  overflow-hidden border mb-1 aspect-[4/3]">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
@@ -1855,6 +2377,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             )}
+            
+            {/* Toaster para notificaciones */}
+            <Toaster />
         </DndProvider>
     );
 }

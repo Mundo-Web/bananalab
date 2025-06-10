@@ -1,16 +1,33 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Number2Currency from "../../../../Utils/Number2Currency";
+import { Local } from "sode-extend-react";
+import Global from "../../../../Utils/Global";
 
 import ButtonPrimary from "./ButtonPrimary";
 import ButtonSecondary from "./ButtonSecondary";
 import CardItem from "./CardItem";
 
-
-
-
 export default function CartStep({ cart, setCart, onContinue, subTotal, envio, igv, totalFinal }) {
 
     console.log(cart)
+
+    // Función wrapper para setCart que también actualiza localStorage
+    const updateCart = (newCartOrFunction) => {
+        if (typeof newCartOrFunction === 'function') {
+            setCart(oldCart => {
+                const newCart = newCartOrFunction(oldCart);
+                // Actualizar localStorage
+                Local.set(`${Global.APP_CORRELATIVE}_cart`, newCart);
+                console.log('🛒 CartStep: Carrito actualizado en localStorage:', newCart.length, 'items');
+                return newCart;
+            });
+        } else {
+            setCart(newCartOrFunction);
+            // Actualizar localStorage
+            Local.set(`${Global.APP_CORRELATIVE}_cart`, newCartOrFunction);
+            console.log('🛒 CartStep: Carrito actualizado en localStorage:', newCartOrFunction.length, 'items');
+        }
+    };
 
 
     return (
@@ -19,7 +36,7 @@ export default function CartStep({ cart, setCart, onContinue, subTotal, envio, i
             <div className="lg:col-span-3">
                 <div className="space-y-6">
                     {cart.map((item, index) => (
-                        <CardItem key={index} {...item} setCart={setCart} />
+                        <CardItem key={index} {...item} setCart={updateCart} />
                     ))}
                 </div>
             </div>

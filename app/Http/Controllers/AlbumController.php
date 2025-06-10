@@ -9,6 +9,8 @@ use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 use SoDe\Extend\Crypto;
 use SoDe\Extend\Response;
 
@@ -269,6 +271,130 @@ class AlbumController extends Controller
             }
 
         } catch (Exception $e) {
+            $response->status = 400;
+            $response->message = $e->getMessage();
+        }
+
+        return response($response->toArray(), $response->status);
+    }
+
+    /**
+     * Finalize album design and save design data.
+     */
+    public function finalizeDesign(Request $request, $uuid)
+    {
+        $response = new Response();
+        
+        try {
+            // Verificar que el usuario esté autenticado
+            if (!Auth::check()) {
+                $response->status = 401;
+                $response->message = 'Debes iniciar sesión para finalizar el diseño';
+                return response($response->toArray(), $response->status);
+            }
+
+            $user = Auth::user();
+            $album = Album::where('id', $uuid)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$album) {
+                $response->status = 404;
+                $response->message = 'Álbum no encontrado';
+                return response($response->toArray(), $response->status);
+            }
+
+            // Validar los datos del diseño
+            $request->validate([
+                'design_data' => 'required|array',
+            ]);
+
+            $designData = $request->design_data;
+            
+            // Verificar el tamaño de los datos antes de procesarlos
+            $rawJsonSize = strlen(json_encode($designData));
+            $sizeMB = round($rawJsonSize / (1024 * 1024), 2);
+            
+            Log::info("Procesando diseño de álbum {$uuid}. Tamaño: {$sizeMB} MB");
+
+            // Si los datos son muy grandes, intentar comprimirlos
+            $finalData = $designData;
+            if ($rawJsonSize > 50 * 1024 * 1024) { // Más de 50MB
+                $response->status = 413;
+                $response->message = "El diseño es demasiado complejo ({$sizeMB} MB). Simplifique las imágenes y vuelva a intentar.";
+                return response($response->toArray(), $response->status);
+            }
+
+            // Procesar y optimizar los datos del diseño
+            if (isset($finalData['pages']) && is_array($finalData['pages'])) {
+                foreach ($finalData['pages'] as &$page) {
+                    if (isset($page['cells']) && is_array($page['cells'])) {
+                        foreach ($page['cells'] as &$cell) {
+                            if (isset($cell['elements']) && is_array($cell['elements'])) {
+                                foreach ($cell['elements'] as &$element) {
+                                    // Para elementos con imágenes base64, guardar solo metadatos
+                                    if (isset($element['content']) && 
+                                        is_string($element['content']) && 
+                                        strpos($element['content'], 'data:image/') === 0) {
+                                        
+                                        // Guardar metadatos de la imagen
+                                        $element['contentType'] = 'base64_image';
+                                        $element['originalSize'] = strlen($element['content']);
+                                        $element['contentHash'] = substr(md5($element['content']), 0, 16);
+                                        
+                                        // Reemplazar el contenido con un placeholder
+                                        $element['content'] = '[BASE64_IMAGE_PLACEHOLDER]';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Volver a verificar el tamaño después de la optimización
+            $optimizedJsonSize = strlen(json_encode($finalData));
+            $optimizedSizeMB = round($optimizedJsonSize / (1024 * 1024), 2);
+            
+            Log::info("Diseño optimizado para álbum {$uuid}. Tamaño final: {$optimizedSizeMB} MB");
+
+            if ($optimizedJsonSize > 100 * 1024 * 1024) { // Más de 100MB incluso después de optimizar
+                $response->status = 413;
+                $response->message = "El diseño sigue siendo demasiado grande después de optimizar ({$optimizedSizeMB} MB).";
+                return response($response->toArray(), $response->status);
+            }
+
+            // Guardar el diseño finalizado usando transacción
+            DB::transaction(function () use ($album, $finalData) {
+                $album->design_data = json_encode($finalData);
+                $album->design_finalized_at = now();
+                $album->status = 'finalized';
+                $album->save();
+            });
+
+            $response->status = 200;
+            $response->message = 'Diseño finalizado exitosamente';
+            $response->data = [
+                'album_id' => $album->id,
+                'uuid' => $album->uuid,
+                'status' => $album->status,
+                'finalized_at' => $album->design_finalized_at,
+                'design_size_mb' => $optimizedSizeMB
+            ];
+
+        } catch (\Illuminate\Database\QueryException $e) {
+            Log::error("Error de base de datos al finalizar diseño: " . $e->getMessage());
+            
+            if (strpos($e->getMessage(), 'max_allowed_packet') !== false) {
+                $response->status = 413;
+                $response->message = 'El diseño es demasiado grande para ser guardado. Intente simplificar las imágenes.';
+            } else {
+                $response->status = 500;
+                $response->message = 'Error de base de datos al guardar el diseño.';
+            }
+            
+        } catch (\Exception $e) {
+            Log::error("Error al finalizar diseño: " . $e->getMessage());
             $response->status = 400;
             $response->message = $e->getMessage();
         }

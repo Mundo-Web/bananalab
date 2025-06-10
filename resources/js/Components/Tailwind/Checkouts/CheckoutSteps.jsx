@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import CartStep from "./Components/CartStep";
 import ShippingStep from "./Components/ShippingStep";
 import ConfirmationStep from "./Components/ConfirmationStep";
+import { Local } from "sode-extend-react";
+import Global from "../../../Utils/Global";
 
 export default function CheckoutSteps({ cart, setCart, user }) {
     const [currentStep, setCurrentStep] = useState(1);
@@ -26,6 +28,34 @@ export default function CheckoutSteps({ cart, setCart, user }) {
     const [sale, setSale] = useState([]);
     const [code, setCode] = useState([]);
     const [delivery, setDelivery] = useState([]);
+
+    // Sincronizar carrito con localStorage al cargar
+    useEffect(() => {
+        console.log('🔄 CheckoutSteps: Sincronizando carrito con localStorage...');
+        const savedCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+        console.log('📦 CheckoutSteps: Carrito desde localStorage:', savedCart);
+        if (savedCart.length > 0 && JSON.stringify(savedCart) !== JSON.stringify(cart)) {
+            console.log('✅ CheckoutSteps: Actualizando carrito desde localStorage');
+            setCart(savedCart);
+        }
+    }, []);
+
+    // Escuchar eventos de actualización del carrito
+    useEffect(() => {
+        const handleCartUpdate = (event) => {
+            console.log('📢 CheckoutSteps: Carrito actualizado:', event.detail);
+            const updatedCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            console.log('🔄 CheckoutSteps: Cargando carrito actualizado:', updatedCart);
+            setCart(updatedCart);
+        };
+
+        window.addEventListener('cartUpdated', handleCartUpdate);
+        
+        return () => {
+            window.removeEventListener('cartUpdated', handleCartUpdate);
+        };
+    }, [setCart]);
+
     useEffect(() => {
         const script = document.createElement("script");
         script.src = "https://checkout.culqi.com/js/v4";
