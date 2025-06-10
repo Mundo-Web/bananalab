@@ -53,6 +53,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     // Estados para el álbum y preset
     const [albumData, setAlbumData] = useState(null);
     const [presetData, setPresetData] = useState(null);
+    const [itemData, setItemData] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [loadError, setLoadError] = useState(null);
 
@@ -123,13 +124,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             }
 
             // Determinar la URL base correcta
-            const baseUrl = window.location.origin.includes('bananalab')
-                ? '/projects/bananalab/public'
-                : '';
+            const baseUrl = Global.APP_URL;
 
             // Siempre usar los endpoints REALES para traer datos de la base de datos
             const albumEndpoint = `${baseUrl}/api/albums/${params.albumId}`;
             const presetEndpoint = `${baseUrl}/api/item-presets/${params.presetId}`;
+
+            const itemEndpoint = `${baseUrl}/api/items/${params.itemId}`;
 
             // Cargar datos del álbum
             const albumResponse = await fetch(albumEndpoint, {
@@ -164,6 +165,28 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const presetResponseData = await presetResponse.json();
             const preset = presetResponseData.data || presetResponseData;
             setPresetData(preset);
+
+
+
+
+            // Cargar datos del item
+            const itemResponse = await fetch(itemEndpoint, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                credentials: 'include'
+            });
+            if (!itemResponse.ok) {
+                const errorText = await itemResponse.text();
+                throw new Error(`Error al cargar item: ${itemResponse.status} ${itemResponse.statusText}`);
+            }
+            const itemResponseData = await itemResponse.json();
+            const item = itemResponseData.data || itemResponseData;
+            setItemData(item);
+         
+
 
             // Solo crear páginas si NO restauramos progreso
             if (!restoredProgress) {
@@ -915,58 +938,162 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     // --- Función para agregar álbum al carrito ---
     const addAlbumToCart = () => {
+        console.log('🛒 === INICIO addAlbumToCart ===');
+        
         try {
-            console.log('🛒 Iniciando addAlbumToCart...');
-            console.log('📊 Datos disponibles:', { 
-                albumData: albumData?.id, 
-                presetData: presetData?.id, 
-                cartLength: cart.length 
+            console.log('📊 Estado actual:', { 
+                albumData: albumData, 
+                presetData: presetData, 
+                cartLength: cart?.length,
+                hasAlbumData: !!albumData,
+                hasPresetData: !!presetData,
+                albumId: albumData?.id,
+                presetId: presetData?.id
             });
 
-            if (!albumData || !presetData) {
-                console.error('❌ Datos del álbum o preset no disponibles');
-                console.log('albumData:', albumData);
-                console.log('presetData:', presetData);
-                toast.error("Error", {
-                    description: "Faltan datos del álbum o preset.",
+            // Verificar que Local y Global estén disponibles PRIMERO
+            console.log('🔍 Verificando dependencias...');
+            console.log('Local type:', typeof Local);
+            console.log('Global type:', typeof Global);
+            console.log('Local object:', Local);
+            console.log('Global object:', Global);
+            
+            if (typeof Local === 'undefined') {
+                console.error('❌ Local no está definido');
+                toast.error("Error del sistema", {
+                    description: "Sistema Local no disponible.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+            
+            if (typeof Global === 'undefined') {
+                console.error('❌ Global no está definido');
+                toast.error("Error del sistema", {
+                    description: "Sistema Global no disponible.",
                     duration: 3000,
                     position: "bottom-center",
                 });
                 return false;
             }
 
+            // Verificar APP_CORRELATIVE
+            console.log('Global.APP_CORRELATIVE:', Global.APP_CORRELATIVE);
+            
+            if (!Global.APP_CORRELATIVE) {
+                console.error('❌ Global.APP_CORRELATIVE no está definido');
+                toast.error("Error del sistema", {
+                    description: "Configuración del sistema incompleta.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+
+            // Verificar datos del álbum y preset
+            if (!albumData) {
+                console.error('❌ albumData no está disponible');
+                console.log('albumData actual:', albumData);
+                toast.error("Error", {
+                    description: "Datos del álbum no disponibles.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+            
+            if (!presetData) {
+                console.error('❌ presetData no está disponible');
+                console.log('presetData actual:', presetData);
+                toast.error("Error", {
+                    description: "Datos del preset no disponibles.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+
+            console.log('✅ Todas las verificaciones pasaron, continuando...');
+
+            // Verificar espacio en localStorage y limpiarlo si es necesario
+            console.log('🧹 Verificando espacio en localStorage...');
+            try {
+                // Calcular tamaño actual del localStorage
+                let totalSize = 0;
+                for (let key in localStorage) {
+                    if (localStorage.hasOwnProperty(key)) {
+                        totalSize += localStorage[key].length;
+                    }
+                }
+                console.log('📊 Tamaño actual del localStorage:', (totalSize / 1024 / 1024).toFixed(2), 'MB');
+                
+                // Si el localStorage está muy lleno (más de 8MB), limpiar datos innecesarios
+                if (totalSize > 8 * 1024 * 1024) {
+                    console.log('⚠️ localStorage lleno, limpiando datos innecesarios...');
+                    
+                    // Limpiar thumbnails viejos y datos temporales
+                    for (let key in localStorage) {
+                        if (key.includes('thumbnail') || key.includes('temp') || key.includes('cache')) {
+                            localStorage.removeItem(key);
+                            console.log('🗑️ Eliminado:', key);
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn('⚠️ Error al verificar localStorage:', e);
+            }
+
             // Generar ID único para el álbum que incluya timestamp para evitar duplicados
             const timestamp = Date.now();
             const albumId = `album_${albumData.id}_${timestamp}`;
+            console.log('🆔 ID generado para el álbum:', albumId);
 
             // Obtener thumbnail de la portada si está disponible
             let albumThumbnail = presetData.cover_image;
             if (pageThumbnails && pageThumbnails['page-cover']) {
                 albumThumbnail = pageThumbnails['page-cover'];
             }
+            console.log('🖼️ Thumbnail del álbum:', albumThumbnail);
 
             // Crear el producto del álbum para el carrito
+            console.log('📦 Creando producto del álbum...');
+            
+            // Optimizar los datos del álbum para reducir el tamaño del carrito
+            const optimizedAlbumData = {
+                album_id: albumData.id,
+                preset_id: presetData.id,
+                pages_count: pages.length,
+                title: albumData.title,
+                description: albumData.description?.substring(0, 200) || "", // Limitar descripción
+                selected_pages: albumData.selected_pages,
+                selected_cover_type: albumData.selected_cover_type,
+                selected_finish: albumData.selected_finish,
+                created_at: new Date().toISOString()
+            };
+
+            // Optimizar imagen del thumbnail (reducir calidad si es base64)
+            let optimizedThumbnail = albumThumbnail;
+            if (albumThumbnail && albumThumbnail.startsWith('data:image/')) {
+                // Si es muy grande, usar una versión más pequeña o la imagen del preset
+                if (albumThumbnail.length > 100000) { // Si es mayor a ~100KB
+                    console.log('🖼️ Thumbnail muy grande, usando imagen del preset');
+                    optimizedThumbnail = presetData.cover_image || '/assets/img/default-album.jpg';
+                }
+            }
+            console.log('🖼️ Thumbnail optimizado:', presetData);
+
             const albumProduct = {
                 id: albumId, // ID único para el álbum
                 name: albumData.title || `Álbum Personalizado - ${presetData.name}`,
-                image: albumThumbnail, // Usar thumbnail si está disponible, sino imagen del preset
+                image: presetData?.image || optimizedThumbnail, // Usar thumbnail optimizado
                 price: presetData.price || 0,
                 final_price: presetData.final_price || presetData.price || 0,
                 discount: presetData.discount || null,
                 slug: `album-${albumData.id}-${timestamp}`,
                 quantity: 1,
                 type: 'custom_album', // Identificar que es un álbum personalizado
-                album_data: {
-                    album_id: albumData.id,
-                    preset_id: presetData.id,
-                    pages_count: pages.length,
-                    title: albumData.title,
-                    description: albumData.description,
-                    selected_pages: albumData.selected_pages,
-                    selected_cover_type: albumData.selected_cover_type,
-                    selected_finish: albumData.selected_finish,
-                    created_at: new Date().toISOString()
-                },
+                album_data: optimizedAlbumData, // Datos optimizados
                 preset_data: {
                     id: presetData.id,
                     name: presetData.name,
@@ -976,46 +1103,155 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 }
             };
 
-            console.log('📦 Producto del álbum creado:', albumProduct);
+            console.log('📦 Producto del álbum creado exitosamente');
+            console.log('📊 Tamaño estimado del producto:', JSON.stringify(albumProduct).length, 'caracteres');
 
             // Obtener carrito actual directamente de localStorage para asegurar sincronización
-            const currentCart = Local.get(`${Global.APP_CORRELATIVE}_cart`) || [];
+            console.log('🛒 Obteniendo carrito actual...');
+            const cartKey = `${Global.APP_CORRELATIVE}_cart`;
+            console.log('🔑 Clave del carrito:', cartKey);
+            
+            const currentCart = Local.get(cartKey) || [];
             console.log('🛒 Carrito actual desde localStorage:', currentCart);
+            console.log('🛒 Longitud del carrito actual:', currentCart.length);
 
             // Agregar al carrito (siempre como nuevo item para álbumes personalizados)
+            console.log('➕ Agregando producto al carrito...');
             const newCart = [...currentCart, albumProduct];
-            
             console.log('🛒 Nuevo carrito:', newCart);
+            console.log('🛒 Nueva longitud del carrito:', newCart.length);
 
             // Actualizar tanto el estado local como localStorage
-            setCart(newCart);
-            Local.set(`${Global.APP_CORRELATIVE}_cart`, newCart);
-
-            console.log('✅ Carrito actualizado en localStorage');
+            console.log('💾 Guardando en estado y localStorage...');
+            
+            let storageError = null;
+            
+            try {
+                setCart(newCart);
+                Local.set(cartKey, newCart);
+                console.log('✅ Carrito actualizado en estado y localStorage');
+            } catch (error) {
+                storageError = error;
+                if (error.name === 'QuotaExceededError') {
+                    console.error('❌ Error de cuota de localStorage excedida');
+                    
+                    // Intentar liberar espacio eliminando elementos del carrito antiguos
+                    console.log('🧹 Intentando liberar espacio del carrito...');
+                    
+                    try {
+                        // Mantener solo los últimos 3 elementos del carrito
+                        const reducedCart = currentCart.slice(-2); // Solo los últimos 2
+                        const finalCart = [...reducedCart, albumProduct]; // Más el nuevo
+                        
+                        console.log('📦 Carrito reducido:', finalCart);
+                        
+                        setCart(finalCart);
+                        Local.set(cartKey, finalCart);
+                        
+                        console.log('✅ Carrito guardado con espacio reducido');
+                        
+                        // Actualizar la referencia del carrito para las verificaciones
+                        newCart = finalCart;
+                        
+                        toast.success("Álbum agregado al carrito", {
+                            description: "Se liberó espacio eliminando productos antiguos.",
+                            duration: 4000,
+                            position: "bottom-center",
+                        });
+                        
+                    } catch (secondError) {
+                        console.error('❌ No se pudo liberar espacio suficiente:', secondError);
+                        
+                        // Como último recurso, guardar solo la información esencial
+                        try {
+                            const minimalProduct = {
+                                id: albumId,
+                                name: albumProduct.name,
+                                price: albumProduct.price,
+                                final_price: albumProduct.final_price,
+                                quantity: 1,
+                                type: 'custom_album',
+                                album_data: {
+                                    album_id: albumData.id,
+                                    preset_id: presetData.id,
+                                    title: albumData.title
+                                }
+                            };
+                            
+                            const minimalCart = [minimalProduct];
+                            setCart(minimalCart);
+                            Local.set(cartKey, minimalCart);
+                            
+                            console.log('✅ Guardado con datos mínimos');
+                            newCart = minimalCart;
+                            
+                            toast.success("Álbum agregado al carrito", {
+                                description: "Guardado con información esencial.",
+                                duration: 3000,
+                                position: "bottom-center",
+                            });
+                            
+                        } catch (finalError) {
+                            console.error('❌ Error final al guardar:', finalError);
+                            throw new Error('No se pudo guardar en el carrito por falta de espacio');
+                        }
+                    }
+                } else {
+                    throw error;
+                }
+            }
 
             // Verificar que se guardó correctamente
-            const verifyCart = Local.get(`${Global.APP_CORRELATIVE}_cart`);
+            console.log('🔍 Verificando que se guardó correctamente...');
+            const verifyCart = Local.get(cartKey);
             console.log('🔍 Verificación del carrito guardado:', verifyCart);
+            console.log('🔍 Longitud del carrito verificado:', verifyCart?.length);
 
-            // Mostrar notificación de éxito
-            toast.success("Álbum agregado al carrito", {
-                description: `${albumProduct.name} se ha añadido al carrito.`,
-                icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
-                duration: 3000,
-                position: "bottom-center",
-            });
+            // Verificar que el álbum específico está en el carrito
+            const albumInCart = verifyCart?.find(item => item.id === albumId);
+            console.log('📦 Álbum encontrado en carrito:', albumInCart ? 'SÍ' : 'NO');
+            console.log('📦 Datos del álbum en carrito:', albumInCart);
+            
+            if (!albumInCart) {
+                console.error('❌ ERROR: El álbum no se encontró en el carrito después de guardarlo');
+                toast.error("Error al verificar carrito", {
+                    description: "El álbum no se guardó correctamente en el carrito.",
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+                return false;
+            }
+
+            // Solo mostrar notificación si no se mostró antes (en caso de espacio reducido)
+            if (!storageError || storageError.name !== 'QuotaExceededError') {
+                // Mostrar notificación de éxito
+                console.log('✅ Mostrando notificación de éxito...');
+                toast.success("Álbum agregado al carrito", {
+                    description: `${albumProduct.name} se ha añadido al carrito.`,
+                    icon: <CheckCircleIcon className="h-5 w-5 text-green-500" />,
+                    duration: 3000,
+                    position: "bottom-center",
+                });
+            }
 
             // Disparar evento personalizado para notificar otros componentes
+            console.log('📡 Disparando evento cartUpdated...');
             window.dispatchEvent(new CustomEvent('cartUpdated', { 
                 detail: { cart: newCart, action: 'add', product: albumProduct }
             }));
 
+            console.log('🛒 === FIN addAlbumToCart EXITOSO ===');
             return true;
+            
         } catch (error) {
-            console.error('❌ Error al agregar álbum al carrito:', error);
+            console.error('❌ === ERROR EN addAlbumToCart ===');
+            console.error('Error completo:', error);
+            console.error('Stack trace:', error.stack);
+            console.error('Mensaje del error:', error.message);
+            
             toast.error("Error al agregar al carrito", {
-                description: "No se pudo agregar el álbum al carrito. Inténtelo nuevamente.",
-                duration: 3000,
+                description: `Error específico: ${error.message}`,
+                duration: 5000,
                 position: "bottom-center",
             });
             return false;
@@ -1212,14 +1448,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             const result = await response.json();
             
-            // Agregar el álbum al carrito después de finalizar exitosamente
-            const addedToCart = addAlbumToCart();
-            
-            if (addedToCart) {
-                alert('¡Diseño finalizado exitosamente! El álbum se ha agregado al carrito. Redirigiendo al checkout...');
-            } else {
-                alert('¡Diseño finalizado exitosamente! Redirigiendo al checkout...');
-            }
+            console.log('✅ Diseño finalizado exitosamente en el servidor');
+            console.log('📄 Respuesta del servidor:', result);
             
             return true;
 

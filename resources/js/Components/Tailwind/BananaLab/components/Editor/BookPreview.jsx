@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import Modal from "react-modal";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import HTMLFlipBook from "react-pageflip";
+import Global from "../../../../../Utils/Global";
 
 // Estilos para el modal
 const customStyles = {
@@ -328,25 +329,108 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                         setIsProcessing(true);
                         
                         try {
+                            console.log('🚀 Iniciando proceso de compra...');
+                            
+                            // Verificar que la función addAlbumToCart esté disponible
+                            if (typeof addAlbumToCart !== 'function') {
+                                console.error('❌ addAlbumToCart no es una función');
+                                console.log('addAlbumToCart type:', typeof addAlbumToCart);
+                                console.log('addAlbumToCart value:', addAlbumToCart);
+                                alert('Error: Función de carrito no disponible. Inténtelo nuevamente.');
+                                return;
+                            }
+                            
                             // Llamar a la función para finalizar el diseño y guardarlo
                             if (typeof window.finalizeAlbumDesign === 'function') {
+                                console.log('📄 Finalizando diseño del álbum...');
                                 const success = await window.finalizeAlbumDesign();
+                                console.log('📄 Resultado de finalizeAlbumDesign:', success);
+                                
                                 if (success) {
-                                    // Determinar la URL base correcta para el checkout
-                                    const baseUrl = window.location.origin.includes('bananalab')
-                                        ? '/projects/bananalab/public'
-                                        : '';
+                                    // Primero agregar al carrito
+                                    console.log('📦 Agregando álbum al carrito...');
+                                    const addedToCart = addAlbumToCart();
+                                    console.log('📦 Resultado de addAlbumToCart:', addedToCart);
                                     
-                                    // Redirigir al checkout
-                                    addAlbumToCart();
-                                    window.location.href = `${baseUrl}/checkout`;
+                                    if (addedToCart) {
+                                        console.log('✅ Álbum agregado al carrito exitosamente');
+                                        
+                                        try {
+                                            // Esperar un poco para asegurar que el localStorage se actualice
+                                            await new Promise(resolve => setTimeout(resolve, 200));
+                                            
+                                            // Verificar una vez más que el álbum esté en el carrito
+                                            const verifyCart = JSON.parse(localStorage.getItem(`${window.Global?.APP_CORRELATIVE || 'bananalab'}_cart`) || '[]');
+                                            console.log('🔍 Verificación final del carrito:', verifyCart);
+                                            console.log('🔍 Longitud del carrito:', verifyCart.length);
+                                            
+                                            if (verifyCart.length === 0) {
+                                                console.error('❌ ADVERTENCIA: El carrito parece vacío después de agregar');
+                                            }
+                                            
+                                            // Determinar la URL base correcta para el carrito
+                                         
+                                            
+                                            // Redirigir al carrito
+                                            const cartUrl = `${Global.APP_URL}/cart`;
+                                            console.log('🔄 Redirigiendo al carrito...');
+                                            console.log('🔄 URL del carrito:', cartUrl);
+                                            
+                                            // Usar window.location.href para la redirección
+                                            window.location.href = cartUrl;
+                                            
+                                        } catch (redirectError) {
+                                            console.error('⚠️ Error durante verificación o redirección:', redirectError);
+                                            console.log('🔄 Intentando redirección directa...');
+                                            
+                                            // Redirección de emergencia sin verificaciones adicionales
+                                              const cartUrl = `${Global.APP_URL}/cart`;
+                                            console.log('🔄 Redirigiendo al carrito...');
+                                            console.log('🔄 URL del carrito:', cartUrl);
+                                            
+                                            // Usar window.location.href para la redirección
+                                            window.location.href = cartUrl;
+                                        }
+                                    } else {
+                                        console.error('❌ No se pudo agregar al carrito');
+                                        alert('Error al agregar el álbum al carrito. Revise la consola para más detalles.');
+                                    }
+                                } else {
+                                    console.error('❌ No se pudo finalizar el diseño del álbum');
+                                    alert('Error al finalizar el diseño del álbum. Inténtelo nuevamente.');
                                 }
                             } else {
+                                console.error('❌ window.finalizeAlbumDesign no está disponible');
                                 alert('Funcionalidad de finalización de diseño pendiente de implementar.');
                             }
                         } catch (error) {
-                            console.error('Error durante el proceso de compra:', error);
-                            alert('Error durante el proceso. Inténtelo nuevamente.');
+                            console.error('❌ === ERROR DURANTE PROCESO DE COMPRA ===');
+                            console.error('Tipo de error:', error.name);
+                            console.error('Mensaje:', error.message);
+                            console.error('Stack trace:', error.stack);
+                            console.error('Error completo:', error);
+                            
+                            // Si el error ocurrió DESPUÉS de agregar al carrito, intentar redirigir de todas formas
+                            try {
+                                const verifyCart = JSON.parse(localStorage.getItem(`${Global?.APP_CORRELATIVE || 'bananalab'}_cart`) || '[]');
+                                console.log('🔍 Verificando carrito después del error:', verifyCart.length > 0 ? 'HAY ITEMS' : 'VACÍO');
+                                
+                                if (verifyCart.length > 0) {
+                                    console.log('✅ El carrito tiene items, redirigiendo de todas formas...');
+                                    // Redirección de emergencia sin verificaciones adicionales
+                                              const cartUrl = `${Global.APP_URL}/cart`;
+                                            console.log('🔄 Redirigiendo al carrito...');
+                                            console.log('🔄 URL del carrito:', cartUrl);
+                                            
+                                            // Usar window.location.href para la redirección
+                                            window.location.href = cartUrl;
+                                    return; // Salir sin mostrar alert de error
+                                }
+                            } catch (recoveryError) {
+                                console.error('❌ Error durante intento de recuperación:', recoveryError);
+                            }
+                            
+                            alert(`Error durante el proceso: ${error.message}. Si el álbum se agregó al carrito, puede ir manualmente a la página del carrito.`);
                         } finally {
                             setIsProcessing(false);
                         }

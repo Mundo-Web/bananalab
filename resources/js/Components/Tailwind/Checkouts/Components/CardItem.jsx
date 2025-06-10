@@ -40,19 +40,13 @@ const CardItem = ({ setCart, ...item }) => {
             }).filter(Boolean)
         );
     }
-
+console.log('CardItem: item', item);
     // Determinar la imagen a mostrar
     const getImageSrc = () => {
         if (item.type === 'custom_album') {
-            // Para álbumes personalizados, verificar si la imagen es base64 o ruta
-            if (item.image && item.image.startsWith('data:')) {
-                return item.image; // Imagen base64
-            } else if (item.image) {
-                return `/storage/images/item/${item.image}`;
-            } else if (item.preset_data?.cover_image) {
-                return `/storage/images/item/${item.preset_data.cover_image}`;
-            }
-            return '/default-album.jpg'; // Imagen por defecto
+        
+                return `/storage/images/item_preset/${item.image}`;
+           
         }
         return `/storage/images/item/${item.image}`;
     };

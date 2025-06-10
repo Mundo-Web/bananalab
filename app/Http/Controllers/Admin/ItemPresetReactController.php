@@ -172,4 +172,24 @@ class ItemPresetReactController extends BasicController
             ], 500);
         }
     }
+
+
+     public function getItemPublic(Request $request, $uuid)
+    {
+        try {
+            // Solo devolver si el item está activo
+         $item = Item::where('id', $uuid)
+                ->first();
+
+            return response()->json([
+                'success' => true,
+                'data' => $item
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al cargar el item: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }

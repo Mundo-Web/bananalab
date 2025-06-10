@@ -77,6 +77,7 @@ Route::post('/albums/{uuid}/finalize-design', [App\Http\Controllers\AlbumControl
 
 // Item Preset routes (public)
 Route::get('/item-presets/{preset}', [App\Http\Controllers\Admin\ItemPresetReactController::class, 'getByIdPublic']);
+Route::get('/items/{uuid}', [App\Http\Controllers\Admin\ItemPresetReactController::class, 'getItemPublic']);
 
 // Authentication check endpoint
 Route::get('/auth/check', [App\Http\Controllers\AlbumController::class, 'checkAuth']);
