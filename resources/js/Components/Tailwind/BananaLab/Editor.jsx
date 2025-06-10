@@ -1434,6 +1434,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         }}
                         presetData={presetData}
                         pageThumbnails={pageThumbnails}
+                        addAlbumToCart={addAlbumToCart}
                     />
 
                     {/* Header - Top Bar */}
@@ -1497,7 +1498,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 >
                                     Vista de Álbum
                                 </Button>
-                                <Button
+                              {/*  <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={addAlbumToCart}
@@ -1505,7 +1506,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     className="bg-green-600 hover:bg-green-700 text-white"
                                 >
                                     Agregar al Carrito
-                                </Button>
+                                </Button> */}
                                 {/* Botón para limpiar progreso guardado (opcional, visible solo en desarrollo) */}
                                 {process.env.NODE_ENV !== 'production' && (
                                     <Button
@@ -2225,7 +2226,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className="relative bg-purple-50  overflow-hidden border  ">
+                                                <div className="relative bg-purple-50  overflow-hidden border aspect-[4/3] ">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}

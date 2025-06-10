@@ -49,7 +49,7 @@ const flipbookStyles = `
 
 Modal.setAppElement('#app'); // Configurar elemento raíz para accesibilidad
 
-const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }) => {
+const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart }) => {
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const flipBook = useRef();
@@ -338,6 +338,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {} }
                                         : '';
                                     
                                     // Redirigir al checkout
+                                    addAlbumToCart();
                                     window.location.href = `${baseUrl}/checkout`;
                                 }
                             } else {
