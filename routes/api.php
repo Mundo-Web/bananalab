@@ -29,6 +29,7 @@ use App\Http\Controllers\Admin\GalleryController as AdminGalleryController;
 use App\Http\Controllers\Admin\ItemController as AdminItemController;
 use App\Http\Controllers\Admin\ItemPresetReactController as AdminItemPresetReactController;
 use App\Http\Controllers\Admin\SaleController as AdminSaleController;
+use App\Http\Controllers\Admin\PaymentMethodController as AdminPaymentMethodController;
 use App\Http\Controllers\Admin\SubCategoryController as AdminSubCategoryController;
 use App\Http\Controllers\Admin\SystemColorController as AdminSystemColorController;
 use App\Http\Controllers\Admin\SystemController as AdminSystemController;
@@ -159,6 +160,14 @@ Route::get('/presets/{preset}', [AdminItemPresetReactController::class, 'getById
 Route::post('/pago', [PaymentController::class, 'charge']);
 Route::get('/pago/{sale_id}', [PaymentController::class, 'getPaymentStatus']);
 
+// Nuevos métodos de pago
+Route::prefix('payments')->group(function () {
+    Route::post('/mercadopago', [PaymentController::class, 'processMercadoPago']);
+    Route::post('/manual', [PaymentController::class, 'processManualPayment']);
+    Route::get('/methods', [AdminPaymentMethodController::class, 'getActiveForFrontend']);
+    Route::post('/validate-proof', [PaymentController::class, 'validatePaymentProof']);
+});
+
 // Nuevas rutas para MercadoPago
 Route::post('/mercadopago/preference', [MercadoPagoController::class, 'createPreference']);
 Route::get('/mercadopago/success', [MercadoPagoController::class, 'handleSuccess']);
@@ -184,6 +193,17 @@ Route::middleware('auth')->group(function () {
     Route::patch('/sales/status', [AdminSaleController::class, 'status']);
     Route::patch('/sales/{field}', [AdminSaleController::class, 'boolean']);
     Route::delete('/sales/{id}', [AdminSaleController::class, 'delete']);
+    Route::get('/sales/pending-verification', [AdminSaleController::class, 'getPendingVerification']);
+
+    // Payment Methods Management
+    Route::post('/payment-methods/paginate', [AdminPaymentMethodController::class, 'paginate']);
+    Route::post('/payment-methods', [AdminPaymentMethodController::class, 'store']);
+    Route::put('/payment-methods/{id}', [AdminPaymentMethodController::class, 'update']);
+    Route::get('/payment-methods/templates', [AdminPaymentMethodController::class, 'getConfigTemplates']);
+    Route::patch('/payment-methods/{id}/toggle', [AdminPaymentMethodController::class, 'toggleStatus']);
+    Route::delete('/payment-methods/{id}', [AdminPaymentMethodController::class, 'destroy']);
+    Route::post('/payment-methods/reorder', [AdminPaymentMethodController::class, 'reorder']);
+    Route::get('/sales/pending-verification', [AdminSaleController::class, 'getPendingVerification']);
 
     // Route::get('/sale-statuses/by-sale/{id}', [AdminSaleStatusController::class, 'bySale']);
 

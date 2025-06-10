@@ -6,8 +6,12 @@ use App\Models\Item;
 use App\Models\Sale;
 use App\Models\SaleDetail;
 use App\Models\SaleStatus;
+use App\Models\Payment;
+use App\Models\PaymentProof;
 use Culqi\Culqi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Validator;
 
 class PaymentController extends Controller
 {
@@ -105,6 +109,294 @@ class PaymentController extends Controller
                 'status' => false,
                 'error' => $e->getMessage()
             ], 400);
+        }
+    }
+
+    /**
+     * Procesar pago con MercadoPago
+     */
+    public function processMercadoPago(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'user_id' => 'required',
+                'amount' => 'required|numeric|min:0.01',
+                'cart' => 'required|array',
+                'email' => 'required|email',
+                'name' => 'required|string',
+                'lastname' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $saleStatusPendiente = SaleStatus::getByName('Pendiente') ?? SaleStatus::first();
+
+            // Crear la venta (similar a Culqi pero con MercadoPago)
+            $sale = Sale::create([
+                'code' => 'MP_' . time() . '_' . $request->user_id,
+                'user_id' => $request->user_id,
+                'name' => $request->name,
+                'lastname' => $request->lastname,
+                'fullname' => $request->fullname ?? $request->name . ' ' . $request->lastname,
+                'email' => $request->email,
+                'phone' => $request->phone ?? '',
+                'country' => $request->country ?? 'Perú',
+                'department' => $request->department,
+                'province' => $request->province,
+                'district' => $request->district,
+                'ubigeo' => $request->ubigeo,
+                'address' => $request->address,
+                'number' => $request->number,
+                'reference' => $request->reference,
+                'comment' => $request->comment,
+                'amount' => $request->amount,
+                'delivery' => $request->delivery ?? 0,
+                'payment_status' => 'pendiente_mercadopago',
+                'status_id' => $saleStatusPendiente->id,
+                'payment_method' => 'mercadopago'
+            ]);
+
+            // Registrar detalles de la venta
+            foreach ($request->cart as $item) {
+                $itemId = is_array($item) ? $item['id'] ?? null : $item->id ?? null;
+                $itemName = is_array($item) ? $item['name'] ?? null : $item->name ?? null;
+                $itemPrice = is_array($item) ? $item['final_price'] ?? null : $item->final_price ?? null;
+                $itemQuantity = is_array($item) ? $item['quantity'] ?? null : $item->quantity ?? null;
+
+                SaleDetail::create([
+                    'sale_id' => $sale->id,
+                    'item_id' => $itemId,
+                    'name' => $itemName,
+                    'price' => $itemPrice,
+                    'quantity' => $itemQuantity,
+                ]);
+            }
+
+            // Aquí integrarías con MercadoPago SDK
+            // Por ahora simulamos respuesta exitosa
+            return response()->json([
+                'status' => true,
+                'message' => 'Orden creada exitosamente',
+                'sale' => $sale,
+                'delivery' => $request->delivery ?? 0,
+                'code' => $sale->code,
+                'payment_url' => 'https://mercadopago.com/checkout/preference_id_here'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error procesando el pago: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Procesar pago manual (Yape/Transferencia)
+     */
+    public function processManualPayment(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'user_id' => 'required',
+                'amount' => 'required|numeric|min:0.01',
+                'cart' => 'required|string', // JSON string
+                'email' => 'required|email',
+                'name' => 'required|string',
+                'lastname' => 'required|string',
+                'payment_method' => 'required|in:yape,transferencia',
+                'payment_proof' => 'required|file|mimes:jpeg,jpg,png,pdf|max:5120' // 5MB max
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $cart = json_decode($request->cart, true);
+            if (!$cart) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Carrito inválido'
+                ], 400);
+            }
+
+            $saleStatusPendiente = SaleStatus::getByName('Pendiente Verificación') ?? SaleStatus::first();
+
+            // Crear la venta
+            $sale = Sale::create([
+                'code' => strtoupper($request->payment_method) . '_' . time() . '_' . $request->user_id,
+                'user_id' => $request->user_id,
+                'name' => $request->name,
+                'lastname' => $request->lastname,
+                'fullname' => $request->name . ' ' . $request->lastname,
+                'email' => $request->email,
+                'phone' => $request->phone ?? '',
+                'country' => $request->country ?? 'Perú',
+                'department' => $request->department,
+                'province' => $request->province,
+                'district' => $request->district,
+                'ubigeo' => $request->ubigeo,
+                'address' => $request->address,
+                'number' => $request->number,
+                'reference' => $request->reference,
+                'comment' => $request->comment,
+                'amount' => $request->amount,
+                'delivery' => $request->delivery ?? 0,
+                'payment_status' => 'pendiente_verificacion',
+                'status_id' => $saleStatusPendiente->id,
+                'payment_method' => $request->payment_method
+            ]);
+
+            // Registrar detalles de la venta
+            foreach ($cart as $item) {
+                SaleDetail::create([
+                    'sale_id' => $sale->id,
+                    'item_id' => $item['id'] ?? null,
+                    'name' => $item['name'] ?? null,
+                    'price' => $item['final_price'] ?? null,
+                    'quantity' => $item['quantity'] ?? null,
+                ]);
+            }
+
+            // Guardar comprobante de pago
+            if ($request->hasFile('payment_proof')) {
+                $file = $request->file('payment_proof');
+                $filename = 'payment_proof_' . $sale->id . '_' . time() . '.' . $file->getClientOriginalExtension();
+                $path = $file->storeAs('payment_proofs', $filename, 'public');
+
+                // Crear registro en tabla de comprobantes (necesitarás crear esta tabla)
+                // PaymentProof::create([...]);
+                
+                // Por ahora guardamos en la venta
+                $sale->update(['payment_proof_path' => $path]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Orden creada. Pendiente de verificación del comprobante.',
+                'sale' => $sale,
+                'delivery' => $request->delivery ?? 0,
+                'code' => $sale->code
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error procesando el pago: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Obtener métodos de pago disponibles
+     */
+    public function getPaymentMethods()
+    {
+        return response()->json([
+            'status' => true,
+            'methods' => [
+                'culqi' => [
+                    'name' => 'Tarjeta de Crédito/Débito',
+                    'description' => 'Visa, Mastercard',
+                    'enabled' => true,
+                    'fees' => 0
+                ],
+                'mercadopago' => [
+                    'name' => 'MercadoPago',
+                    'description' => 'Pago online seguro',
+                    'enabled' => true,
+                    'fees' => 0
+                ],
+                'yape' => [
+                    'name' => 'Yape',
+                    'description' => 'Pago móvil',
+                    'enabled' => true,
+                    'fees' => 0,
+                    'phone' => '+51 999 888 777'
+                ],
+                'transferencia' => [
+                    'name' => 'Transferencia Bancaria',
+                    'description' => 'Depósito o transferencia',
+                    'enabled' => true,
+                    'fees' => 0,
+                    'bank_details' => [
+                        'bank' => 'BCP',
+                        'account' => '123-456789-0-12',
+                        'cci' => '00212312345678901234',
+                        'holder' => 'BananaLab SAC'
+                    ]
+                ]
+            ]
+        ]);
+    }
+
+    /**
+     * Validar comprobante de pago (Admin)
+     */
+    public function validatePaymentProof(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'sale_id' => 'required|exists:sales,id',
+                'status' => 'required|in:approved,rejected',
+                'admin_notes' => 'nullable|string|max:500'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Datos inválidos',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+            $sale = Sale::findOrFail($request->sale_id);
+            
+            if ($request->status === 'approved') {
+                $saleStatusPagado = SaleStatus::getByName('Pagado') ?? SaleStatus::first();
+                
+                $sale->update([
+                    'payment_status' => 'pagado',
+                    'status_id' => $saleStatusPagado->id,
+                    'admin_notes' => $request->admin_notes
+                ]);
+
+                // Actualizar stock
+                foreach ($sale->saleDetails as $detail) {
+                    if ($detail->item_id) {
+                        Item::where('id', $detail->item_id)->decrement('stock', $detail->quantity);
+                    }
+                }
+            } else {
+                $saleStatusRechazado = SaleStatus::getByName('Rechazado') ?? SaleStatus::first();
+                
+                $sale->update([
+                    'payment_status' => 'rechazado',
+                    'status_id' => $saleStatusRechazado->id,
+                    'admin_notes' => $request->admin_notes
+                ]);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Comprobante ' . ($request->status === 'approved' ? 'aprobado' : 'rechazado') . ' exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error validando comprobante: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

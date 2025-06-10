@@ -3,12 +3,13 @@ import Number2Currency from "../../../../Utils/Number2Currency";
 import ubigeoData from "../../../../../../storage/app/utils/ubigeo.json";
 import DeliveryPricesRest from "../../../../Actions/DeliveryPricesRest";
 import { processCulqiPayment } from "../../../../Actions/culqiPayment";
+import { processMercadoPagoPayment, processManualPayment } from "../../../../Actions/paymentMethods";
 import ButtonPrimary from "./ButtonPrimary";
 import ButtonSecondary from "./ButtonSecondary";
 import InputForm from "./InputForm";
 import SelectForm from "./SelectForm";
 import OptionCard from "./OptionCard";
-import { InfoIcon } from "lucide-react";
+import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check } from "lucide-react";
 import { Notify } from "sode-extend-react";
 
 export default function ShippingStep({
@@ -38,11 +39,71 @@ export default function ShippingStep({
         comment: user?.comment || "",
         reference: user?.reference || "",
         shippingOption: "delivery", // Valor predeterminado
+        paymentMethod: "culqi", // Nuevo campo para método de pago
     });
+
+    // Estados para archivos de comprobante
+    const [paymentProof, setPaymentProof] = useState(null);
+    const [paymentProofPreview, setPaymentProofPreview] = useState(null);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    
+    // Estado para métodos de pago dinámicos
+    const [availablePaymentMethods, setAvailablePaymentMethods] = useState([]);
+    const [loadingMethods, setLoadingMethods] = useState(true);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
+    };
+
+    // Manejar selección de método de pago
+    const handlePaymentMethodChange = (method) => {
+        setFormData((prev) => ({ ...prev, paymentMethod: method }));
+        // Limpiar archivo si cambia de método
+        if (method === 'culqi' || method === 'mercadopago') {
+            setPaymentProof(null);
+            setPaymentProofPreview(null);
+        }
+    };
+
+    // Manejar subida de comprobante
+    const handleFileUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            // Validar tipo de archivo
+            const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+            if (!allowedTypes.includes(file.type)) {
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "Archivo no válido",
+                    body: "Solo se permiten imágenes (JPG, PNG) o archivos PDF",
+                    type: "danger",
+                });
+                return;
+            }
+
+            // Validar tamaño (max 5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "Archivo muy grande",
+                    body: "El archivo no debe superar los 5MB",
+                    type: "danger",
+                });
+                return;
+            }
+
+            setPaymentProof(file);
+            
+            // Crear preview si es imagen
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => setPaymentProofPreview(e.target.result);
+                reader.readAsDataURL(file);
+            } else {
+                setPaymentProofPreview(null);
+            }
+        }
     };
 
     // Estados para manejar los valores seleccionados
@@ -57,6 +118,29 @@ export default function ShippingStep({
 
     // Estado para el precio de envío
     const [shippingCost, setShippingCost] = useState(0);
+
+    // Cargar métodos de pago disponibles
+    useEffect(() => {
+        fetchPaymentMethods();
+    }, []);
+
+    const fetchPaymentMethods = async () => {
+        try {
+            const response = await fetch('/api/payments/methods');
+            const data = await response.json();
+            if (data.status) {
+                setAvailablePaymentMethods(data.methods);
+                // Establecer el primer método activo como predeterminado
+                if (data.methods.length > 0) {
+                    setFormData(prev => ({ ...prev, paymentMethod: data.methods[0].slug }));
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching payment methods:', error);
+        } finally {
+            setLoadingMethods(false);
+        }
+    };
 
     // Cargar los departamentos al iniciar el componente
     useEffect(() => {
@@ -139,16 +223,18 @@ export default function ShippingStep({
 
     const handlePayment = async (e) => {
         e.preventDefault();
+        
         if (!user) {
             Notify.add({
                 icon: "/assets/img/icon.svg",
                 title: "Iniciar Sesión",
-                body: "Se requiere que incie sesión para realizar la compra",
+                body: "Se requiere que inicie sesión para realizar la compra",
                 type: "danger",
             });
-
             return;
         }
+
+        // Validar campos obligatorios
         if (
             !formData.department ||
             !formData.province ||
@@ -165,37 +251,79 @@ export default function ShippingStep({
                 body: "Completar los datos de envío",
                 type: "danger",
             });
-
             return;
         }
 
-        if (!window.Culqi) {
-            console.error("❌ Culqi aún no se ha cargado.");
+        // Validar comprobante para métodos que lo requieren
+        if ((formData.paymentMethod === 'yape' || formData.paymentMethod === 'transferencia') && !paymentProof) {
+            Notify.add({
+                icon: "/assets/img/icon.svg",
+                title: "Comprobante requerido",
+                body: "Debe subir el comprobante de pago para este método",
+                type: "danger",
+            });
             return;
         }
+
+        const baseRequest = {
+            user_id: user?.id || "",
+            name: formData?.name || "",
+            lastname: formData?.lastname || "",
+            fullname: `${formData?.name} ${formData?.lastname}`,
+            email: formData?.email || "",
+            phone: "",
+            country: "Perú",
+            department: departamento || "",
+            province: provincia || "",
+            district: distrito || "",
+            ubigeo: null,
+            address: formData?.address || "",
+            number: formData?.number || "",
+            comment: formData?.comment || "",
+            reference: formData?.reference || "",
+            amount: totalFinal || 0,
+            delivery: envio,
+            cart: cart,
+            payment_method: formData.paymentMethod,
+        };
+
         try {
-            const request = {
-                user_id: user?.id || "",
-                name: formData?.name || "",
-                lastname: formData?.lastname || "",
-                fullname: `${formData?.name} ${formData?.lastname}`,
-                email: formData?.email || "",
-                phone: "",
-                country: "Perú",
-                department: departamento || "",
-                province: provincia || "",
-                district: distrito || "",
-                ubigeo: null,
-                address: formData?.address || "",
-                number: formData?.number || "",
-                comment: formData?.comment || "",
-                reference: formData?.reference || "",
-                amount: totalFinal || 0,
-                delivery: envio,
-                cart: cart,
-            };
+            let response;
+            
+            switch (formData.paymentMethod) {
+                case 'culqi':
+                    if (!window.Culqi) {
+                        console.error("❌ Culqi aún no se ha cargado.");
+                        return;
+                    }
+                    response = await processCulqiPayment(baseRequest);
+                    break;
+                
+                case 'mercadopago':
+                    // Aquí implementarás la integración con MercadoPago
+                    response = await processMercadoPagoPayment(baseRequest);
+                    break;
+                
+                case 'yape':
+                case 'transferencia':
+                    // Para métodos manuales, subir comprobante
+                    const formData = new FormData();
+                    Object.keys(baseRequest).forEach(key => {
+                        if (Array.isArray(baseRequest[key])) {
+                            formData.append(key, JSON.stringify(baseRequest[key]));
+                        } else {
+                            formData.append(key, baseRequest[key]);
+                        }
+                    });
+                    formData.append('payment_proof', paymentProof);
+                    
+                    response = await processManualPayment(formData);
+                    break;
+                
+                default:
+                    throw new Error('Método de pago no válido');
+            }
 
-            const response = await processCulqiPayment(request);
             const data = response;
 
             if (data.status) {
@@ -203,12 +331,22 @@ export default function ShippingStep({
                 setDelivery(data.delivery);
                 setCode(data.code);
                 setCart([]);
+                
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "¡Pedido procesado!",
+                    body: formData.paymentMethod === 'culqi' || formData.paymentMethod === 'mercadopago' 
+                        ? "Su pago ha sido procesado exitosamente" 
+                        : "Su pedido está pendiente de validación del comprobante",
+                    type: "success",
+                });
+                
                 onContinue();
             } else {
                 Notify.add({
                     icon: "/assets/img/icon.svg",
                     title: "Error en el Pago",
-                    body: "El pago ha sido rechazado",
+                    body: data.message || "El pago ha sido rechazado",
                     type: "danger",
                 });
             }
@@ -217,7 +355,7 @@ export default function ShippingStep({
             Notify.add({
                 icon: "/assets/img/icon.svg",
                 title: "Error en el Pago",
-                body: "No se llegó a procesar el pago",
+                body: "No se pudo procesar el pago",
                 type: "danger",
             });
         }
@@ -342,7 +480,6 @@ export default function ShippingStep({
                     </div>
 
                     {/* Referencia */}
-
                     <InputForm
                         label="Referencia"
                         type="text"
@@ -351,6 +488,196 @@ export default function ShippingStep({
                         onChange={handleChange}
                         placeholder="Ejem. Altura de la avenida..."
                     />
+
+                    {/* Métodos de Pago */}
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-semibold text-gray-900">Método de Pago</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Culqi - Tarjeta */}
+                            <div 
+                                className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                                    formData.paymentMethod === 'culqi' 
+                                    ? 'border-primary bg-primary/5' 
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handlePaymentMethodChange('culqi')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                        formData.paymentMethod === 'culqi' ? 'bg-primary text-white' : 'bg-gray-100'
+                                    }`}>
+                                        <CreditCard size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium">Tarjeta de Crédito/Débito</h4>
+                                        <p className="text-sm text-gray-500">Visa, Mastercard</p>
+                                    </div>
+                                    {formData.paymentMethod === 'culqi' && (
+                                        <Check size={20} className="text-primary" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* MercadoPago */}
+                            <div 
+                                className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                                    formData.paymentMethod === 'mercadopago' 
+                                    ? 'border-primary bg-primary/5' 
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handlePaymentMethodChange('mercadopago')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                        formData.paymentMethod === 'mercadopago' ? 'bg-primary text-white' : 'bg-gray-100'
+                                    }`}>
+                                        <CreditCard size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium">MercadoPago</h4>
+                                        <p className="text-sm text-gray-500">Pago online seguro</p>
+                                    </div>
+                                    {formData.paymentMethod === 'mercadopago' && (
+                                        <Check size={20} className="text-primary" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Yape */}
+                            <div 
+                                className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                                    formData.paymentMethod === 'yape' 
+                                    ? 'border-primary bg-primary/5' 
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handlePaymentMethodChange('yape')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                        formData.paymentMethod === 'yape' ? 'bg-primary text-white' : 'bg-gray-100'
+                                    }`}>
+                                        <Smartphone size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium">Yape</h4>
+                                        <p className="text-sm text-gray-500">Pago móvil</p>
+                                    </div>
+                                    {formData.paymentMethod === 'yape' && (
+                                        <Check size={20} className="text-primary" />
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Transferencia Bancaria */}
+                            <div 
+                                className={`border-2 rounded-xl p-4 cursor-pointer transition-all duration-200 ${
+                                    formData.paymentMethod === 'transferencia' 
+                                    ? 'border-primary bg-primary/5' 
+                                    : 'border-gray-200 hover:border-gray-300'
+                                }`}
+                                onClick={() => handlePaymentMethodChange('transferencia')}
+                            >
+                                <div className="flex items-center gap-3">
+                                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                                        formData.paymentMethod === 'transferencia' ? 'bg-primary text-white' : 'bg-gray-100'
+                                    }`}>
+                                        <Building2 size={20} />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-medium">Transferencia Bancaria</h4>
+                                        <p className="text-sm text-gray-500">Depósito o transferencia</p>
+                                    </div>
+                                    {formData.paymentMethod === 'transferencia' && (
+                                        <Check size={20} className="text-primary" />
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Información del método seleccionado */}
+                        {formData.paymentMethod === 'yape' && (
+                            <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                                <h4 className="font-medium text-purple-800 mb-2">Instrucciones para Yape:</h4>
+                                <div className="text-sm text-purple-700 space-y-2">
+                                    <p>1. Realiza el Yape al número: <strong>+51 999 888 777</strong></p>
+                                    <p>2. Monto: <strong>S/ {Number2Currency(totalFinal)}</strong></p>
+                                    <p>3. Toma captura del comprobante</p>
+                                    <p>4. Sube la imagen abajo</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {formData.paymentMethod === 'transferencia' && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                                <h4 className="font-medium text-blue-800 mb-2">Datos para Transferencia:</h4>
+                                <div className="text-sm text-blue-700 space-y-2">
+                                    <p><strong>Banco:</strong> BCP</p>
+                                    <p><strong>Cuenta Corriente:</strong> 123-456789-0-12</p>
+                                    <p><strong>CCI:</strong> 00212312345678901234</p>
+                                    <p><strong>Titular:</strong> BananaLab SAC</p>
+                                    <p><strong>Monto:</strong> S/ {Number2Currency(totalFinal)}</p>
+                                    <p className="mt-2 font-medium">Sube el voucher de la transferencia abajo</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Subida de comprobante para métodos manuales */}
+                        {(formData.paymentMethod === 'yape' || formData.paymentMethod === 'transferencia') && (
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Comprobante de Pago *
+                                </label>
+                                <div className="border-2 border-dashed border-gray-300 rounded-xl p-6">
+                                    <div className="text-center">
+                                        <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                                        <div className="mt-4">
+                                            <label htmlFor="payment-proof" className="cursor-pointer">
+                                                <span className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
+                                                    Subir Archivo
+                                                </span>
+                                                <input
+                                                    id="payment-proof"
+                                                    type="file"
+                                                    className="hidden"
+                                                    accept="image/*,.pdf"
+                                                    onChange={handleFileUpload}
+                                                />
+                                            </label>
+                                            <p className="mt-2 text-sm text-gray-500">
+                                                PNG, JPG o PDF hasta 5MB
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                {/* Preview del archivo */}
+                                {paymentProof && (
+                                    <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-xl">
+                                        <div className="flex items-center gap-3">
+                                            <Check className="text-green-600" size={20} />
+                                            <div>
+                                                <p className="text-sm font-medium text-green-800">
+                                                    Archivo cargado: {paymentProof.name}
+                                                </p>
+                                                <p className="text-xs text-green-600">
+                                                    {(paymentProof.size / 1024 / 1024).toFixed(2)} MB
+                                                </p>
+                                            </div>
+                                        </div>
+                                        {paymentProofPreview && (
+                                            <div className="mt-3">
+                                                <img 
+                                                    src={paymentProofPreview} 
+                                                    alt="Preview" 
+                                                    className="max-w-full h-32 object-contain rounded-lg border"
+                                                />
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
                 </form>
                 <div className="flex gap-4 mt-4">
                     <OptionCard
@@ -413,9 +740,12 @@ export default function ShippingStep({
                             <div className="flex items-center gap-4">
                                 <div className="bg-white p-2 rounded-xl">
                                     <img
-                                        src={`/storage/images/item/${item.image}`}
+                                        src={item.type === 'custom_album' 
+                                            ? `/storage/images/item_preset/${item.image}` 
+                                            : `/storage/images/item/${item.image}`
+                                        }
                                         alt={item.name}
-                                        className="w-20 h-20 object-cover rounded  "
+                                        className="w-20 h-20 object-cover rounded"
                                     />
                                 </div>
                                 <div className="flex-1">
@@ -423,24 +753,44 @@ export default function ShippingStep({
                                         {item.name}
                                     </h3>
 
-                                    <p className="text-sm customtext-neutral-light">
-                                        Marca:{" "}
-                                        <span className="customtext-neutral-dark">
-                                            {item.brand.name}
-                                        </span>
-                                    </p>
+                                    {item.type === 'custom_album' ? (
+                                        // Información para álbumes personalizados
+                                        <>
+                                            <p className="text-sm customtext-neutral-light">
+                                                Tipo:{" "}
+                                                <span className="customtext-neutral-dark">
+                                                    Álbum Personalizado
+                                                </span>
+                                            </p>
+                                            <p className="text-sm customtext-neutral-light">
+                                                Páginas:{" "}
+                                                <span className="customtext-neutral-dark">
+                                                    {item.album_data?.pages_count || 'N/A'}
+                                                </span>
+                                            </p>
+                                        </>
+                                    ) : (
+                                        // Información para productos regulares
+                                        <p className="text-sm customtext-neutral-light">
+                                            Marca:{" "}
+                                            <span className="customtext-neutral-dark">
+                                                {item.brand?.name || 'Sin marca'}
+                                            </span>
+                                        </p>
+                                    )}
+                                    
                                     <p className="text-sm customtext-neutral-light">
                                         Cantidad:{" "}
                                         <span className="customtext-neutral-dark">
-                                            {item.quantity}{" "}
+                                            {item.quantity || 1}
                                         </span>
                                     </p>
-                                    <p className="text-sm customtext-neutral-light">
+                                  {/*  <p className="text-sm customtext-neutral-light">
                                         SKU:{" "}
                                         <span className="customtext-neutral-dark">
-                                            {item.sku}
+                                            {item.sku || ''}
                                         </span>
-                                    </p>
+                                    </p> */}
                                 </div>
                             </div>
                         </div>
@@ -448,6 +798,30 @@ export default function ShippingStep({
                 </div>
 
                 <div className="space-y-4 mt-6">
+                    {/* Calcular y mostrar ahorros totales */}
+                    {(() => {
+                        const totalSavings = cart.reduce((acc, item) => {
+                            const basePrice = item.price || 0;
+                            const finalPrice = item.final_price || item.price || 0;
+                            const quantity = item.quantity || 1;
+                            if (basePrice > finalPrice) {
+                                return acc + ((basePrice - finalPrice) * quantity);
+                            }
+                            return acc;
+                        }, 0);
+                        
+                        return totalSavings > 0 ? (
+                            <div className="flex justify-between">
+                                <span className="text-green-600 font-medium">
+                                    Ahorros totales
+                                </span>
+                                <span className="font-semibold text-green-600">
+                                    -S/ {Number2Currency(totalSavings)}
+                                </span>
+                            </div>
+                        ) : null;
+                    })()}
+                    
                     <div className="flex justify-between">
                         <span className="customtext-neutral-dark">
                             Subtotal
@@ -476,12 +850,23 @@ export default function ShippingStep({
                     </div>
                     <div className="space-y-2 pt-4">
                         <ButtonPrimary onClick={handlePayment}>
-                            {" "}
-                            Continuar
+                            {(() => {
+                                switch (formData.paymentMethod) {
+                                    case 'culqi':
+                                        return 'Pagar con Tarjeta';
+                                    case 'mercadopago':
+                                        return 'Pagar con MercadoPago';
+                                    case 'yape':
+                                        return 'Confirmar Pago Yape';
+                                    case 'transferencia':
+                                        return 'Confirmar Transferencia';
+                                    default:
+                                        return 'Continuar';
+                                }
+                            })()}
                         </ButtonPrimary>
 
                         <ButtonSecondary onClick={noContinue}>
-                            {" "}
                             Cancelar
                         </ButtonSecondary>
                     </div>

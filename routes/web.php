@@ -31,6 +31,8 @@ use App\Http\Controllers\Admin\SaleController as AdminSaleController;
 use App\Http\Controllers\Admin\SubCategoryController as AdminSubCategoryController;
 use App\Http\Controllers\Admin\ItemPresetController as AdminItemPresetController;
 use App\Http\Controllers\Admin\ItemPresetReactController as AdminItemPresetReactController;
+use App\Http\Controllers\Admin\PaymentMethodController as AdminPaymentMethodController;
+
 
 use App\Http\Controllers\Admin\FaqController as AdminFaqController;
 use App\Http\Controllers\Admin\RepositoryController as AdminRepositoryController;
@@ -73,12 +75,18 @@ Route::get('/login', [AuthController::class, 'loginView'])->name('Login.jsx');
 
 // Admin routes
 Route::middleware(['can:Admin', 'auth'])->prefix('admin')->group(function () {
+
+
+
+    Route::get('/payment-methods', [AdminPaymentMethodController::class, 'reactView'])->name('Admin/PaymentMethodsAdmin.jsx');
+
+
     Route::get('/', fn() => redirect()->route('Admin/Home.jsx'));
     Route::get('/home', [AdminHomeController::class, 'reactView'])->name('Admin/Home.jsx');
     Route::get('/sales', [AdminSaleController::class, 'reactView'])->name('Admin/Sales.jsx');
     Route::get('/items', [AdminItemController::class, 'reactView'])->name('Admin/Items.jsx');
     Route::get('/item-presets', [AdminItemPresetReactController::class, 'reactView'])->name('Admin/ItemPresets.jsx');
-    
+
     // Rutas para Item Presets
     Route::resource('/item-presets', AdminItemPresetController::class, [
         'as' => 'admin'

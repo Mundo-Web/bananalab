@@ -184,6 +184,23 @@ const Menu = ({ session, hasRole }) => {
                                 >
                                     Costos de envío
                                 </MenuItem>
+                                <MenuItemContainer
+                                    title="Pagos y Transacciones"
+                                    icon="mdi mdi-credit-card"
+                                >
+                                    <MenuItem
+                                        href="/admin/payment-methods"
+                                        icon="mdi mdi-credit-card-outline"
+                                    >
+                                        Métodos de Pago
+                                    </MenuItem>
+                                    <MenuItem
+                                        href="/admin/payment-proofs"
+                                        icon="mdi mdi-file-image"
+                                    >
+                                        Validar Comprobantes
+                                    </MenuItem>
+                                </MenuItemContainer>
                                 <MenuItem
                                     href="/admin/messages"
                                     icon="mdi mdi-message-text"
