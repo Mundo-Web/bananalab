@@ -36,7 +36,7 @@ const PaymentMethodsAdmin = () => {
     const sortOrderRef = useRef();
 
     // Configuration refs
-    const configurationRef = useRef({});    const [isEditing, setIsEditing] = useState(false);
+    const configurationRef = useRef({}); const [isEditing, setIsEditing] = useState(false);
     const [templates, setTemplates] = useState({});
     const [currentType, setCurrentType] = useState('gateway');
     const [currentTemplateKey, setCurrentTemplateKey] = useState('');
@@ -55,16 +55,18 @@ const PaymentMethodsAdmin = () => {
         } catch (error) {
             console.error('Error loading templates:', error);
         }
-    };    const onModalOpen = async (data) => {
+    };
+
+    const onModalOpen = async (data) => {
         console.log('🚀 Opening modal with data:', data);
-        
+
         setPaymentMethodData(data || null);
         setIsEditing(!!data?.id);
 
         // Ensure templates are loaded before proceeding
         let availableTemplates = templates;
         let templatesUpdated = false;
-        
+
         if (!availableTemplates || Object.keys(availableTemplates).length === 0) {
             console.log('⏳ Templates not loaded, fetching directly...');
             try {
@@ -87,7 +89,7 @@ const PaymentMethodsAdmin = () => {
         // Set template key and type based on data
         const templateKey = data?.template_key || '';
         let configData = data?.configuration || {};
-        
+
         // Parse configuration if string
         if (typeof configData === 'string') {
             try {
@@ -105,10 +107,10 @@ const PaymentMethodsAdmin = () => {
 
         // Store configuration data in ref for later use
         configurationRef.current = configData;
-        
+
         // Reset all basic form values immediately
         populateBasicFields(data);
-        
+
         // Set type and template key BEFORE showing modal to trigger field generation
         if (data?.type) {
             setCurrentType(data.type);
@@ -116,23 +118,23 @@ const PaymentMethodsAdmin = () => {
         if (templateKey) {
             setCurrentTemplateKey(templateKey);
         }
-        
+
         // Show modal
         $(modalRef.current).modal("show");
-        
+
         // Wait for modal animation and React state updates to complete
         const waitTime = templatesUpdated ? 800 : 500; // More time if templates were just loaded
         setTimeout(async () => {
             console.log('🔄 Setting up dynamic fields...');
-            
+
             // Update type dropdown
             if (typeRef.current) {
                 $(typeRef.current).val(data?.type || "gateway").trigger("change");
             }
-            
+
             // Wait for React state updates and field generation
             await new Promise(resolve => setTimeout(resolve, 300));
-            
+
             // Now populate configuration fields if we have data
             if (templateKey && availableTemplates[templateKey] && Object.keys(configData).length > 0) {
                 console.log('🎯 Populating configuration fields...');
@@ -146,17 +148,17 @@ const PaymentMethodsAdmin = () => {
                     availableTemplateKeys: Object.keys(availableTemplates)
                 });
             }
-            
+
             // Set up instructions preview
             updateInstructionsPreview(templateKey, availableTemplates);
-            
+
         }, waitTime);
     };
 
     // Separate function for basic field population
     const populateBasicFields = (data) => {
         console.log('📝 Populating basic fields...');
-        
+
         if (idRef.current) idRef.current.value = data?.id || "";
         if (nameRef.current) nameRef.current.value = data?.name || "";
         if (displayNameRef.current) displayNameRef.current.value = data?.display_name || "";
@@ -168,13 +170,10 @@ const PaymentMethodsAdmin = () => {
         if (feeFixedRef.current) feeFixedRef.current.value = data?.fee_fixed || 0;
         if (sortOrderRef.current) sortOrderRef.current.value = data?.sort_order || 0;
 
-        // Handle icon
-        if (iconRef.current) {
-            iconRef.current.value = null;
-            if (iconRef.image) {
-                iconRef.image.src = data?.icon ? `/storage/payment_icons/${data.icon}` : "/storage/images/item/undefined";
-            }
-        }
+
+        iconRef.image.src = data?.icon ? `/storage/images/payment_method/${data?.icon}` : "/storage/images/item/undefined";
+
+
     };    // Separate function for instructions preview
     const updateInstructionsPreview = (templateKey, availableTemplates = templates) => {
         setTimeout(() => {
@@ -204,14 +203,14 @@ const PaymentMethodsAdmin = () => {
         return new Promise((resolve) => {
             const attemptPopulation = (attempt = 1) => {
                 const maxAttempts = 25; // Increased attempts
-                
+
                 console.log(`🔍 Population attempt ${attempt}/${maxAttempts}`);
-                
+
                 // Check if all required DOM elements exist
                 const configFieldKeys = Object.keys(template.config);
                 const missingFields = [];
                 const availableFields = [];
-                
+
                 configFieldKeys.forEach(fieldKey => {
                     const element = document.getElementById(`config_${fieldKey}`);
                     if (!element) {
@@ -220,10 +219,10 @@ const PaymentMethodsAdmin = () => {
                         availableFields.push(fieldKey);
                     }
                 });
-                
+
                 console.log(`✅ Available fields (${availableFields.length}):`, availableFields);
                 console.log(`❌ Missing fields (${missingFields.length}):`, missingFields);
-                
+
                 if (missingFields.length === 0) {
                     // All fields found, populate them
                     console.log('🎯 All fields found! Populating values...');
@@ -231,7 +230,7 @@ const PaymentMethodsAdmin = () => {
                     resolve(true);
                     return;
                 }
-                
+
                 if (attempt < maxAttempts) {
                     console.log(`⏳ Waiting 300ms before retry...`);
                     setTimeout(() => attemptPopulation(attempt + 1), 300);
@@ -241,7 +240,7 @@ const PaymentMethodsAdmin = () => {
                     resolve(false);
                 }
             };
-            
+
             // Start the population process
             setTimeout(() => attemptPopulation(), 100);
         });
@@ -250,19 +249,19 @@ const PaymentMethodsAdmin = () => {
     // Actual field population logic
     const populateConfigFields = (template, configData) => {
         console.log('� Populating configuration fields with data:', configData);
-        
+
         Object.keys(template.config).forEach(fieldKey => {
             const element = document.getElementById(`config_${fieldKey}`);
             const fieldConfig = template.config[fieldKey];
             const value = configData[fieldKey] || fieldConfig.default || '';
-            
+
             if (!element) {
                 console.warn(`⚠️ Element config_${fieldKey} not found during population`);
                 return;
             }
-            
+
             console.log(`📝 Setting field ${fieldKey} =`, value);
-            
+
             if (element.type === 'checkbox') {
                 element.checked = !!value;
             } else if (element.type === 'file') {
@@ -271,7 +270,7 @@ const PaymentMethodsAdmin = () => {
                 element.value = value;
             }
         });
-        
+
         console.log('✅ Configuration field population completed');
     };
 
@@ -279,21 +278,21 @@ const PaymentMethodsAdmin = () => {
     const populateFileField = (element, fieldKey, value, fieldConfig) => {
         // Check if this is within an ImageFormGroup wrapper
         const imageFormGroupWrapper = element.closest('[data-image-form-group]');
-        
+
         if (imageFormGroupWrapper && fieldConfig.accept && fieldConfig.accept.includes('image')) {
             console.log(`🖼️ Populating ImageFormGroup for ${fieldKey} with value:`, value);
-            
+
             // Find the preview image in the ImageFormGroup
             const previewImage = imageFormGroupWrapper.querySelector('img');
-            
+
             if (value && value !== '') {
                 // Set the preview image
                 if (previewImage) {
-                    previewImage.src = `/storage/payment_config/${value}`;
+                    previewImage.src = `/storage/images/payment_method/${value}`;
                     previewImage.style.display = 'block';
-                    console.log(`✅ Image preview set for ${fieldKey}:`, `/storage/payment_config/${value}`);
+                    console.log(`✅ Image preview set for ${fieldKey}:`, `/storage/images/payment_method/${value}`);
                 }
-                
+
                 // Add file info
                 let fileInfoElement = imageFormGroupWrapper.querySelector('.config-file-info');
                 if (!fileInfoElement) {
@@ -308,7 +307,7 @@ const PaymentMethodsAdmin = () => {
                     previewImage.src = '/api/cover/thumbnail/null';
                     previewImage.style.display = 'block';
                 }
-                
+
                 // Remove file info if exists
                 const fileInfoElement = imageFormGroupWrapper.querySelector('.config-file-info');
                 if (fileInfoElement) {
@@ -318,7 +317,7 @@ const PaymentMethodsAdmin = () => {
         } else {
             // Handle regular file inputs (non-ImageFormGroup)
             console.log(`📎 Populating regular file field ${fieldKey} with value:`, value);
-            
+
             let fileInfoElement = document.getElementById(`config_${fieldKey}_info`);
             if (!fileInfoElement) {
                 fileInfoElement = document.createElement('div');
@@ -326,7 +325,7 @@ const PaymentMethodsAdmin = () => {
                 fileInfoElement.className = 'mt-2';
                 element.parentNode.appendChild(fileInfoElement);
             }
-            
+
             if (value && value !== '') {
                 fileInfoElement.innerHTML = `<small class="text-success"><i class="mdi mdi-check-circle"></i> Archivo actual: <strong>${value}</strong></small>`;
             } else {
@@ -374,7 +373,7 @@ const PaymentMethodsAdmin = () => {
                 }
             });
         }
-        
+
         // También guardar el template key seleccionado
         formData.append("template_key", currentTemplateKey);
 
@@ -391,8 +390,8 @@ const PaymentMethodsAdmin = () => {
 
         try {
             const response = isEditing
-                ? await paymentMethodsRest.update(formData)
-                : await paymentMethodsRest.store(formData);
+                ? await paymentMethodsRest.save(formData)
+                : await paymentMethodsRest.save(formData);
             if (response) {
                 if (modalRef.current) {
                     $(modalRef.current).modal("hide");
@@ -461,20 +460,20 @@ const PaymentMethodsAdmin = () => {
                 });
             }
         }
-    };    const handleTypeChange = (e) => {
+    }; const handleTypeChange = (e) => {
         const newType = e.target.value;
         setCurrentType(newType);
-        
+
         // Find the first template that matches this type and select it
-        const matchingTemplate = Object.keys(templates).find(key => 
+        const matchingTemplate = Object.keys(templates).find(key =>
             templates[key].type === newType
         );
-        
+
         if (matchingTemplate) {
             setCurrentTemplateKey(matchingTemplate);
             configurationRef.current = {};
             updateConfigurationFields(matchingTemplate, {});
-            
+
             // Force re-render to show instructions preview
             setTimeout(() => {
                 const previewContainer = document.getElementById('instructions-preview-container');
@@ -488,7 +487,7 @@ const PaymentMethodsAdmin = () => {
                 }
             }, 100);
         }
-    };const renderConfigurationFields = () => {
+    }; const renderConfigurationFields = () => {
         const template = templates[currentTemplateKey];
         if (!template || !template.config) {
             if (!currentTemplateKey) {
@@ -538,7 +537,9 @@ const PaymentMethodsAdmin = () => {
                 )}
             </>
         );
-    };const renderInstructionsPreview = (instructions) => {
+    }; 
+    
+    const renderInstructionsPreview = (instructions) => {
         return (
             <div className="instructions-preview">
                 {instructions.title && (
@@ -801,7 +802,9 @@ const PaymentMethodsAdmin = () => {
     };
 
     return (
-        <>            <Table
+        <>           
+        
+         <Table
             gridRef={gridRef}
             title="Métodos de Pago"
             rest={paymentMethodsRest}
@@ -842,27 +845,25 @@ const PaymentMethodsAdmin = () => {
                     dataField: "icon",
                     caption: "Icono",
                     width: "60px",
-                    cellTemplate: (container, { data }) => {
-                        const iconSrc = data.icon
-                            ? `/storage/payment_icons/${data.icon}`
-                            : null;
-
-                        container.html(
-                            renderToString(
-                                <div className="text-center">
-                                    {iconSrc ? (
-                                        <img
-                                            src={iconSrc}
-                                            alt={data.name}
-                                            style={{ width: "32px", height: "32px", objectFit: "contain" }}
-                                        />
-                                    ) : (
-                                        <i className={`${getTypeIcon(data.type)} fs-4`}></i>
-                                    )}
-                                </div>
-                            )
-                        );
-                    },
+                      cellTemplate: (container, { data }) => {
+                            ReactAppend(
+                                container,
+                                <img
+                                    src={`/storage/images/payment_method/${data.icon}`}
+                                    style={{
+                                        width: "80px",
+                                        height: "48px",
+                                        objectFit: "cover",
+                                        objectPosition: "center",
+                                        borderRadius: "4px",
+                                    }}
+                                    onError={(e) =>
+                                        (e.target.src =
+                                            "/api/cover/thumbnail/null")
+                                    }
+                                />
+                            );
+                        },
                 },
                 {
                     dataField: "display_name",
@@ -968,15 +969,15 @@ const PaymentMethodsAdmin = () => {
                     },
                 },
             ]}
-        />            
-        
-        <Modal
-            modalRef={modalRef}
-            title={isEditing ? "Editar Método de Pago" : "Nuevo Método de Pago"}
-            onSubmit={onModalSubmit}
-            size="lg"
-            id="modalForm"
-        >
+        />
+
+            <Modal
+                modalRef={modalRef}
+                title={isEditing ? "Editar Método de Pago" : "Nuevo Método de Pago"}
+                onSubmit={onModalSubmit}
+                size="lg"
+                id="modalForm"
+            >
                 <input ref={idRef} type="hidden" />
                 <div className="row">
                     <div className="col-md-6">
@@ -1002,26 +1003,26 @@ const PaymentMethodsAdmin = () => {
                     rows={3}
                 />                <div className="row">
                     <div className="col-md-4">                        <SelectFormGroup
-                            eRef={typeRef}
-                            label="Tipo de método"
-                            required
-                            onChange={handleTypeChange}
-                            dropdownParent="#modalForm"
-                        >
-                            <option value="">Seleccionar tipo...</option>
-                            {templates && [...new Set(Object.values(templates).map(t => t.type))].map(type => {
-                                const typeNames = {
-                                    'gateway': 'Gateway (Online)',
-                                    'qr': 'QR/Móvil', 
-                                    'manual': 'Manual'
-                                };
-                                return (
-                                    <option key={type} value={type}>
-                                        {typeNames[type] || type.charAt(0).toUpperCase() + type.slice(1)}
-                                    </option>
-                                );
-                            })}
-                        </SelectFormGroup>
+                        eRef={typeRef}
+                        label="Tipo de método"
+                        required
+                        onChange={handleTypeChange}
+                        dropdownParent="#modalForm"
+                    >
+                        <option value="">Seleccionar tipo...</option>
+                        {templates && [...new Set(Object.values(templates).map(t => t.type))].map(type => {
+                            const typeNames = {
+                                'gateway': 'Gateway (Online)',
+                                'qr': 'QR/Móvil',
+                                'manual': 'Manual'
+                            };
+                            return (
+                                <option key={type} value={type}>
+                                    {typeNames[type] || type.charAt(0).toUpperCase() + type.slice(1)}
+                                </option>
+                            );
+                        })}
+                    </SelectFormGroup>
                     </div>
                     <div className="col-md-4">
                         <div className="mb-3">
@@ -1030,25 +1031,25 @@ const PaymentMethodsAdmin = () => {
                                 <span className="text-danger">*</span>
                             </label>                            <select
                                 className="form-select"
-                                value={currentTemplateKey}                                onChange={(e) => {
+                                value={currentTemplateKey} onChange={(e) => {
                                     const newTemplateKey = e.target.value;
                                     setCurrentTemplateKey(newTemplateKey);
-                                    
+
                                     console.log('Template changed to:', newTemplateKey);
-                                    
+
                                     if (newTemplateKey && templates[newTemplateKey]) {
                                         // Auto-update type based on template
                                         const templateType = templates[newTemplateKey].type;
                                         setCurrentType(templateType);
-                                        
+
                                         if (typeRef.current) {
                                             $(typeRef.current).val(templateType).trigger("change");
                                         }
-                                        
+
                                         // When changing template, use stored config if we're editing and the template matches
                                         // the original template, otherwise clear config
                                         let configToUse = {};
-                                        
+
                                         if (isEditing && paymentMethodData?.template_key === newTemplateKey) {
                                             // We're editing and selected the original template, use saved config
                                             configToUse = paymentMethodData?.configuration || {};
@@ -1062,7 +1063,7 @@ const PaymentMethodsAdmin = () => {
                                             configToUse = {};
                                             console.log('New payment method, using empty config');
                                         }
-                                        
+
                                         configurationRef.current = configToUse;                                        // Update configuration fields
                                         setTimeout(() => {
                                             populateConfigurationFieldsRobust(newTemplateKey, configToUse, templates);
@@ -1085,9 +1086,9 @@ const PaymentMethodsAdmin = () => {
                                         'efectivo': 'Pago en Efectivo',
                                         'agente_bancario': 'Agente Bancario'
                                     };
-                                    
+
                                     const displayName = templateNames[key] || template.name || key.charAt(0).toUpperCase() + key.slice(1);
-                                    
+
                                     return (
                                         <option key={key} value={key}>
                                             {displayName}
@@ -1155,13 +1156,13 @@ const PaymentMethodsAdmin = () => {
                         </div>
                     </div>
                 </div>                <div id="dynamic-config-section">
-                  {!templates || Object.keys(templates).length === 0 ? (
+                    {!templates || Object.keys(templates).length === 0 ? (
                         <div className="alert alert-info mt-4 mb-0">
-                          <i className="mdi mdi-timer-sand"></i> Cargando configuración dinámica...
+                            <i className="mdi mdi-timer-sand"></i> Cargando configuración dinámica...
                         </div>
-                      ) : (
+                    ) : (
                         renderConfigurationFields()
-                      )}
+                    )}
                 </div>
             </Modal>
         </>

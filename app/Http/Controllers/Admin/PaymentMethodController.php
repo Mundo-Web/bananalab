@@ -9,17 +9,18 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-
+use SoDe\Extend\Crypto;
 
 class PaymentMethodController extends BasicController
 {
     public $model = PaymentMethod::class;
     public $reactView = 'Admin/PaymentMethodsAdmin';
 
+    public $imageFields = ['icon'];
     // Usar hooks de BasicController para lógica personalizada
     public function beforeSave(Request $request)
     {
-        $data = $request->except(['icon', 'config_files']);
+        $data = $request->except(['config_files']);
 
         // Convertir booleanos y valores numéricos
         $data['is_active'] = $request->boolean('is_active', true);
@@ -33,13 +34,6 @@ class PaymentMethodController extends BasicController
             $data['slug'] = Str::slug($data['name']);
         }
 
-        // Icono
-        if ($request->hasFile('icon')) {
-            $icon = $request->file('icon');
-            $filename = time() . '_' . Str::slug($data['name']) . '.' . $icon->getClientOriginalExtension();
-            $icon->storeAs('payment_icons', $filename, 'public');
-            $data['icon'] = $filename;
-        }
 
         // Configuración JSON
         $configuration = [];
@@ -56,9 +50,14 @@ class PaymentMethodController extends BasicController
         if ($request->hasFile('config_files')) {
             foreach ($request->file('config_files') as $fieldKey => $file) {
                 if ($file && $file->isValid()) {
-                    $filename = time() . '_config_' . $fieldKey . '.' . $file->getClientOriginalExtension();
-                    $file->storeAs('payment_config', $filename, 'public');
-                    $configuration[$fieldKey] = $filename;
+  
+
+                    $uuid = Crypto::randomUUID();
+                    $ext = $file->getClientOriginalExtension();
+                    $path = "images/payment_method/{$uuid}.{$ext}";
+                    Storage::put($path, file_get_contents($file));
+                    $configuration[$fieldKey] = "{$uuid}.{$ext}";
+                   
                 }
             }
         }
@@ -461,7 +460,6 @@ class PaymentMethodController extends BasicController
                 'message' => 'Estado actualizado exitosamente',
                 'is_active' => $method->is_active
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -499,7 +497,6 @@ class PaymentMethodController extends BasicController
                 'status' => true,
                 'message' => 'Orden actualizado exitosamente'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -515,7 +512,7 @@ class PaymentMethodController extends BasicController
     {
         try {
             $methods = PaymentMethod::active()->ordered()->get();
-            
+
             $formattedMethods = $methods->map(function ($method) {
                 return [
                     'id' => $method->id,
@@ -536,7 +533,6 @@ class PaymentMethodController extends BasicController
                 'status' => true,
                 'methods' => $formattedMethods
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,
@@ -565,7 +561,7 @@ class PaymentMethodController extends BasicController
             case 'qr':
             case 'manual':
                 // Incluir toda la configuración excepto claves sensibles
-                $publicConfig = array_filter($config, function($key) {
+                $publicConfig = array_filter($config, function ($key) {
                     return !in_array($key, ['secret_key', 'access_token', 'private_key']);
                 }, ARRAY_FILTER_USE_KEY);
                 break;
@@ -581,19 +577,18 @@ class PaymentMethodController extends BasicController
     {
         try {
             $method = PaymentMethod::findOrFail($id);
-            
+
             // Eliminar icono si existe
             if ($method->icon) {
                 Storage::disk('public')->delete('payment_icons/' . $method->icon);
             }
-            
+
             $method->delete();
 
             return response()->json([
                 'status' => true,
                 'message' => 'Método de pago eliminado exitosamente'
             ]);
-
         } catch (\Exception $e) {
             return response()->json([
                 'status' => false,

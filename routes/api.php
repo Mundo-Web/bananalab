@@ -197,8 +197,8 @@ Route::middleware('auth')->group(function () {
 
     // Payment Methods Management
     Route::post('/payment-methods/paginate', [AdminPaymentMethodController::class, 'paginate']);
-    Route::post('/payment-methods', [AdminPaymentMethodController::class, 'store']);
-    Route::put('/payment-methods/{id}', [AdminPaymentMethodController::class, 'update']);
+    Route::post('/payment-methods', [AdminPaymentMethodController::class, 'save']);
+
     Route::get('/payment-methods/templates', [AdminPaymentMethodController::class, 'getConfigTemplates']);
     Route::patch('/payment-methods/{id}/toggle', [AdminPaymentMethodController::class, 'toggleStatus']);
     Route::delete('/payment-methods/{id}', [AdminPaymentMethodController::class, 'destroy']);
