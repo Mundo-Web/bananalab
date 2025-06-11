@@ -543,10 +543,15 @@ class PaymentMethodController extends BasicController
 
     /**
      * Obtener configuración pública (sin claves privadas)
-     */
-    private function getPublicConfig($method)
+     */    private function getPublicConfig($method)
     {
         $config = $method->configuration ?? [];
+        
+        // Ensure configuration is an array (might be stored as JSON string)
+        if (is_string($config)) {
+            $config = json_decode($config, true) ?? [];
+        }
+        
         $publicConfig = [];
 
         // Solo incluir datos públicos según el tipo

@@ -135,7 +135,7 @@ class PaymentMethod extends Model
             return $this->icon;
         }
 
-        return asset('storage/payment_icons/' . $this->icon);
+        return asset('storage/images/payment_method/' . $this->icon);
     }
 
     /**
