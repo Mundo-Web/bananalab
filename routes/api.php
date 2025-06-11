@@ -169,10 +169,12 @@ Route::prefix('payments')->group(function () {
 });
 
 // Nuevas rutas para MercadoPago
+Route::get('/mercadopago/config', [MercadoPagoController::class, 'getConfig']);
 Route::post('/mercadopago/preference', [MercadoPagoController::class, 'createPreference']);
 Route::get('/mercadopago/success', [MercadoPagoController::class, 'handleSuccess']);
 Route::get('/mercadopago/failure', [MercadoPagoController::class, 'handleFailure']);
 Route::get('/mercadopago/pending', [MercadoPagoController::class, 'handlePending']);
+Route::post('/mercadopago/webhook', [MercadoPagoController::class, 'webhook']);
 
 //pedido
 Route::post('/orders', [MercadoPagoController::class, 'getOrder']);

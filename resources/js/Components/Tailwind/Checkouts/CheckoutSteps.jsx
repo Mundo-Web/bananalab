@@ -7,6 +7,39 @@ import Global from "../../../Utils/Global";
 
 export default function CheckoutSteps({ cart, setCart, user }) {
     const [currentStep, setCurrentStep] = useState(1);
+    
+    // Detectar parámetros de URL para pagos exitosos
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const step = urlParams.get('step');
+        const status = urlParams.get('status');
+        const paymentType = urlParams.get('payment_type');
+        const orderNumber = urlParams.get('order');
+        
+        console.log('🔍 CheckoutSteps: Parámetros URL detectados:', { step, status, paymentType, orderNumber });
+        
+        if (step === '3' && status === 'success' && paymentType === 'mercadopago') {
+            console.log('✅ CheckoutSteps: Pago exitoso de MercadoPago detectado, navegando al paso 3');
+            setCurrentStep(3);
+            
+            if (orderNumber) {
+                setCode(orderNumber);
+                // Mostrar notificación de éxito
+                if (window.Notify) {
+                    window.Notify.add({
+                        icon: "/assets/img/icon.svg",
+                        title: "¡Pago exitoso!",
+                        body: "Tu pago con MercadoPago ha sido procesado correctamente.",
+                        type: "success",
+                    });
+                }
+            }
+            
+            // Limpiar la URL para evitar confusiones
+            window.history.replaceState({}, document.title, window.location.pathname);
+        }
+    }, []);
+    
     // Calcular el precio total incluyendo IGV
     const totalPrice = cart.reduce((acc, item) => {
         const finalPrice = item.final_price;

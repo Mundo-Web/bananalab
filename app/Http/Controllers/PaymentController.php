@@ -135,58 +135,40 @@ class PaymentController extends Controller
                 ], 400);
             }
 
-            $saleStatusPendiente = SaleStatus::getByName('Pendiente') ?? SaleStatus::first();
-
-            // Crear la venta (similar a Culqi pero con MercadoPago)
-            $sale = Sale::create([
-                'code' => 'MP_' . time() . '_' . $request->user_id,
-                'user_id' => $request->user_id,
-                'name' => $request->name,
-                'lastname' => $request->lastname,
-                'fullname' => $request->fullname ?? $request->name . ' ' . $request->lastname,
-                'email' => $request->email,
-                'phone' => $request->phone ?? '',
-                'country' => $request->country ?? 'Perú',
-                'department' => $request->department,
-                'province' => $request->province,
-                'district' => $request->district,
-                'ubigeo' => $request->ubigeo,
-                'address' => $request->address,
-                'number' => $request->number,
-                'reference' => $request->reference,
-                'comment' => $request->comment,
-                'amount' => $request->amount,
-                'delivery' => $request->delivery ?? 0,
-                'payment_status' => 'pendiente_mercadopago',
-                'status_id' => $saleStatusPendiente->id,
-                'payment_method' => 'mercadopago'
-            ]);
-
-            // Registrar detalles de la venta
-            foreach ($request->cart as $item) {
-                $itemId = is_array($item) ? $item['id'] ?? null : $item->id ?? null;
-                $itemName = is_array($item) ? $item['name'] ?? null : $item->name ?? null;
-                $itemPrice = is_array($item) ? $item['final_price'] ?? null : $item->final_price ?? null;
-                $itemQuantity = is_array($item) ? $item['quantity'] ?? null : $item->quantity ?? null;
-
-                SaleDetail::create([
-                    'sale_id' => $sale->id,
-                    'item_id' => $itemId,
-                    'name' => $itemName,
-                    'price' => $itemPrice,
-                    'quantity' => $itemQuantity,
-                ]);
+            // Verificar que MercadoPago esté configurado
+            if (!config('services.mercadopago.access_token') || !config('services.mercadopago.public_key')) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'MercadoPago no está configurado correctamente'
+                ], 500);
             }
 
-            // Aquí integrarías con MercadoPago SDK
-            // Por ahora simulamos respuesta exitosa
+            // Usar el MercadoPagoController para crear la preferencia
+            $mercadoPagoController = new \App\Http\Controllers\MercadoPagoController();
+            $preferenceResponse = $mercadoPagoController->createPreference($request);
+            
+            // Verificar si la preferencia se creó exitosamente
+            $responseData = $preferenceResponse->getData(true);
+            
+            if (!$responseData['status']) {
+                return response()->json([
+                    'status' => false,
+                    'message' => $responseData['message'] ?? 'Error al crear preferencia de MercadoPago'
+                ], 400);
+            }
+
             return response()->json([
                 'status' => true,
-                'message' => 'Orden creada exitosamente',
-                'sale' => $sale,
+                'message' => 'Preferencia de MercadoPago creada exitosamente',
+                'sale' => [
+                    'id' => $responseData['sale_id'],
+                    'code' => $responseData['orderNumber']
+                ],
                 'delivery' => $request->delivery ?? 0,
-                'code' => $sale->code,
-                'payment_url' => 'https://mercadopago.com/checkout/preference_id_here'
+                'code' => $responseData['orderNumber'],
+                'payment_url' => $responseData['redirect_url'],
+                'preference_id' => $responseData['preference_id'],
+                'public_key' => $responseData['public_key']
             ]);
 
         } catch (\Exception $e) {

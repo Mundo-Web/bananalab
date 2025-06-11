@@ -73,6 +73,11 @@ foreach ($pages as $page) {
 Route::get('/base-template', [SystemController::class, 'reactView'])->name('System.jsx');
 Route::get('/login', [AuthController::class, 'loginView'])->name('Login.jsx');
 
+// Test routes for development
+Route::get('/test-mercadopago', function () {
+    return view('test-mercadopago');
+})->name('test.mercadopago');
+
 // Admin routes
 Route::middleware(['can:Admin', 'auth'])->prefix('admin')->group(function () {
 
@@ -128,6 +133,28 @@ Route::middleware(['can:Admin', 'auth'])->prefix('admin')->group(function () {
 
     Route::get('/profile', [AdminProfileController::class, 'reactView'])->name('Admin/Profile.jsx');
     Route::get('/account', [AdminAccountController::class, 'reactView'])->name('Admin/Account.jsx');
+});
+
+// Rutas de callback para MercadoPago
+Route::get('/checkout/success', function (Illuminate\Http\Request $request) {
+    $orderNumber = $request->query('external_reference');
+    $paymentType = $request->query('payment_type');
+    
+    if ($paymentType === 'mercadopago') {
+        return redirect('/cart?step=3&order=' . $orderNumber . '&status=success&payment_type=mercadopago');
+    }
+    
+    return redirect('/cart?step=3&status=success');
+});
+
+Route::get('/checkout/failure', function (Illuminate\Http\Request $request) {
+    $orderNumber = $request->query('external_reference');
+    return redirect('/cart?message=El pago ha sido rechazado&order=' . $orderNumber);
+});
+
+Route::get('/checkout/pending', function (Illuminate\Http\Request $request) {
+    $orderNumber = $request->query('external_reference');
+    return redirect('/cart?message=Pago pendiente de confirmación&order=' . $orderNumber);
 });
 
 if (env('APP_ENV') === 'local') {

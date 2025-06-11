@@ -5,7 +5,7 @@
 // Procesar pago con MercadoPago
 export const processMercadoPagoPayment = async (request) => {
     try {
-        const response = await fetch('/api/payments/mercadopago', {
+        const response = await fetch('/api/mercadopago/preference', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -18,7 +18,29 @@ export const processMercadoPagoPayment = async (request) => {
             throw new Error(`HTTP error! status: ${response.status}`);
         }
 
-        return await response.json();
+        const data = await response.json();
+        
+        // Si el pago fue exitoso, redirigir a MercadoPago
+        if (data.status && data.redirect_url) {
+            // Mostrar mensaje de redirección
+            if (window.Notify) {
+                window.Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "Redirigiendo a MercadoPago",
+                    body: "Te estamos redirigiendo al checkout seguro de MercadoPago...",
+                    type: "info",
+                });
+            }
+            
+            // Redirigir después de un breve delay
+            setTimeout(() => {
+                window.location.href = data.redirect_url;
+            }, 1500);
+            
+            return data;
+        }
+        
+        return data;
     } catch (error) {
         console.error('Error processing MercadoPago payment:', error);
         throw error;

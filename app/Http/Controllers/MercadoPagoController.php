@@ -7,6 +7,7 @@ use App\Models\Sale;
 use App\Models\SaleDetail;
 use App\Models\SaleStatus;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use MercadoPago\MercadoPagoConfig;
 use MercadoPago\Exceptions\MPApiException;
 use MercadoPago\Client\Preference\PreferenceClient;
@@ -18,67 +19,117 @@ class MercadoPagoController extends Controller
     public function createPreference(Request $request)
     {
         try {
-            // Configurar SDK de MercadoPago
-            MercadoPagoConfig::setAccessToken(config('services.mercadopago.access_token'));
+
+            // Obtener configuración de MercadoPago desde la base de datos
+            $paymentMethod = \App\Models\PaymentMethod::where('slug', 'mercadopago')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$paymentMethod) {
+                return response()->json([
+                    'message' => 'MercadoPago no está disponible',
+                    'status' => false,
+                ], 400);
+            }
+
+            $config = json_decode($paymentMethod->configuration, true);
+            
+            // Configurar SDK de MercadoPago con datos de la DB
+            MercadoPagoConfig::setAccessToken($config['access_token']);
 
             // Generar número de orden
             $orderNumber = $this->generateOrderNumber();
+
+            // Extraer datos del cliente (puede venir en $request->customer o directamente en $request)
+            $customer = $request->customer ?? [];
+            $customerName = $customer['name'] ?? $request->name ?? 'Cliente';
+            $customerLastname = $customer['lastname'] ?? $request->lastname ?? '';
+            $customerEmail = $customer['email'] ?? $request->email ?? 'test@example.com';
+            $customerPhone = $customer['phone'] ?? $request->phone ?? '';
 
             // Crear registro de venta con estado "pendiente" ANTES de crear la preferencia
             $saleStatusPendiente = SaleStatus::getByName('Pendiente');
 
             $sale = Sale::create([
                 'code' => $orderNumber,
-                'user_id' => $request->user_id,
-                'name' => $request->name,
-                'lastname' => $request->lastname,
-                'fullname' => $request->fullname,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'country' => $request->country,
-                'department' => $request->department,
-                'province' => $request->province,
-                'district' => $request->district,
-                'ubigeo' => $request->ubigeo,
-                'address' => $request->address,
-                'number' => $request->number,
-                'reference' => $request->reference,
-                'comment' => $request->comment,
-                'amount' => $request->amount,
-                'delivery' => $request->delivery,
+                'user_id' => $request->user_id ?? null,
+                'name' => $customerName,
+                'lastname' => $customerLastname,
+                'fullname' => $customerName . ' ' . $customerLastname,
+                'email' => $customerEmail,
+                'phone' => $customerPhone,
+                'country' => $request->country ?? 'PE',
+                'department' => $request->department ?? '',
+                'province' => $request->province ?? '',
+                'district' => $request->district ?? '',
+                'ubigeo' => $request->ubigeo ?? '',
+                'address' => $request->address ?? '',
+                'number' => $request->number ?? '',
+                'reference' => $request->reference ?? '',
+                'comment' => $request->comment ?? '',
+                'amount' => $request->amount ?? 0,
+                'delivery' => $request->delivery ?? 0,
                 'payment_status' => 'pendiente',
                 'status_id' => $saleStatusPendiente ? $saleStatusPendiente->id : null,
-                'invoiceType' => $request->invoiceType,
-                'documentType' => $request->documentType,
-                'document' => $request->document,
-                'businessName' => $request->businessName,
+                'invoiceType' => $request->invoiceType ?? '',
+                'documentType' => $request->documentType ?? '',
+                'document' => $request->document ?? '',
+                'businessName' => $request->businessName ?? '',
             ]);
 
              // Registrar detalles de la venta (sin afectar stock aún)
-            foreach ($request->cart as $item) {
+            $cart = $request->cart ?? $request->items ?? [];
+            
+            foreach ($cart as $item) {
                 $itemId = is_array($item) ? $item['id'] ?? null : $item->id ?? null;
-                $itemName = is_array($item) ? $item['name'] ?? null : $item->name ?? null;
-                $itemPrice = is_array($item) ? $item['final_price'] ?? null : $item->final_price ?? null;
+                $itemName = is_array($item) ? ($item['name'] ?? $item['title'] ?? null) : ($item->name ?? $item->title ?? null);
+                $itemPrice = is_array($item) ? ($item['final_price'] ?? $item['unit_price'] ?? null) : ($item->final_price ?? $item->unit_price ?? null);
                 $itemQuantity = is_array($item) ? $item['quantity'] ?? null : $item->quantity ?? null;
 
-                SaleDetail::create([
-                    'sale_id' => $sale->id,
-                    'item_id' => $itemId,
-                    'name' => $itemName,
-                    'price' => $itemPrice,
-                    'quantity' => $itemQuantity,
-                ]);
+                if ($itemName && $itemPrice && $itemQuantity && $itemId) {
+                    // Solo crear el detalle si tenemos un item_id válido
+                    try {
+                        SaleDetail::create([
+                            'sale_id' => $sale->id,
+                            'item_id' => $itemId,
+                            'name' => $itemName,
+                            'price' => $itemPrice,
+                            'quantity' => $itemQuantity,
+                        ]);
+                    } catch (\Exception $e) {
+                        // Si falla crear el detalle (ej: item_id no existe), continuar
+                        \Illuminate\Support\Facades\Log::warning('No se pudo crear detalle de venta: ' . $e->getMessage());
+                    }
+                }
             }
 
             // Configurar items para MercadoPago
             $items = [];
 
-            foreach ($request->cart as $cartItem) {
+            foreach ($cart as $cartItem) {
+                $itemTitle = is_array($cartItem) ? ($cartItem['name'] ?? $cartItem['title'] ?? null) : ($cartItem->name ?? $cartItem->title ?? null);
+                $itemPrice = is_array($cartItem) ? ($cartItem['final_price'] ?? $cartItem['unit_price'] ?? null) : ($cartItem->final_price ?? $cartItem->unit_price ?? null);
+                $itemQuantity = is_array($cartItem) ? ($cartItem['quantity'] ?? null) : ($cartItem->quantity ?? null);
+                $itemId = is_array($cartItem) ? ($cartItem['id'] ?? null) : ($cartItem->id ?? null);
+
+                if ($itemTitle && $itemPrice && $itemQuantity) {
+                    $items[] = [
+                        'id' => $itemId ? (string) $itemId : 'item',
+                        'title' => $itemTitle,
+                        'quantity' => (int) $itemQuantity,
+                        'unit_price' => round((float) $itemPrice, 2),
+                        'currency_id' => 'PEN',
+                    ];
+                }
+            }
+
+            // Si no hay items del carrito, crear un item por defecto basado en el monto
+            if (empty($items)) {
                 $items[] = [
-                    'id' => is_array($cartItem) ? (string) $cartItem['id'] ?? null : (string) $cartItem->id ?? null,
-                    'title' => is_array($cartItem) ? $cartItem['name'] ?? null : $cartItem->name ?? null,
-                    'quantity' => is_array($cartItem) ? (int) $cartItem['quantity'] ?? null : (int) $cartItem->quantity ?? null,
-                    'unit_price' => is_array($cartItem) ? (float) $cartItem['final_price'] ?? null : (float) $cartItem->final_price ?? null,
+                    'id' => 'default',
+                    'title' => 'Pago',
+                    'quantity' => 1,
+                    'unit_price' => round((float) $request->amount, 2),
                     'currency_id' => 'PEN',
                 ];
             }
@@ -94,6 +145,10 @@ class MercadoPagoController extends Controller
                 ];
             }
 
+            // Use public URLs for sandbox mode (MercadoPago requirement)
+            $baseUrl = ($config['sandbox'] ?? true) ? 'https://httpbin.org' : config('app.url');
+            $webhookUrl = ($config['sandbox'] ?? true) ? 'https://httpbin.org/post' : config('app.url') . '/api/mercadopago/webhook';
+
             // Configurar preferencia
             $preferenceData = [
                 'items' => $items,
@@ -103,42 +158,49 @@ class MercadoPagoController extends Controller
                     'excluded_payment_types' => [
                         ['id' => 'ticket'], // Excluye pagos en efectivo (Ripley, Banco Azteca, etc.)
                         ['id' => 'atm'], // Excluye pagos en cajeros
-                        ['id' => 'bank_transfer'], // Excluye transferencias bancarias
-                        ['id' => 'digital_wallet'], // Excluye billeteras digitales
-                        ['id' => 'digital_currency'], // Excluye criptomonedas
-                        ['id' => 'prepaid_card'], // Excluye tarjetas prepago
                     ],
                     'installments' => 6,
                     'default_installments' => 1,
                 ],
                 'payer' => [
-                    'name' => $request->name,
-                    'surname' => $request->lastname,
-                    'email' => $request->email,
+                    'name' => $customerName,
+                    'surname' => $customerLastname,
+                    'email' => $customerEmail,
                     'phone' => [
                         'area_code' => '',
-                        'number' => $request->phone ?? '',
+                        'number' => $customerPhone,
                     ],
                     'address' => [
-                        'street_name' => $request->address,
+                        'street_name' => $request->address ?? '',
                         'street_number' => $request->number ?? '',
                         'zip_code' => '',
                     ],
                 ],
                 'back_urls' => [
-                    'success' => url('/api/mercadopago/success'),
-                    'failure' => url('/api/mercadopago/failure'),
-                    'pending' => url('/api/mercadopago/pending'),
+                    'success' => $baseUrl . '/status/200?payment_type=mercadopago&order=' . $orderNumber,
+                    'failure' => $baseUrl . '/status/400?payment_type=mercadopago&order=' . $orderNumber,
+                    'pending' => $baseUrl . '/status/202?payment_type=mercadopago&order=' . $orderNumber,
                 ],
                 'auto_return' => 'approved',
                 'external_reference' => $orderNumber,
+                'notification_url' => $webhookUrl,
+                'expires' => true,
+                'expiration_date_from' => now()->toISOString(),
+                'expiration_date_to' => now()->addHours(24)->toISOString(),
             ];
 
             // Crear preferencia
             $client = new PreferenceClient();
 
             // Guardar la preferencia
-            $preference = $client->create($preferenceData);
+            try {
+                $preference = $client->create($preferenceData);
+            } catch (\Exception $e) {
+                // Log detallado del error de MercadoPago
+                \Illuminate\Support\Facades\Log::error('Error en MercadoPago API: ' . $e->getMessage());
+                \Illuminate\Support\Facades\Log::error('Datos enviados: ' . json_encode($preferenceData, JSON_PRETTY_PRINT));
+                throw new \Exception('Error en la API de MercadoPago: ' . $e->getMessage());
+            }
 
             if (!$preference || !isset($preference->id)) {
                 throw new \Exception('No se pudo crear la preferencia de pago');
@@ -147,10 +209,12 @@ class MercadoPagoController extends Controller
             return response()->json([
                 'status' => true,
                 'preference_id' => $preference->id,
-                'public_key' => config('services.mercadopago.public_key'),
+                'public_key' => $config['public_key'],
+                'init_point' => $preference->init_point,
+                'sandbox_init_point' => $preference->sandbox_init_point,
                 'redirect_url' => $preference->init_point,
                 'orderNumber' => $orderNumber,
-                'cart' => $request->cart,
+                'cart' => $cart,
                 'sale_id' => $sale->id,
             ]);
         } catch (\Exception $e) {
@@ -171,57 +235,15 @@ class MercadoPagoController extends Controller
     public function handleSuccess(Request $request)
     {
         try {
-
-            // Verificar el pago con MercadoPago
-            MercadoPagoConfig::setAccessToken(config('services.mercadopago.access_token'));
-
-            $paymentClient = new PaymentClient();
-
-            $paymentId = $request->input('payment_id') ?? $request->input('data.id') ?? $request->query('payment_id');
-
-            if (!$paymentId) {
-                return redirect('/cart?message=No se recibió ID de pago');
-            }
-
-            $payment = $paymentClient->get($paymentId);
-
-            if ($payment->status !== 'approved') {
-                return redirect('/cart?message=Pago no aprobado. Estado: ' . $payment->status);
-            }
-
-            // Obtener el ID de la venta desde external_reference
-            $saleId = $payment->external_reference ?? $request->query('external_reference');
-
-            if (!$saleId) {
-                return redirect('/cart?message=No se pudo identificar la orden');
-            }
-
-            // Buscar la venta
-            $sale = Sale::where('code', $saleId)->first();
-
-            if (!$sale) {
-                return redirect('/cart?message=Orden no encontrada');
-            }
-
-            // Registrar la venta
-            $saleStatusPagado = SaleStatus::getByName('Pagado');
-
-            $sale->update([
-                'culqi_charge_id' => $payment->id,
-                'payment_status' => 'pagado',
-                'status_id' => $saleStatusPagado ? $saleStatusPagado->id : null,
-            ]);
-
+            // Los pagos exitosos serán manejados por el webhook
+            // Aquí solo redirigimos al usuario con el external_reference
+            $externalReference = $request->query('external_reference');
             
-            $saleDetails = SaleDetail::where('sale_id', $sale->id)->get();
-            
-            // Actualizar stock (solo si el pago es aprobado)
-            foreach ($saleDetails as $detail) {
-                Item::where('id', $detail->item_id)->decrement('stock', $detail->quantity);
+            if ($externalReference) {
+                return redirect('/checkout/step/3?order=' . $externalReference . '&status=success');
             }
-
-            return redirect('/cart?code=' . $sale->code);
-
+            
+            return redirect('/checkout/step/3?status=success');
         } catch (\Exception $e) {
             return redirect('/cart?message=' . urlencode($e->getMessage()));
         }
@@ -229,13 +251,108 @@ class MercadoPagoController extends Controller
 
     public function handleFailure(Request $request)
     {
-        return redirect('/catalogo');
-        // return redirect('/cart?message=El pago ha sido rechazado');
+        $externalReference = $request->query('external_reference');
+        return redirect('/cart?message=El pago ha sido rechazado&order=' . $externalReference);
     }
 
     public function handlePending(Request $request)
     {
-        return redirect('/cart?message=Pago pendiente de confirmacion');
+        $externalReference = $request->query('external_reference');
+        return redirect('/cart?message=Pago pendiente de confirmacion&order=' . $externalReference);
+    }
+
+    public function webhook(Request $request)
+    {
+        try {
+            // Obtener configuración de MercadoPago desde la base de datos
+            $paymentMethod = \App\Models\PaymentMethod::where('slug', 'mercadopago')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$paymentMethod) {
+                return response()->json(['status' => 'error'], 400);
+            }
+
+            $config = json_decode($paymentMethod->configuration, true);
+            
+            // Configurar SDK de MercadoPago con datos de la DB
+            MercadoPagoConfig::setAccessToken($config['access_token']);
+
+            $data = $request->all();
+            
+            // Verificar si es una notificación de pago
+            if ($data['type'] === 'payment' && isset($data['data']['id'])) {
+                $paymentId = $data['data']['id'];
+                
+                $paymentClient = new PaymentClient();
+                $payment = $paymentClient->get($paymentId);
+
+                if ($payment && $payment->external_reference) {
+                    $sale = Sale::where('code', $payment->external_reference)->first();
+                    
+                    if ($sale) {
+                        if ($payment->status === 'approved') {
+                            // Pago aprobado
+                            $saleStatusPagado = SaleStatus::getByName('Pagado');
+                            
+                            $sale->update([
+                                'culqi_charge_id' => $payment->id,
+                                'payment_status' => 'pagado',
+                                'status_id' => $saleStatusPagado ? $saleStatusPagado->id : null,
+                            ]);
+
+                            // Actualizar stock
+                            $saleDetails = SaleDetail::where('sale_id', $sale->id)->get();
+                            foreach ($saleDetails as $detail) {
+                                Item::where('id', $detail->item_id)->decrement('stock', $detail->quantity);
+                            }
+                        } elseif ($payment->status === 'rejected') {
+                            // Pago rechazado
+                            $saleStatusRechazado = SaleStatus::getByName('Rechazado');
+                            
+                            $sale->update([
+                                'payment_status' => 'rechazado',
+                                'status_id' => $saleStatusRechazado ? $saleStatusRechazado->id : null,
+                            ]);
+                        }
+                    }
+                }
+            }
+
+            return response()->json(['status' => 'success'], 200);
+        } catch (\Exception $e) {
+            Log::error('MercadoPago Webhook Error: ' . $e->getMessage());
+            return response()->json(['status' => 'error'], 500);
+        }
+    }
+
+    public function getConfig()
+    {
+        try {
+            $paymentMethod = \App\Models\PaymentMethod::where('slug', 'mercadopago')
+                ->where('is_active', true)
+                ->first();
+
+            if (!$paymentMethod) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'MercadoPago no está disponible'
+                ], 400);
+            }
+
+            $config = json_decode($paymentMethod->configuration, true);
+
+            return response()->json([
+                'status' => true,
+                'public_key' => $config['public_key'],
+                'is_sandbox' => $config['sandbox'] ?? true,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Error al obtener configuración: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     private function generateOrderNumber()

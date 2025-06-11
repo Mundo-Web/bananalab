@@ -9,7 +9,8 @@ import ButtonSecondary from "./ButtonSecondary";
 import InputForm from "./InputForm";
 import SelectForm from "./SelectForm";
 import OptionCard from "./OptionCard";
-import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check, User, Copy, QrCode, Clock } from "lucide-react";
+import PaymentStepsModal from "./PaymentStepsModal";
+import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check, User, Copy, QrCode, Clock, ChevronRight } from "lucide-react";
 import { Notify } from "sode-extend-react";
 
 export default function ShippingStep({
@@ -51,6 +52,10 @@ export default function ShippingStep({
     const [availablePaymentMethods, setAvailablePaymentMethods] = useState([]);
     const [loadingMethods, setLoadingMethods] = useState(true);
 
+    // Estados para el modal de pasos de pago
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setFormData((prev) => ({ ...prev, [name]: value }));
@@ -67,6 +72,157 @@ export default function ShippingStep({
         if (selectedMethod && !selectedMethod.requires_proof) {
             setPaymentProof(null);
             setPaymentProofPreview(null);
+        }
+    };
+
+    // Función para obtener datos del checkout
+    const getCheckoutData = () => {
+        return {
+            user_id: user?.id || "",
+            name: formData?.name || "",
+            lastname: formData?.lastname || "",
+            fullname: `${formData?.name} ${formData?.lastname}`,
+            email: formData?.email || "",
+            phone: formData?.phone || "",
+            country: "Perú",
+            department: departamento || "",
+            province: provincia || "",
+            district: distrito || "",
+            ubigeo: null,
+            address: formData?.address || "",
+            number: formData?.number || "",
+            comment: formData?.comment || "",
+            reference: formData?.reference || "",
+            amount: totalFinal || 0,
+            delivery: envio,
+            cart: cart,
+            payment_method: formData.paymentMethod,
+            invoiceType: formData.invoiceType,
+            documentType: formData.documentType,
+            document: formData.document,
+            businessName: formData.businessName,
+        };
+    };
+
+    // Abrir modal de pasos de pago
+    const handleOpenPaymentModal = () => {
+        const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
+        if (selectedMethod) {
+            setSelectedPaymentMethod(selectedMethod);
+            setShowPaymentModal(true);
+        }
+    };
+
+    // Manejar pago exitoso desde el modal
+    const handlePaymentSuccess = async () => {
+        const baseRequest = {
+            user_id: user?.id || "",
+            name: formData?.name || "",
+            lastname: formData?.lastname || "",
+            fullname: `${formData?.name} ${formData?.lastname}`,
+            email: formData?.email || "",
+            phone: formData?.phone || "",
+            country: "Perú",
+            department: departamento || "",
+            province: provincia || "",
+            district: distrito || "",
+            ubigeo: null,
+            address: formData?.address || "",
+            number: formData?.number || "",
+            comment: formData?.comment || "",
+            reference: formData?.reference || "",
+            amount: totalFinal || 0,
+            delivery: envio,
+            cart: cart,
+            payment_method: formData.paymentMethod,
+            invoiceType: formData.invoiceType,
+            documentType: formData.documentType,
+            document: formData.document,
+            businessName: formData.businessName,
+        };
+
+        try {
+            let response;
+            const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
+            
+            if (!selectedMethod) {
+                throw new Error('Método de pago no válido');
+            }
+            
+            // Procesar según el tipo de método de pago
+            switch (selectedMethod.type) {
+                case 'gateway':
+                    if (selectedMethod.slug === 'culqi') {
+                        if (!window.Culqi) {
+                            console.error("❌ Culqi aún no se ha cargado.");
+                            return;
+                        }
+                        response = await processCulqiPayment(baseRequest);
+                    } else if (selectedMethod.slug === 'mercadopago') {
+                        response = await processMercadoPagoPayment(baseRequest);
+                    } else {
+                        throw new Error('Gateway no implementado');
+                    }
+                    break;
+                
+                case 'qr':
+                case 'manual':
+                    // Para métodos manuales o QR, subir comprobante
+                    const formDataPayment = new FormData();
+                    Object.keys(baseRequest).forEach(key => {
+                        if (Array.isArray(baseRequest[key])) {
+                            formDataPayment.append(key, JSON.stringify(baseRequest[key]));
+                        } else {
+                            formDataPayment.append(key, baseRequest[key]);
+                        }
+                    });
+                    
+                    if (paymentProof) {
+                        formDataPayment.append('payment_proof', paymentProof);
+                    }
+                    
+                    response = await processManualPayment(formDataPayment);
+                    break;
+                
+                default:
+                    throw new Error('Tipo de método de pago no válido');
+            }
+
+            const data = response;
+
+            if (data.status) {
+                setSale(data.sale);
+                setDelivery(data.delivery);
+                setCode(data.code);
+                setCart([]);
+                
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "¡Pedido procesado!",
+                    body: selectedMethod.type === 'gateway' 
+                        ? "Su pago ha sido procesado exitosamente" 
+                        : "Su pedido está pendiente de validación del comprobante",
+                    type: "success",
+                });
+                
+                onContinue();
+            } else {
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "Error en el Pago",
+                    body: data.message || "El pago ha sido rechazado",
+                    type: "danger",
+                });
+            }
+        } catch (error) {
+            console.log(error);
+            Notify.add({
+                icon: "/assets/img/icon.svg",
+                title: "Error en el Pago",
+                body: "No se pudo procesar el pago",
+                type: "danger",
+            });
+            throw error;
         }
     };
 
@@ -266,122 +422,8 @@ export default function ShippingStep({
             return;
         }
 
-        // Validar comprobante para métodos que lo requieren
-        const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
-        if (selectedMethod && selectedMethod.requires_proof && !paymentProof) {
-            Notify.add({
-                icon: "/assets/img/icon.svg",
-                title: "Comprobante requerido",
-                body: "Debe subir el comprobante de pago para este método",
-                type: "danger",
-            });
-            return;
-        }
-
-        const baseRequest = {
-            user_id: user?.id || "",
-            name: formData?.name || "",
-            lastname: formData?.lastname || "",
-            fullname: `${formData?.name} ${formData?.lastname}`,
-            email: formData?.email || "",
-            phone: "",
-            country: "Perú",
-            department: departamento || "",
-            province: provincia || "",
-            district: distrito || "",
-            ubigeo: null,
-            address: formData?.address || "",
-            number: formData?.number || "",
-            comment: formData?.comment || "",
-            reference: formData?.reference || "",
-            amount: totalFinal || 0,
-            delivery: envio,
-            cart: cart,
-            payment_method: formData.paymentMethod,
-        };
-
-        try {
-            let response;
-            const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
-            
-            if (!selectedMethod) {
-                throw new Error('Método de pago no válido');
-            }
-            
-            // Procesar según el tipo de método de pago
-            switch (selectedMethod.type) {
-                case 'gateway':
-                    if (selectedMethod.slug === 'culqi') {
-                        if (!window.Culqi) {
-                            console.error("❌ Culqi aún no se ha cargado.");
-                            return;
-                        }
-                        response = await processCulqiPayment(baseRequest);
-                    } else if (selectedMethod.slug === 'mercadopago') {
-                        response = await processMercadoPagoPayment(baseRequest);
-                    } else {
-                        throw new Error('Gateway no implementado');
-                    }
-                    break;
-                
-                case 'qr':
-                case 'manual':
-                    // Para métodos manuales o QR, subir comprobante
-                    const formData = new FormData();
-                    Object.keys(baseRequest).forEach(key => {
-                        if (Array.isArray(baseRequest[key])) {
-                            formData.append(key, JSON.stringify(baseRequest[key]));
-                        } else {
-                            formData.append(key, baseRequest[key]);
-                        }
-                    });
-                    
-                    if (paymentProof) {
-                        formData.append('payment_proof', paymentProof);
-                    }
-                    
-                    response = await processManualPayment(formData);
-                    break;
-                
-                default:
-                    throw new Error('Tipo de método de pago no válido');
-            }
-
-            const data = response;
-
-            if (data.status) {
-                setSale(data.sale);
-                setDelivery(data.delivery);
-                setCode(data.code);
-                setCart([]);
-                
-                Notify.add({
-                    icon: "/assets/img/icon.svg",
-                    title: "¡Pedido procesado!",
-                    body: selectedMethod.type === 'gateway' 
-                        ? "Su pago ha sido procesado exitosamente" 
-                        : "Su pedido está pendiente de validación del comprobante",
-                    type: "success",
-                });
-                
-                onContinue();
-            } else {
-                Notify.add({
-                    icon: "/assets/img/icon.svg",
-                    title: "Error en el Pago",
-                    body: data.message || "El pago ha sido rechazado",
-                    type: "danger",
-                });
-            }
-        } catch (error) {
-            console.log(error);
-            Notify.add({
-                icon: "/assets/img/icon.svg",
-                title: "Error en el Pago",
-                body: "No se pudo procesar el pago",
-                type: "danger",
-            });
-        }
+        // Abrir modal de pasos de pago en lugar de procesar directamente
+        handleOpenPaymentModal();
     };
 
     const [selectedOption, setSelectedOption] = useState("free");
@@ -929,9 +971,7 @@ export default function ShippingStep({
                         value={formData.reference}
                         onChange={handleChange}
                         placeholder="Ejem. Altura de la avenida..."
-                    />
-
-    {/* Métodos de Pago */}
+                    />                    {/* Métodos de Pago - Simplificado */}
                     <div className="space-y-6">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -971,7 +1011,7 @@ export default function ShippingStep({
 
                                         <div className="flex items-center gap-4">
                                             {/* Icono del método */}
-                                            <div className={`w-16 h-16 rounded-xl flex items-center justify-center transition-all duration-200 ${
+                                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-all duration-200 ${
                                                 formData.paymentMethod === method.slug 
                                                     ? 'bg-primary text-white shadow-lg' 
                                                     : 'bg-gray-100 group-hover:bg-gray-200'
@@ -980,7 +1020,7 @@ export default function ShippingStep({
                                                     <img 
                                                         src={method.icon} 
                                                         alt={method.name}
-                                                        className="w-10 h-10 object-contain"
+                                                        className="w-8 h-8 object-contain"
                                                     />
                                                 ) : (
                                                     getPaymentMethodIcon(method.type, method.slug)
@@ -990,7 +1030,7 @@ export default function ShippingStep({
                                             {/* Información del método */}
                                             <div className="flex-1">
                                                 <div className="flex items-center gap-2 mb-1">
-                                                    <h4 className="font-semibold text-lg text-gray-900">{method.name}</h4>
+                                                    <h4 className="font-semibold text-gray-900">{method.name}</h4>
                                                     {/* Badge del tipo */}
                                                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
                                                         method.type === 'gateway' ? 'bg-blue-100 text-blue-800' :
@@ -1002,26 +1042,19 @@ export default function ShippingStep({
                                                     </span>
                                                 </div>
                                                 
-                                                <p className="text-sm text-gray-600 mb-2">{method.description}</p>
+                                                <p className="text-sm text-gray-600">{method.description}</p>
                                                 
-                                                {/* Información de tarifas */}
-                                                <div className="flex items-center gap-4 text-xs">
+                                                {/* Información de tarifas compacta */}
+                                                <div className="flex items-center gap-2 text-xs mt-1">
                                                     {method.fee_percentage > 0 || method.fee_fixed > 0 ? (
-                                                        <span className="text-orange-600 font-medium bg-orange-50 px-2 py-1 rounded">
+                                                        <span className="text-orange-600 font-medium">
                                                             {method.fee_percentage > 0 && `+${method.fee_percentage}%`}
                                                             {method.fee_percentage > 0 && method.fee_fixed > 0 && ' '}
                                                             {method.fee_fixed > 0 && `+S/ ${Number2Currency(method.fee_fixed)}`}
                                                         </span>
                                                     ) : (
-                                                        <span className="text-green-600 font-medium bg-green-50 px-2 py-1 rounded">
+                                                        <span className="text-green-600 font-medium">
                                                             Sin comisión
-                                                        </span>
-                                                    )}
-                                                    
-                                                    {method.requires_proof && (
-                                                        <span className="text-blue-600 bg-blue-50 px-2 py-1 rounded flex items-center gap-1">
-                                                            <Upload size={12} />
-                                                            Requiere comprobante
                                                         </span>
                                                     )}
                                                 </div>
@@ -1043,133 +1076,71 @@ export default function ShippingStep({
                             </div>
                         )}
 
-                        {/* Información del método seleccionado */}
+                        {/* Información resumida del método seleccionado */}
                         {(() => {
                             const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
-                            return selectedMethod ? renderPaymentInstructions(selectedMethod) : null;
-                        })()}
-
-                        {/* Subida de comprobante para métodos que lo requieren */}
-                        {(() => {
-                            const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
-                            return selectedMethod && selectedMethod.requires_proof ? (
-                                <div className="space-y-4 bg-gray-50 rounded-xl p-6">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                                            <Upload size={20} className="text-blue-600" />
+                            if (!selectedMethod) return null;
+                            
+                            const colorClass = getInstructionColor(selectedMethod.type);
+                            const getBgClass = () => {
+                                if (colorClass === 'blue') return 'bg-blue-50 border-blue-200';
+                                if (colorClass === 'purple') return 'bg-purple-50 border-purple-200';
+                                if (colorClass === 'green') return 'bg-green-50 border-green-200';
+                                return 'bg-gray-50 border-gray-200';
+                            };
+                            
+                            const getIconBgClass = () => {
+                                if (colorClass === 'blue') return 'bg-blue-100';
+                                if (colorClass === 'purple') return 'bg-purple-100';
+                                if (colorClass === 'green') return 'bg-green-100';
+                                return 'bg-gray-100';
+                            };
+                            
+                            const getTextClass = () => {
+                                if (colorClass === 'blue') return 'text-blue-800';
+                                if (colorClass === 'purple') return 'text-purple-800';
+                                if (colorClass === 'green') return 'text-green-800';
+                                return 'text-gray-800';
+                            };
+                            
+                            const getSecondaryTextClass = () => {
+                                if (colorClass === 'blue') return 'text-blue-700';
+                                if (colorClass === 'purple') return 'text-purple-700';
+                                if (colorClass === 'green') return 'text-green-700';
+                                return 'text-gray-700';
+                            };
+                            
+                            const getAccentTextClass = () => {
+                                if (colorClass === 'blue') return 'text-blue-600';
+                                if (colorClass === 'purple') return 'text-purple-600';
+                                if (colorClass === 'green') return 'text-green-600';
+                                return 'text-gray-600';
+                            };
+                            
+                            return (
+                                <div className={`border rounded-xl p-4 ${getBgClass()}`}>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getIconBgClass()}`}>
+                                            {getPaymentMethodIcon(selectedMethod.type, selectedMethod.slug)}
                                         </div>
-                                        <div>
-                                            <h4 className="font-semibold text-gray-900">Comprobante de Pago</h4>
-                                            <p className="text-sm text-gray-600">Sube tu comprobante para validar el pago</p>
-                                        </div>
+                                        <h4 className={`font-semibold ${getTextClass()}`}>
+                                            {selectedMethod.name} - {selectedMethod.type === 'gateway' ? 'Pago Online' : 'Proceso Paso a Paso'}
+                                        </h4>
                                     </div>
-
-                                    {/* Zona de subida */}
-                                    <div className={`border-2 border-dashed rounded-xl p-8 text-center transition-all duration-200 ${
-                                        paymentProof 
-                                            ? 'border-green-300 bg-green-50' 
-                                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
-                                    }`}>
-                                        {!paymentProof ? (
-                                            <div>
-                                                <Upload className="mx-auto h-16 w-16 text-gray-400 mb-4" />
-                                                <div className="space-y-2">
-                                                    <label htmlFor="payment-proof" className="cursor-pointer">
-                                                        <span className="bg-primary text-white px-6 py-3 rounded-lg hover:bg-primary-dark transition-colors font-medium inline-block">
-                                                            Seleccionar Archivo
-                                                        </span>
-                                                        <input
-                                                            id="payment-proof"
-                                                            type="file"
-                                                            className="hidden"
-                                                            accept="image/*,.pdf"
-                                                            onChange={handleFileUpload}
-                                                        />
-                                                    </label>
-                                                    <p className="text-sm text-gray-500">
-                                                        Arrastra y suelta tu archivo aquí, o haz clic para seleccionar
-                                                    </p>
-                                                    <p className="text-xs text-gray-400">
-                                                        Formatos: PNG, JPG, PDF • Tamaño máximo: 5MB
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-center gap-3">
-                                                    <Check className="text-green-600" size={24} />
-                                                    <span className="text-green-800 font-medium">Archivo cargado exitosamente</span>
-                                                </div>
-                                                
-                                                <div className="bg-white rounded-lg p-4 border border-green-200">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                                                            {paymentProof.type.startsWith('image/') ? (
-                                                                <img src="/assets/img/file-image.svg" alt="Image" className="w-6 h-6" />
-                                                            ) : (
-                                                                <img src="/assets/img/file-pdf.svg" alt="PDF" className="w-6 h-6" />
-                                                            )}
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <p className="font-medium text-gray-900 truncate">
-                                                                {paymentProof.name}
-                                                            </p>
-                                                            <p className="text-sm text-gray-500">
-                                                                {(paymentProof.size / 1024 / 1024).toFixed(2)} MB
-                                                            </p>
-                                                        </div>
-                                                        <button 
-                                                            onClick={() => {
-                                                                setPaymentProof(null);
-                                                                setPaymentProofPreview(null);
-                                                            }}
-                                                            className="text-red-500 hover:text-red-700 transition-colors"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
-                                                    
-                                                    {/* Preview de imagen */}
-                                                    {paymentProofPreview && (
-                                                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                                            <p className="text-sm text-gray-600 mb-2">Vista previa:</p>
-                                                            <img 
-                                                                src={paymentProofPreview} 
-                                                                alt="Preview" 
-                                                                className="max-w-full h-40 object-contain rounded-lg border mx-auto"
-                                                            />
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <label htmlFor="payment-proof-replace" className="cursor-pointer">
-                                                    <span className="text-primary hover:text-primary-dark text-sm font-medium">
-                                                        Cambiar archivo
-                                                    </span>
-                                                    <input
-                                                        id="payment-proof-replace"
-                                                        type="file"
-                                                        className="hidden"
-                                                        accept="image/*,.pdf"
-                                                        onChange={handleFileUpload}
-                                                    />
-                                                </label>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Tips para el comprobante */}
-                                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                                        <h5 className="font-medium text-blue-900 mb-2">💡 Tips para tu comprobante:</h5>
-                                        <ul className="text-sm text-blue-800 space-y-1">
-                                            <li>• Asegúrate de que se vea claramente el monto y fecha</li>
-                                            <li>• Incluye el número de operación si está disponible</li>
-                                            <li>• La imagen debe ser nítida y completa</li>
-                                            <li>• No envíes capturas de pantalla parciales</li>
-                                        </ul>
+                                    <p className={`text-sm mb-3 ${getSecondaryTextClass()}`}>
+                                        {selectedMethod.type === 'gateway' 
+                                            ? 'Te redirigiremos al gateway de pago seguro para procesar tu transacción.'
+                                            : 'Te guiaremos paso a paso para completar tu pago de forma fácil y segura.'
+                                        }
+                                    </p>
+                                    <div className="flex items-center gap-2">
+                                        <ChevronRight size={16} className={getAccentTextClass()} />
+                                        <span className={`text-sm font-medium ${getTextClass()}`}>
+                                            Monto total: S/ {Number2Currency(totalFinal)}
+                                        </span>
                                     </div>
                                 </div>
-                            ) : null;
+                            );
                         })()}
                     </div>
                 </form>
@@ -1380,6 +1351,18 @@ export default function ShippingStep({
                     </div>
                 </div>
             </div>
+
+            {/* Modal de pasos de pago */}
+            <PaymentStepsModal
+                isOpen={showPaymentModal}
+                onClose={() => setShowPaymentModal(false)}
+                paymentMethod={selectedPaymentMethod}
+                amount={totalFinal}
+                onPaymentSuccess={handlePaymentSuccess}
+                onFileUpload={handleFileUpload}
+                paymentProof={paymentProof}
+                checkoutData={getCheckoutData()}
+            />
         </div>
     );
 }

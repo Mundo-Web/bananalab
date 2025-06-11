@@ -12,7 +12,15 @@ class SaleStatus extends Model
     public $incrementing = false;
     protected $keyType = 'string';
 
-    protected $fillable = ['name', 'description', 'visible', 'status'];
+    protected $fillable = [
+        'name',
+        'description',
+        'visible',
+        'status',
+        'color',
+        'editable',
+        'reversible'
+    ];
 
     public static function getByName($name)
     {
