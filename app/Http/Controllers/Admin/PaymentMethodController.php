@@ -10,115 +10,30 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
+
 class PaymentMethodController extends BasicController
 {
     public $model = PaymentMethod::class;
     public $reactView = 'Admin/PaymentMethodsAdmin';
 
-    /**
-     * Guardar o actualizar método de pago
-     */    public function store(Request $request)
-    {
-        Log::info('PaymentMethod store called', [
-            'all_data' => $request->all(),
-            'files' => $request->allFiles(),
-            'is_update' => $request->has('id') && $request->id
-        ]);
-
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'display_name' => 'required|string|max:255',
-            'type' => 'required|in:gateway,manual,qr',
-            'template_key' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-            'requires_proof' => 'boolean',
-            'fee_percentage' => 'nullable|numeric|min:0|max:100',
-            'fee_fixed' => 'nullable|numeric|min:0',
-            'configuration' => 'nullable|string', // JSON string
-            'instructions' => 'nullable|string', // JSON string
-            'sort_order' => 'nullable|integer|min:0',
-            'icon' => 'nullable|image|mimes:jpeg,png,jpg,svg|max:2048'
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'status' => false,
-                'message' => 'Datos inválidos',
-                'errors' => $validator->errors()
-            ], 400);
-        }
-
-        try {
-            $data = $this->preparePaymentMethodData($request);
-            
-            Log::info('Prepared payment method data', ['data' => $data]);
-            
-            // Crear o actualizar
-            if ($request->has('id') && $request->id) {
-                $method = PaymentMethod::findOrFail($request->id);
-                
-                // Eliminar archivos anteriores si se suben nuevos
-                if ($request->hasFile('icon') && $method->icon) {
-                    Storage::disk('public')->delete('payment_icons/' . $method->icon);
-                }
-                
-                // Eliminar archivos de configuración anteriores si hay nuevos
-                $this->handleOldConfigFiles($request, $method);
-                
-                $method->update($data);
-                $message = 'Método de pago actualizado exitosamente';
-            } else {
-                $method = PaymentMethod::create($data);
-                $message = 'Método de pago creado exitosamente';
-            }
-
-            // Recargar el modelo con datos frescos
-            $method = $method->fresh();
-            
-            Log::info('Payment method saved', ['method' => $method->toArray()]);
-
-            return response()->json([
-                'status' => true,
-                'message' => $message,
-                'data' => $method
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Payment method store error', ['error' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
-            return response()->json([
-                'status' => false,
-                'message' => 'Error guardando método de pago: ' . $e->getMessage()
-            ], 500);
-        }
-    }
-
-    /**
-     * Preparar datos del método de pago
-     */    private function preparePaymentMethodData(Request $request)
+    // Usar hooks de BasicController para lógica personalizada
+    public function beforeSave(Request $request)
     {
         $data = $request->except(['icon', 'config_files']);
-        
-        Log::info('Preparing payment method data', [
-            'request_all' => $request->all(),
-            'data_after_except' => $data
-        ]);
-        
-        // Generar slug automáticamente
-        if (!isset($data['slug']) || empty($data['slug'])) {
-            $data['slug'] = Str::slug($data['name']);
-        }
 
-        // Convertir booleanos
+        // Convertir booleanos y valores numéricos
         $data['is_active'] = $request->boolean('is_active', true);
         $data['requires_proof'] = $request->boolean('requires_proof', false);
-        
-        // Convertir valores numéricos
         $data['fee_percentage'] = $request->fee_percentage ?? 0;
         $data['fee_fixed'] = $request->fee_fixed ?? 0;
         $data['sort_order'] = $request->sort_order ?? 0;
 
-        // Manejar subida de icono
+        // Slug automático
+        if (!isset($data['slug']) || empty($data['slug'])) {
+            $data['slug'] = Str::slug($data['name']);
+        }
+
+        // Icono
         if ($request->hasFile('icon')) {
             $icon = $request->file('icon');
             $filename = time() . '_' . Str::slug($data['name']) . '.' . $icon->getClientOriginalExtension();
@@ -126,7 +41,7 @@ class PaymentMethodController extends BasicController
             $data['icon'] = $filename;
         }
 
-        // Manejar configuración JSON
+        // Configuración JSON
         $configuration = [];
         if ($request->has('configuration')) {
             $configData = $request->configuration;
@@ -137,25 +52,19 @@ class PaymentMethodController extends BasicController
             }
         }
 
-        Log::info('Configuration before processing files', ['configuration' => $configuration]);
-
-        // Manejar archivos de configuración (QR codes, etc.)
+        // Archivos de configuración (ej: QR)
         if ($request->hasFile('config_files')) {
-            Log::info('Processing config files', ['files' => array_keys($request->file('config_files'))]);
             foreach ($request->file('config_files') as $fieldKey => $file) {
                 if ($file && $file->isValid()) {
                     $filename = time() . '_config_' . $fieldKey . '.' . $file->getClientOriginalExtension();
                     $file->storeAs('payment_config', $filename, 'public');
                     $configuration[$fieldKey] = $filename;
-                    Log::info("Stored config file: {$fieldKey} as {$filename}");
                 }
             }
         }
-        
-        // Guardar como string JSON para la base de datos
         $data['configuration'] = json_encode($configuration, JSON_UNESCAPED_UNICODE);
 
-        // Manejar instrucciones JSON
+        // Instrucciones JSON
         if ($request->has('instructions')) {
             $instructionsData = $request->instructions;
             if (is_string($instructionsData)) {
@@ -165,28 +74,17 @@ class PaymentMethodController extends BasicController
             }
         }
 
-        Log::info('Final prepared data', ['data' => $data]);
-
         return $data;
     }
 
-    /**
-     * Manejar eliminación de archivos de configuración anteriores
-     */
-    private function handleOldConfigFiles(Request $request, PaymentMethod $method)
+    // Si necesitas lógica después de guardar, puedes usar afterSave
+    public function afterSave(Request $request, object $jpa, ?bool $isNew)
     {
-        if ($request->hasFile('config_files')) {
-            $oldConfig = $method->configuration ?? [];
-            foreach ($request->file('config_files') as $fieldKey => $file) {
-                if ($file && isset($oldConfig[$fieldKey])) {
-                    $oldFilePath = 'payment_config/' . $oldConfig[$fieldKey];
-                    if (Storage::disk('public')->exists($oldFilePath)) {
-                        Storage::disk('public')->delete($oldFilePath);
-                    }
-                }
-            }
-        }
+        // Puedes devolver el modelo actualizado si lo necesitas
+        return $jpa->fresh();
     }
+
+    // El resto de métodos personalizados (getConfigTemplates, toggleStatus, reorder, etc.) se mantienen igual
 
     /**
      * Actualizar método de pago existente

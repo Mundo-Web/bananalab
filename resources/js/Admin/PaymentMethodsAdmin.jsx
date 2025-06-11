@@ -55,23 +55,108 @@ const PaymentMethodsAdmin = () => {
         } catch (error) {
             console.error('Error loading templates:', error);
         }
-    };    const onModalOpen = (data) => {
+    };    const onModalOpen = async (data) => {
+        console.log('🚀 Opening modal with data:', data);
+        
         setPaymentMethodData(data || null);
         setIsEditing(!!data?.id);
+
+        // Ensure templates are loaded before proceeding
+        let availableTemplates = templates;
+        let templatesUpdated = false;
         
-        console.log('Opening modal with data:', data);
-        
+        if (!availableTemplates || Object.keys(availableTemplates).length === 0) {
+            console.log('⏳ Templates not loaded, fetching directly...');
+            try {
+                const result = await paymentMethodsRest.getTemplates();
+                if (result.status) {
+                    availableTemplates = result.templates;
+                    setTemplates(availableTemplates); // Update state for future use
+                    templatesUpdated = true;
+                    console.log('✅ Templates loaded directly:', Object.keys(availableTemplates));
+                } else {
+                    console.error('❌ Failed to load templates:', result);
+                    availableTemplates = {};
+                }
+            } catch (error) {
+                console.error('❌ Error loading templates:', error);
+                availableTemplates = {};
+            }
+        }
+
         // Set template key and type based on data
-        const templateKey = data?.template_key || ''; // Usar template_key del backend
-        const configData = data?.configuration || {};
+        const templateKey = data?.template_key || '';
+        let configData = data?.configuration || {};
         
-        console.log('Setting template key to:', templateKey, 'and type to:', data?.type || "gateway");
-        console.log('Configuration data from backend:', configData);
-        
+        // Parse configuration if string
+        if (typeof configData === 'string') {
+            try {
+                configData = JSON.parse(configData);
+                console.log('✅ Parsed configuration JSON:', configData);
+            } catch (e) {
+                console.warn('⚠️ Could not parse configuration JSON:', configData);
+                configData = {};
+            }
+        }
+
+        console.log('📋 Template key:', templateKey);
+        console.log('🔧 Configuration data:', configData);
+        console.log('📊 Available templates:', Object.keys(availableTemplates));
+
         // Store configuration data in ref for later use
         configurationRef.current = configData;
         
-        // Reset form values
+        // Reset all basic form values immediately
+        populateBasicFields(data);
+        
+        // Set type and template key BEFORE showing modal to trigger field generation
+        if (data?.type) {
+            setCurrentType(data.type);
+        }
+        if (templateKey) {
+            setCurrentTemplateKey(templateKey);
+        }
+        
+        // Show modal
+        $(modalRef.current).modal("show");
+        
+        // Wait for modal animation and React state updates to complete
+        const waitTime = templatesUpdated ? 800 : 500; // More time if templates were just loaded
+        setTimeout(async () => {
+            console.log('🔄 Setting up dynamic fields...');
+            
+            // Update type dropdown
+            if (typeRef.current) {
+                $(typeRef.current).val(data?.type || "gateway").trigger("change");
+            }
+            
+            // Wait for React state updates and field generation
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Now populate configuration fields if we have data
+            if (templateKey && availableTemplates[templateKey] && Object.keys(configData).length > 0) {
+                console.log('🎯 Populating configuration fields...');
+                await populateConfigurationFieldsRobust(templateKey, configData, availableTemplates);
+            } else {
+                console.log('ℹ️ No configuration data to populate or template not found');
+                console.log('📋 Debug info:', {
+                    templateKey,
+                    hasTemplate: !!availableTemplates[templateKey],
+                    configDataKeys: Object.keys(configData),
+                    availableTemplateKeys: Object.keys(availableTemplates)
+                });
+            }
+            
+            // Set up instructions preview
+            updateInstructionsPreview(templateKey, availableTemplates);
+            
+        }, waitTime);
+    };
+
+    // Separate function for basic field population
+    const populateBasicFields = (data) => {
+        console.log('📝 Populating basic fields...');
+        
         if (idRef.current) idRef.current.value = data?.id || "";
         if (nameRef.current) nameRef.current.value = data?.name || "";
         if (displayNameRef.current) displayNameRef.current.value = data?.display_name || "";
@@ -83,131 +168,171 @@ const PaymentMethodsAdmin = () => {
         if (feeFixedRef.current) feeFixedRef.current.value = data?.fee_fixed || 0;
         if (sortOrderRef.current) sortOrderRef.current.value = data?.sort_order || 0;
 
+        // Handle icon
         if (iconRef.current) {
             iconRef.current.value = null;
             if (iconRef.image) {
                 iconRef.image.src = data?.icon ? `/storage/payment_icons/${data.icon}` : "/storage/images/item/undefined";
             }
-        }        
-        
-        // Show modal first
-        $(modalRef.current).modal("show");
-        
-        // Set states after modal is shown to trigger template field generation
-        setTimeout(() => {
-            // Set type first to populate type-specific templates
-            setCurrentType(data?.type || "gateway");
-            
-            if (typeRef.current) {
-                $(typeRef.current).val(data?.type || "gateway").trigger("change");
-            }
-            
-            // Then set template key to trigger configuration field generation
-            if (templateKey) {
-                setCurrentTemplateKey(templateKey);
-                console.log('Template key set to:', templateKey, 'triggering field generation...');
-            }
-        }, 300);
-
-        // Wait longer for configuration fields to be generated, then populate them
-        setTimeout(() => {
-            if (templateKey && templates[templateKey] && configData) {
-                console.log('Attempting to populate config fields with data:', configData);
-                updateConfigurationFields(templateKey, configData);
-            }
-        }, 1200);
-
-        // Show/hide instructions preview based on template
+        }
+    };    // Separate function for instructions preview
+    const updateInstructionsPreview = (templateKey, availableTemplates = templates) => {
         setTimeout(() => {
             const previewContainer = document.getElementById('instructions-preview-container');
             if (previewContainer) {
-                const template = templates[templateKey];
+                const template = availableTemplates[templateKey];
                 if (template && template.instructions) {
                     previewContainer.style.display = 'block';
                 } else {
                     previewContainer.style.display = 'none';
                 }
             }
-        }, 1300);
-    };    const updateConfigurationFields = (templateKey, config = {}) => {
-        const template = templates[templateKey];
+        }, 200);
+    };// More robust configuration field population
+    const populateConfigurationFieldsRobust = async (templateKey, configData, availableTemplates = templates) => {
+        const template = availableTemplates[templateKey];
         if (!template || !template.config) {
-            console.warn('Template or config not found for templateKey:', templateKey);
+            console.warn('❌ Template or config not found for templateKey:', templateKey);
+            console.warn('📋 Available templates:', Object.keys(availableTemplates));
             return;
         }
 
-        console.log('Updating config fields for template:', templateKey, 'with config:', config);
+        console.log('🔧 Starting robust config field population for template:', templateKey);
+        console.log('📊 Config data to populate:', configData);
+        console.log('🏗️ Template structure:', template.config);
 
-        // Use a more robust approach to wait for DOM elements with retry counter
-        const updateFields = (retryCount = 0) => {
-            const maxRetries = 15; // Maximum number of retries
-            let allFieldsFound = true;
-            
-            // First check if all fields exist
-            Object.keys(template.config).forEach(fieldKey => {
-                const element = document.getElementById(`config_${fieldKey}`);
-                if (!element) {
-                    allFieldsFound = false;
-                    console.warn(`Element config_${fieldKey} not found in DOM (attempt ${retryCount + 1})`);
+        return new Promise((resolve) => {
+            const attemptPopulation = (attempt = 1) => {
+                const maxAttempts = 25; // Increased attempts
+                
+                console.log(`🔍 Population attempt ${attempt}/${maxAttempts}`);
+                
+                // Check if all required DOM elements exist
+                const configFieldKeys = Object.keys(template.config);
+                const missingFields = [];
+                const availableFields = [];
+                
+                configFieldKeys.forEach(fieldKey => {
+                    const element = document.getElementById(`config_${fieldKey}`);
+                    if (!element) {
+                        missingFields.push(fieldKey);
+                    } else {
+                        availableFields.push(fieldKey);
+                    }
+                });
+                
+                console.log(`✅ Available fields (${availableFields.length}):`, availableFields);
+                console.log(`❌ Missing fields (${missingFields.length}):`, missingFields);
+                
+                if (missingFields.length === 0) {
+                    // All fields found, populate them
+                    console.log('🎯 All fields found! Populating values...');
+                    populateConfigFields(template, configData);
+                    resolve(true);
+                    return;
                 }
-            });
-            
-            if (!allFieldsFound) {
-                if (retryCount < maxRetries) {
-                    console.log(`Not all fields found, retrying in 200ms... (attempt ${retryCount + 1}/${maxRetries})`);
-                    setTimeout(() => updateFields(retryCount + 1), 200);
+                
+                if (attempt < maxAttempts) {
+                    console.log(`⏳ Waiting 300ms before retry...`);
+                    setTimeout(() => attemptPopulation(attempt + 1), 300);
                 } else {
-                    console.error('Max retries reached. Some configuration fields could not be found.');
+                    console.warn('🚨 Max attempts reached. Populating available fields only.');
+                    populateConfigFields(template, configData);
+                    resolve(false);
                 }
+            };
+            
+            // Start the population process
+            setTimeout(() => attemptPopulation(), 100);
+        });
+    };
+
+    // Actual field population logic
+    const populateConfigFields = (template, configData) => {
+        console.log('� Populating configuration fields with data:', configData);
+        
+        Object.keys(template.config).forEach(fieldKey => {
+            const element = document.getElementById(`config_${fieldKey}`);
+            const fieldConfig = template.config[fieldKey];
+            const value = configData[fieldKey] || fieldConfig.default || '';
+            
+            if (!element) {
+                console.warn(`⚠️ Element config_${fieldKey} not found during population`);
                 return;
             }
             
-            console.log('All config fields found, updating values...');
+            console.log(`📝 Setting field ${fieldKey} =`, value);
             
-            // Update configuration form fields based on template
-            Object.keys(template.config).forEach(fieldKey => {
-                const element = document.getElementById(`config_${fieldKey}`);
-                if (element) {
-                    const value = config[fieldKey] || template.config[fieldKey].default || '';
-                    console.log(`Setting field ${fieldKey} to:`, value);
-                    
-                    if (element.type === 'checkbox') {
-                        element.checked = !!value;
-                    } else if (element.type === 'file') {
-                        // For file inputs, we can't set a value but we can show existing file info
-                        const existingFileInfo = document.getElementById(`config_${fieldKey}_info`);
-                        const previewImage = document.getElementById(`config_${fieldKey}_preview`);
-                        
-                        if (existingFileInfo) {
-                            if (value && value !== '') {
-                                existingFileInfo.innerHTML = `<small class="text-success">✅ Archivo actual: ${value}</small>`;
-                                
-                                // Si es una imagen y hay preview, mostrarla
-                                if (previewImage && template.config[fieldKey].accept && template.config[fieldKey].accept.includes('image')) {
-                                    previewImage.src = `/storage/payment_config/${value}`;
-                                    previewImage.style.display = 'block';
-                                    console.log(`Showing image preview for ${fieldKey}:`, `/storage/payment_config/${value}`);
-                                }
-                            } else {
-                                existingFileInfo.innerHTML = '<small class="text-muted">No hay archivo subido</small>';
-                                if (previewImage) {
-                                    previewImage.style.display = 'none';
-                                }
-                            }
-                        }
-                    } else {
-                        element.value = value;
-                    }
-                } else {
-                    console.warn(`Element config_${fieldKey} not found during update`);
-                }
-            });
-            
-            console.log('Configuration fields updated successfully');
-        };
+            if (element.type === 'checkbox') {
+                element.checked = !!value;
+            } else if (element.type === 'file') {
+                populateFileField(element, fieldKey, value, fieldConfig);
+            } else {
+                element.value = value;
+            }
+        });
         
-        // Start the update process
-        setTimeout(updateFields, 100);
+        console.log('✅ Configuration field population completed');
+    };
+
+    // Handle file field population (including ImageFormGroup)
+    const populateFileField = (element, fieldKey, value, fieldConfig) => {
+        // Check if this is within an ImageFormGroup wrapper
+        const imageFormGroupWrapper = element.closest('[data-image-form-group]');
+        
+        if (imageFormGroupWrapper && fieldConfig.accept && fieldConfig.accept.includes('image')) {
+            console.log(`🖼️ Populating ImageFormGroup for ${fieldKey} with value:`, value);
+            
+            // Find the preview image in the ImageFormGroup
+            const previewImage = imageFormGroupWrapper.querySelector('img');
+            
+            if (value && value !== '') {
+                // Set the preview image
+                if (previewImage) {
+                    previewImage.src = `/storage/payment_config/${value}`;
+                    previewImage.style.display = 'block';
+                    console.log(`✅ Image preview set for ${fieldKey}:`, `/storage/payment_config/${value}`);
+                }
+                
+                // Add file info
+                let fileInfoElement = imageFormGroupWrapper.querySelector('.config-file-info');
+                if (!fileInfoElement) {
+                    fileInfoElement = document.createElement('div');
+                    fileInfoElement.className = 'config-file-info mt-2';
+                    imageFormGroupWrapper.appendChild(fileInfoElement);
+                }
+                fileInfoElement.innerHTML = `<small class="text-success"><i class="mdi mdi-check-circle"></i> Archivo actual: <strong>${value}</strong></small>`;
+            } else {
+                // No file - set placeholder image
+                if (previewImage) {
+                    previewImage.src = '/api/cover/thumbnail/null';
+                    previewImage.style.display = 'block';
+                }
+                
+                // Remove file info if exists
+                const fileInfoElement = imageFormGroupWrapper.querySelector('.config-file-info');
+                if (fileInfoElement) {
+                    fileInfoElement.remove();
+                }
+            }
+        } else {
+            // Handle regular file inputs (non-ImageFormGroup)
+            console.log(`📎 Populating regular file field ${fieldKey} with value:`, value);
+            
+            let fileInfoElement = document.getElementById(`config_${fieldKey}_info`);
+            if (!fileInfoElement) {
+                fileInfoElement = document.createElement('div');
+                fileInfoElement.id = `config_${fieldKey}_info`;
+                fileInfoElement.className = 'mt-2';
+                element.parentNode.appendChild(fileInfoElement);
+            }
+            
+            if (value && value !== '') {
+                fileInfoElement.innerHTML = `<small class="text-success"><i class="mdi mdi-check-circle"></i> Archivo actual: <strong>${value}</strong></small>`;
+            } else {
+                fileInfoElement.innerHTML = '<small class="text-muted">No hay archivo subido</small>';
+            }
+        }
     };
 
     const onModalSubmit = async (e) => {
@@ -600,58 +725,23 @@ const PaymentMethodsAdmin = () => {
                             {fieldConfig.label}
                         </label>
                     </div>
-                );            case 'file':
-                // Para archivos de imagen, crear un componente de carga mejorado
+                );
+            case 'file':                // Usa SIEMPRE ImageFormGroup para imágenes/QR
                 if (fieldConfig.accept && fieldConfig.accept.includes('image')) {
                     return (
-                        <div>
-                            <div className="image-upload-container">
-                                <input
-                                    type="file"
-                                    id={fieldId}
-                                    className="form-control"
-                                    accept={fieldConfig.accept}
-                                    required={fieldConfig.required}
-                                    onChange={(e) => {
-                                        if (e.target.files[0]) {
-                                            const reader = new FileReader();
-                                            reader.onload = (event) => {
-                                                const preview = document.getElementById(`${fieldId}_preview`);
-                                                if (preview) {
-                                                    preview.src = event.target.result;
-                                                    preview.style.display = 'block';
-                                                }
-                                                const info = document.getElementById(`${fieldId}_info`);
-                                                if (info) {
-                                                    info.innerHTML = `<small class="text-success">Archivo seleccionado: ${e.target.files[0].name}</small>`;
-                                                }
-                                            };
-                                            reader.readAsDataURL(e.target.files[0]);
-                                        }
-                                    }}
-                                />
-                                <div id={`${fieldId}_info`} className="mt-1"></div>
-                                <img 
-                                    id={`${fieldId}_preview`} 
-                                    style={{
-                                        display: 'none',
-                                        maxWidth: '200px',
-                                        maxHeight: '150px',
-                                        marginTop: '10px',
-                                        border: '1px solid #ddd',
-                                        borderRadius: '4px',
-                                        padding: '5px'
-                                    }}
-                                    alt="Vista previa"
-                                />
-                            </div>
-                            {fieldConfig.help && (
-                                <small className="form-text text-muted">{fieldConfig.help}</small>
-                            )}
+                        <div data-image-form-group={fieldId}>
+                            <ImageFormGroup
+                                eRef={null}
+                                id={fieldId}
+                                label={fieldConfig.label || fieldKey}
+                                accept={fieldConfig.accept}
+                                required={fieldConfig.required}
+                                help={fieldConfig.help}
+                            />
                         </div>
                     );
                 } else {
-                    // Para otros tipos de archivo, usar input file normal
+                    // Otros archivos
                     return (
                         <div>
                             <input
@@ -668,7 +758,6 @@ const PaymentMethodsAdmin = () => {
                         </div>
                     );
                 }
-
             case 'textarea':
                 return (
                     <textarea
@@ -974,11 +1063,9 @@ const PaymentMethodsAdmin = () => {
                                             console.log('New payment method, using empty config');
                                         }
                                         
-                                        configurationRef.current = configToUse;
-                                        
-                                        // Update configuration fields
+                                        configurationRef.current = configToUse;                                        // Update configuration fields
                                         setTimeout(() => {
-                                            updateConfigurationFields(newTemplateKey, configToUse);
+                                            populateConfigurationFieldsRobust(newTemplateKey, configToUse, templates);
                                         }, 100);
                                     } else {
                                         // Clear configuration when no template selected
