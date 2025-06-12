@@ -8,15 +8,17 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     */
-    public function up(): void
+     */    public function up(): void
     {
         Schema::create('albums', function (Blueprint $table) {
             $table->id();
             $table->char('uuid', 36)->unique();
             $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-            $table->foreignId('item_id')->constrained('items')->onDelete('cascade');
-            $table->foreignId('item_preset_id')->constrained('item_presets')->onDelete('cascade');
+            
+            // ✅ Usar foreignUuid para coincidir con los tipos UUID de items e item_presets
+            $table->foreignUuid('item_id')->constrained('items')->onDelete('cascade');
+            $table->foreignUuid('item_preset_id')->constrained('item_presets')->onDelete('cascade');
+            
             $table->string('title');
             $table->text('description')->nullable();
             $table->string('cover_image_path')->nullable();
