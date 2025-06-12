@@ -24,15 +24,36 @@ export default function CheckoutSteps({ cart, setCart, user }) {
             
             if (orderNumber) {
                 setCode(orderNumber);
-                // Mostrar notificación de éxito
-                if (window.Notify) {
-                    window.Notify.add({
-                        icon: "/assets/img/icon.svg",
-                        title: "¡Pago exitoso!",
-                        body: "Tu pago con MercadoPago ha sido procesado correctamente.",
-                        type: "success",
+                
+                // Verificar si la venta ya existe en la base de datos
+                fetch(`/api/sales/by-code/${orderNumber}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status && data.sale) {
+                            console.log('✅ Venta encontrada:', data.sale);
+                            setSale(data.sale);
+                            
+                            // Mostrar notificación de éxito
+                            if (window.Notify) {
+                                window.Notify.add({
+                                    icon: "/assets/img/icon.svg",
+                                    title: "¡Pago exitoso!",
+                                    body: `Tu pago con MercadoPago ha sido procesado correctamente. Operación: ${orderNumber}`,
+                                    type: "success",
+                                });
+                            }
+                            
+                            // Limpiar carrito después de pago exitoso
+                            setCart([]);
+                            Local.remove(`${Global.APP_CORRELATIVE}_cart`);
+                            
+                        } else {
+                            console.warn('⚠️ Venta no encontrada para:', orderNumber);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('❌ Error buscando venta:', error);
                     });
-                }
             }
             
             // Limpiar la URL para evitar confusiones
@@ -196,7 +217,8 @@ export default function CheckoutSteps({ cart, setCart, user }) {
                     <ConfirmationStep
                         code={code}
                         delivery={delivery}
-                        cart={sale}
+                        cart={cart}
+                        sale={sale}
                         subTotal={subTotal}
                         envio={envio}
                         igv={igv}

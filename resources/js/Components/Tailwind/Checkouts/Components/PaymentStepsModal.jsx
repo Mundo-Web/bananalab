@@ -259,6 +259,36 @@ export default function PaymentStepsModal({
                         valueProp: 'smart_option',
                     },
                 },
+                callbacks: {
+                    onReady: () => {
+                        console.log('🎉 Checkout de MercadoPago listo');
+                        if (buttonContainer) {
+                            buttonContainer.style.display = 'flex';
+                        }
+                    },
+                    onSubmit: ({ selectedPaymentMethod, formData }) => {
+                        console.log('💳 Enviando pago...', { selectedPaymentMethod, formData });
+                        return new Promise((resolve, reject) => {
+                            // El pago será procesado por MercadoPago
+                            // El webhook manejará la confirmación
+                            resolve();
+                        });
+                    },
+                    onError: (error) => {
+                        console.error('❌ Error en checkout:', error);
+                        if (buttonContainer) {
+                            buttonContainer.innerHTML = `
+                                <div class="text-red-600 p-4 text-center">
+                                    <p class="font-medium">❌ Error en el pago</p>
+                                    <p class="text-sm mt-1">${error.message || 'Error desconocido'}</p>
+                                    <button class="mt-2 bg-blue-600 text-white px-4 py-2 rounded text-sm" onclick="location.reload()">
+                                        Reintentar
+                                    </button>
+                                </div>
+                            `;
+                        }
+                    }
+                }
             });
 
             console.log('🎉 Checkout de MercadoPago creado exitosamente');

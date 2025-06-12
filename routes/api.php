@@ -109,8 +109,23 @@ Route::post('/scrap-shopsimon', [ScrapController::class, 'scrapShopSimon']);
 
 Route::post('/import-items', [ItemImportController::class, 'import']);
 Route::post('/complaints', [ComplaintController::class, 'saveComplaint']);
-Route::post('/login', [AuthController::class, 'login']);
-Route::post('/signup', [AuthController::class, 'signup']);
+
+// Rutas de autenticación con middleware de sesión
+Route::middleware(['web', \Illuminate\Session\Middleware\StartSession::class])->group(function () {
+  Route::post('/login', [AuthController::class, 'login']);
+  Route::post('/login-test', [AuthController::class, 'loginTest']); // Temporal para pruebas
+  Route::post('/signup', [AuthController::class, 'signup']);
+  Route::post('/logout', [AuthController::class, 'logout']);
+  Route::get('/user', function () {
+    if (Auth::check()) {
+      return response()->json([
+        'authenticated' => true,
+        'user' => Auth::user()
+      ]);
+    }
+    return response()->json(['authenticated' => false], 401);
+  });
+});
 
 Route::post('/login-client', [AuthClientController::class, 'login']);
 Route::post('/signup-client', [AuthClientController::class, 'signup']);
@@ -162,9 +177,17 @@ Route::get('/pago/{sale_id}', [PaymentController::class, 'getPaymentStatus']);
 
 // Nuevos métodos de pago
 Route::prefix('payments')->group(function () {
+    // Nueva ruta principal para procesar cualquier tipo de pago
+    Route::post('/process', [PaymentController::class, 'processPayment']);
+    
+    // Rutas específicas (mantenidas por compatibilidad)
     Route::post('/mercadopago', [PaymentController::class, 'processMercadoPago']);
     Route::post('/manual', [PaymentController::class, 'processManualPayment']);
+    
+    // Obtener métodos de pago disponibles
     Route::get('/methods', [AdminPaymentMethodController::class, 'getActiveForFrontend']);
+    
+    // Validar comprobante de pago (para admin)
     Route::post('/validate-proof', [PaymentController::class, 'validatePaymentProof']);
 });
 
@@ -175,6 +198,12 @@ Route::get('/mercadopago/success', [MercadoPagoController::class, 'handleSuccess
 Route::get('/mercadopago/failure', [MercadoPagoController::class, 'handleFailure']);
 Route::get('/mercadopago/pending', [MercadoPagoController::class, 'handlePending']);
 Route::post('/mercadopago/webhook', [MercadoPagoController::class, 'webhook']);
+Route::get('/mercadopago/verify-payment', [MercadoPagoController::class, 'verifyPaymentStatus']);
+
+// Rutas de prueba para verificar el flujo
+Route::post('/mercadopago/create-preference', [MercadoPagoController::class, 'createPreference']);
+Route::get('/mercadopago/verify-credentials', [MercadoPagoController::class, 'verifyCredentials']);
+Route::get('/mercadopago/test-api', [MercadoPagoController::class, 'testAPI']);
 
 //pedido
 Route::post('/orders', [MercadoPagoController::class, 'getOrder']);
@@ -196,6 +225,7 @@ Route::middleware('auth')->group(function () {
     Route::patch('/sales/{field}', [AdminSaleController::class, 'boolean']);
     Route::delete('/sales/{id}', [AdminSaleController::class, 'delete']);
     Route::get('/sales/pending-verification', [AdminSaleController::class, 'getPendingVerification']);
+    Route::get('/sales/by-code/{code}', [AdminSaleController::class, 'getByCode']);
 
     // Payment Methods Management
     Route::post('/payment-methods/paginate', [AdminPaymentMethodController::class, 'paginate']);

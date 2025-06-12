@@ -4,12 +4,13 @@ import ubigeoData from "../../../../../../storage/app/utils/ubigeo.json";
 import DeliveryPricesRest from "../../../../Actions/DeliveryPricesRest";
 import { processCulqiPayment } from "../../../../Actions/culqiPayment";
 import { processMercadoPagoPayment, processManualPayment } from "../../../../Actions/paymentMethods";
+import paymentAPI from "../../../../Actions/paymentMethods";
 import ButtonPrimary from "./ButtonPrimary";
 import ButtonSecondary from "./ButtonSecondary";
 import InputForm from "./InputForm";
 import SelectForm from "./SelectForm";
 import OptionCard from "./OptionCard";
-import PaymentStepsModal from "./PaymentStepsModal";
+import PaymentStepsModalFixed from "./PaymentStepsModalFixed";
 import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check, User, Copy, QrCode, Clock, ChevronRight } from "lucide-react";
 import { Notify } from "sode-extend-react";
 
@@ -142,86 +143,59 @@ export default function ShippingStep({
         };
 
         try {
-            let response;
             const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
             
             if (!selectedMethod) {
                 throw new Error('Método de pago no válido');
             }
-            
-            // Procesar según el tipo de método de pago
-            switch (selectedMethod.type) {
-                case 'gateway':
-                    if (selectedMethod.slug === 'culqi') {
-                        if (!window.Culqi) {
-                            console.error("❌ Culqi aún no se ha cargado.");
-                            return;
-                        }
-                        response = await processCulqiPayment(baseRequest);
-                    } else if (selectedMethod.slug === 'mercadopago') {
-                        response = await processMercadoPagoPayment(baseRequest);
-                    } else {
-                        throw new Error('Gateway no implementado');
+
+            let response;
+
+            // Usar la nueva API unificada para procesar pagos
+            if (selectedMethod.type === 'gateway') {
+                // Para gateways (Culqi, MercadoPago)
+                if (selectedMethod.slug === 'culqi') {
+                    if (!window.Culqi) {
+                        throw new Error("Culqi aún no se ha cargado.");
                     }
-                    break;
-                
-                case 'qr':
-                case 'manual':
-                    // Para métodos manuales o QR, subir comprobante
-                    const formDataPayment = new FormData();
-                    Object.keys(baseRequest).forEach(key => {
-                        if (Array.isArray(baseRequest[key])) {
-                            formDataPayment.append(key, JSON.stringify(baseRequest[key]));
-                        } else {
-                            formDataPayment.append(key, baseRequest[key]);
-                        }
-                    });
-                    
-                    if (paymentProof) {
-                        formDataPayment.append('payment_proof', paymentProof);
-                    }
-                    
-                    response = await processManualPayment(formDataPayment);
-                    break;
-                
-                default:
-                    throw new Error('Tipo de método de pago no válido');
+                    response = await processCulqiPayment(baseRequest);
+                } else if (selectedMethod.slug === 'mercadopago') {
+                    response = await processMercadoPagoPayment(baseRequest);
+                } else {
+                    // Otros gateways usando la API unificada
+                    response = await paymentAPI.processPayment(baseRequest);
+                }
+            } else {
+                // Para métodos manuales o QR, usar la nueva API
+                response = await paymentAPI.processPayment(baseRequest, paymentProof);
             }
 
-            const data = response;
-
-            if (data.status) {
-                setSale(data.sale);
-                setDelivery(data.delivery);
-                setCode(data.code);
+            if (response && response.status) {
+                setSale(response.sale);
+                setDelivery(response.delivery);
+                setCode(response.code);
                 setCart([]);
                 
-                Notify.add({
-                    icon: "/assets/img/icon.svg",
-                    title: "¡Pedido procesado!",
-                    body: selectedMethod.type === 'gateway' 
-                        ? "Su pago ha sido procesado exitosamente" 
-                        : "Su pedido está pendiente de validación del comprobante",
-                    type: "success",
-                });
+                // Limpiar archivos de pago
+                setPaymentProof(null);
+                setPaymentProofPreview(null);
                 
+                // Mostrar notificación de éxito
+                const message = selectedMethod.type === 'gateway' 
+                    ? 'Pago procesado exitosamente'
+                    : 'Pedido creado. Te notificaremos cuando el pago sea verificado.';
+                
+                paymentAPI.showSuccessNotification(message);
+                
+                // Continuar al siguiente paso
                 onContinue();
             } else {
-                Notify.add({
-                    icon: "/assets/img/icon.svg",
-                    title: "Error en el Pago",
-                    body: data.message || "El pago ha sido rechazado",
-                    type: "danger",
-                });
+                throw new Error(response?.message || 'Error procesando el pago');
             }
+
         } catch (error) {
-            console.log(error);
-            Notify.add({
-                icon: "/assets/img/icon.svg",
-                title: "Error en el Pago",
-                body: "No se pudo procesar el pago",
-                type: "danger",
-            });
+            console.error('Error en el pago:', error);
+            paymentAPI.showErrorNotification(error.message || 'Error procesando el pago');
             throw error;
         }
     };
@@ -286,8 +260,7 @@ export default function ShippingStep({
 
     const fetchPaymentMethods = async () => {
         try {
-            const response = await fetch('/api/payments/methods');
-            const data = await response.json();
+            const data = await paymentAPI.getPaymentMethods();
             if (data.status && data.methods) {
                 setAvailablePaymentMethods(data.methods);
                 // Establecer el primer método activo como predeterminado
@@ -296,15 +269,11 @@ export default function ShippingStep({
                 }
             } else {
                 console.error('Error en respuesta de métodos de pago:', data);
+                paymentAPI.showErrorNotification('Error al cargar métodos de pago');
             }
         } catch (error) {
             console.error('Error fetching payment methods:', error);
-            Notify.add({
-                icon: "/assets/img/icon.svg",
-                title: "Error",
-                body: "No se pudieron cargar los métodos de pago",
-                type: "danger",
-            });
+            paymentAPI.showErrorNotification('No se pudieron cargar los métodos de pago');
         } finally {
             setLoadingMethods(false);
         }
@@ -1353,14 +1322,12 @@ export default function ShippingStep({
             </div>
 
             {/* Modal de pasos de pago */}
-            <PaymentStepsModal
+            <PaymentStepsModalFixed
                 isOpen={showPaymentModal}
                 onClose={() => setShowPaymentModal(false)}
                 paymentMethod={selectedPaymentMethod}
                 amount={totalFinal}
                 onPaymentSuccess={handlePaymentSuccess}
-                onFileUpload={handleFileUpload}
-                paymentProof={paymentProof}
                 checkoutData={getCheckoutData()}
             />
         </div>

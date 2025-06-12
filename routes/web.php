@@ -138,9 +138,49 @@ Route::middleware(['can:Admin', 'auth'])->prefix('admin')->group(function () {
 // Rutas de callback para MercadoPago
 Route::get('/checkout/success', function (Illuminate\Http\Request $request) {
     $orderNumber = $request->query('external_reference');
+    $paymentId = $request->query('payment_id');
+    $collectionId = $request->query('collection_id');
     $paymentType = $request->query('payment_type');
     
-    if ($paymentType === 'mercadopago') {
+    // Log para debug
+    \Illuminate\Support\Facades\Log::info('MercadoPago Success Callback', [
+        'external_reference' => $orderNumber,
+        'payment_id' => $paymentId,
+        'collection_id' => $collectionId,
+        'all_params' => $request->all()
+    ]);
+    
+    if ($paymentType === 'mercadopago' && $orderNumber) {
+        // Usar collection_id si no hay payment_id
+        $finalPaymentId = $paymentId ?: $collectionId;
+        
+        // Intentar marcar el pago como exitoso directamente en la base de datos
+        try {
+            $sale = \App\Models\Sale::where('code', $orderNumber)->first();
+            if ($sale && $finalPaymentId) {
+                $saleStatusPagado = \App\Models\SaleStatus::getByName('Pagado');
+                
+                $sale->update([
+                    'culqi_charge_id' => $finalPaymentId,
+                    'payment_status' => 'pagado',
+                    'status_id' => $saleStatusPagado ? $saleStatusPagado->id : null,
+                ]);
+                
+                // Actualizar stock
+                $saleDetails = \App\Models\SaleDetail::where('sale_id', $sale->id)->get();
+                foreach ($saleDetails as $detail) {
+                    \App\Models\Item::where('id', $detail->item_id)->decrement('stock', $detail->quantity);
+                }
+                
+                \Illuminate\Support\Facades\Log::info('Pago marcado como exitoso', [
+                    'sale_id' => $sale->id,
+                    'payment_id' => $finalPaymentId
+                ]);
+            }
+        } catch (Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Error al marcar pago como exitoso: ' . $e->getMessage());
+        }
+        
         return redirect('/cart?step=3&order=' . $orderNumber . '&status=success&payment_type=mercadopago');
     }
     

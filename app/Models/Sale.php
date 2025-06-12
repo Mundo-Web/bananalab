@@ -35,6 +35,10 @@ class Sale extends Model
         'status_id',
         'culqi_charge_id',
         'payment_status',
+        'payment_method',
+        'payment_method_id',
+        'payment_fee',
+        'payment_proof_path',
         'invoiceType',
         'documentType',
         'document',
@@ -44,5 +48,45 @@ class Sale extends Model
     public function details()
     {
         return $this->hasMany(SaleDetail::class);
+    }
+      public function status()
+    {
+        return $this->belongsTo(SaleStatus::class);
+    }
+
+    /**
+     * Relación con el método de pago
+     */
+    public function paymentMethod()
+    {
+        return $this->belongsTo(PaymentMethod::class, 'payment_method_id');
+    }
+
+    /**
+     * Obtener la URL del comprobante de pago
+     */
+    public function getPaymentProofUrlAttribute()
+    {
+        if (!$this->payment_proof_path) {
+            return null;
+        }
+        
+        return asset('storage/' . $this->payment_proof_path);
+    }
+
+    /**
+     * Verificar si el pago está pendiente de verificación
+     */
+    public function isPendingVerification()
+    {
+        return $this->payment_status === 'pendiente_verificacion';
+    }
+
+    /**
+     * Verificar si el pago está completo
+     */
+    public function isPaid()
+    {
+        return $this->payment_status === 'pagado';
     }
 }

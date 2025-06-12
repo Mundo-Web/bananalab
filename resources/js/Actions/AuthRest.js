@@ -6,9 +6,18 @@ class AuthRest {
 
       const { status, result } = await Fetch('./api/login', {
         method: 'POST',
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       })
       if (!status) throw new Error(result?.message || 'Error al iniciar sesion')
+
+      // Debug: mostrar la respuesta completa
+      console.log('🔍 AuthRest.login - Respuesta completa:', { status, result });
+      console.log('🔍 AuthRest.login - result.data:', result?.data);
 
       Notify.add({
         icon: '/assets/img/icon.svg',
@@ -33,7 +42,12 @@ class AuthRest {
 
       const { status, result } = await Fetch('./api/signup', {
         method: 'POST',
-        body: JSON.stringify(request)
+        body: JSON.stringify(request),
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
       })
       if (!status) throw new Error(result?.message || 'Error al registrar el usuario')
 

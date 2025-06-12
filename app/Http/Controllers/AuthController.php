@@ -139,14 +139,127 @@ class AuthController extends Controller
       $email = $request->email;
       $password = $request->password;
 
-      if (!Auth::attempt([
+      // Inicializar sesión si no existe
+      if (!$request->hasSession()) {
+        $request->setLaravelSession(app('session.store'));
+      }
+
+      $credentials = [
         'email' => Controller::decode($email),
         'password' => Controller::decode($password)
-      ])) {
+      ];
+
+      // Intentar autenticación
+      if (!Auth::attempt($credentials, true)) { // El true habilita "remember me"
+        throw new Exception('Credenciales invalidas');
+      }
+
+      // Regenerar sesión por seguridad
+      $request->session()->regenerate();
+      
+      // Forzar el guardado de la sesión
+      $request->session()->save();
+      
+      // Determinar URL de redirección según el rol del usuario
+      $user = Auth::user();
+      $redirectUrl = '/login'; // Default fallback
+      
+      switch ($user->getRole()) {
+        case 'Admin':
+        case 'Root':
+          $redirectUrl = '/admin/home';
+          break;
+        default:
+          $redirectUrl = '/';
+          break;
+      }
+      
+      $response->data = [
+        'redirect_url' => $redirectUrl,
+        'session_id' => $request->session()->getId(),
+        'cookies_enabled' => $request->session()->isStarted(),
+        'user' => [
+          'id' => $user->id,
+          'name' => $user->name,
+          'email' => $user->email,
+          'role' => $user->getRole()
+        ]
+      ];
+    });
+    
+    // Crear respuesta con headers de cookie
+    $responseData = $response->toArray();
+    $httpResponse = response($responseData, $response->status);
+    
+    // Forzar headers de sesión
+    if ($request->hasSession()) {
+      $sessionId = $request->session()->getId();
+      $cookieName = config('session.cookie', 'laravel_session');
+      
+      $httpResponse->withCookie(cookie(
+        $cookieName,
+        $sessionId,
+        config('session.lifetime', 120),
+        config('session.path', '/'),
+        config('session.domain'),
+        config('session.secure', false),
+        config('session.http_only', true),
+        false,
+        config('session.same_site', 'lax')
+      ));
+    }
+    
+    return $httpResponse;
+  }
+
+  public function loginTest(Request $request): HttpResponse | ResponseFactory | RedirectResponse
+  {
+    $response = Response::simpleTryCatch(function (Response $response) use ($request) {
+      $email = $request->email;
+      $password = $request->password;
+
+      // Para pruebas, intentar login sin desencriptar primero
+      $loginSuccess = false;
+      
+      // Intentar sin encriptar
+      if (Auth::attempt(['email' => $email, 'password' => $password])) {
+        $loginSuccess = true;
+      } else {
+        // Si falla, intentar con encriptación (método original)
+        if (Auth::attempt(['email' => Controller::decode($email), 'password' => Controller::decode($password)])) {
+          $loginSuccess = true;
+        }
+      }
+      
+      if (!$loginSuccess) {
         throw new Exception('Credenciales invalidas');
       }
 
       $request->session()->regenerate();
+      
+      // Determinar URL de redirección según el rol del usuario
+      $user = Auth::user();
+      $redirectUrl = '/login'; // Default fallback
+      
+      switch ($user->getRole()) {
+        case 'Admin':
+        case 'Root':
+          $redirectUrl = '/admin/home';
+          break;
+        default:
+          $redirectUrl = '/';
+          break;
+      }
+      
+      $response->data = [
+        'redirect_url' => $redirectUrl,
+        'user' => [
+          'id' => $user->id,
+          'name' => $user->name,
+          'email' => $user->email,
+          'role' => $user->getRole()
+        ]
+      ];
     });
     return response($response->toArray(), $response->status);
   }

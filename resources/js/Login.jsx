@@ -47,9 +47,26 @@ const Login = ({ }) => {
     }
     const result = await AuthRest.login(request)
 
+    console.log('🔍 Login.jsx - result recibido:', result);
+
     if (!result) return setLoading(false)
 
-    location.reload();
+    // Usar la URL de redirección devuelta por el backend
+    console.log('🔍 Login.jsx - Buscando redirect_url en:', result);
+    console.log('🔍 Login.jsx - result.redirect_url:', result.redirect_url);
+    console.log('🔍 Login.jsx - result.data?.redirect_url:', result.data?.redirect_url);
+    
+    const redirectUrl = result.redirect_url || result.data?.redirect_url;
+    console.log('🔍 Login.jsx - URL final de redirección:', redirectUrl);
+    
+    if (redirectUrl) {
+      console.log('✅ Redirigiendo a:', redirectUrl);
+      window.location.href = redirectUrl;
+    } else {
+      console.log('⚠️ No se encontró URL de redirección, recargando página');
+      // Fallback: recargar la página si no hay URL específica
+      location.reload();
+    }
   }
 
   return (
