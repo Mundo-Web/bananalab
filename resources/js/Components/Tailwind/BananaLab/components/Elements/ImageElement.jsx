@@ -421,14 +421,13 @@ export default function ImageElement({
             ref={ref}
             className={`absolute ${mask.class} ${
                 isSelected ? "ring-2 ring-blue-500 ring-opacity-75" : ""
-            } ${isDragging ? "opacity-50" : "opacity-100"}`}
-            style={{
+            } ${isDragging ? "opacity-50" : "opacity-100"}`}            style={{
                 left: `${currentPosition.x}px`,
                 top: `${currentPosition.y}px`,
                 width: `${currentSize.width}px`,
                 height: `${currentSize.height}px`,
                 cursor: getCursor(),
-                zIndex: isSelected ? 1000 : element.zIndex || 1,
+                zIndex: element.zIndex || 5, // Z-index fijo - NO cambia al seleccionar para mantener capas
                 transition: isManipulating ? "none" : "all 0.1s ease-out",
                 pointerEvents: "all",
                 userSelect: "none",
@@ -456,33 +455,31 @@ export default function ImageElement({
                             elementRef.current.style.visibility = 'visible';
                         }
                     }}
-                />
-
-                {/* Controles de redimensionamiento mejorados */}
+                />                {/* Controles de redimensionamiento mejorados */}
                 {isSelected && !isDragging && (
                     <>
                         {/* Esquinas de redimensionamiento */}
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-nw-resize"
-                            style={{ top: -8, left: -8 }}
+                            style={{ top: -8, left: -8, zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "nw")}
                             title="Redimensionar desde esquina superior izquierda"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-ne-resize"
-                            style={{ top: -8, right: -8 }}
+                            style={{ top: -8, right: -8, zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "ne")}
                             title="Redimensionar desde esquina superior derecha"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-se-resize"
-                            style={{ bottom: -8, right: -8 }}
+                            style={{ bottom: -8, right: -8, zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "se")}
                             title="Redimensionar desde esquina inferior derecha"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-sw-resize"
-                            style={{ bottom: -8, left: -8 }}
+                            style={{ bottom: -8, left: -8, zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "sw")}
                             title="Redimensionar desde esquina inferior izquierda"
                         />
@@ -490,32 +487,32 @@ export default function ImageElement({
                         {/* Controles de los bordes */}
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-n-resize"
-                            style={{ top: -8, left: "calc(50% - 8px)" }}
+                            style={{ top: -8, left: "calc(50% - 8px)", zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "n")}
                             title="Redimensionar verticalmente"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-e-resize"
-                            style={{ right: -8, top: "calc(50% - 8px)" }}
+                            style={{ right: -8, top: "calc(50% - 8px)", zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "e")}
                             title="Redimensionar horizontalmente"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-s-resize"
-                            style={{ bottom: -8, left: "calc(50% - 8px)" }}
+                            style={{ bottom: -8, left: "calc(50% - 8px)", zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "s")}
                             title="Redimensionar verticalmente"
                         />
                         <div
                             className="absolute w-4 h-4 bg-blue-500 border-2 border-white rounded-full shadow-md hover:bg-blue-600 transition-colors cursor-w-resize"
-                            style={{ left: -8, top: "calc(50% - 8px)" }}
+                            style={{ left: -8, top: "calc(50% - 8px)", zIndex: 9999 }}
                             onMouseDown={(e) => handleStartResize(e, "w")}
                             title="Redimensionar horizontalmente"
                         />
 
                         {/* Indicador visual de manipulación   */}
                       {isManipulating && (
-                            <div className="absolute -inset-2 border-2 border-blue-300 border-dashed rounded animate-pulse" />
+                            <div className="absolute -inset-2 border-2 border-blue-300 border-dashed rounded animate-pulse" style={{ zIndex: 9999 }} />
                         )}
                     </>
                 )}
@@ -550,20 +547,20 @@ export default function ImageElement({
                     </button>
                 </div>
             )}*/}
-            
-
-            {/* Menú contextual mejorado */}
+                {/* Menú contextual mejorado */}
             {showContextMenu && (
                 <>
                     <div
-                        className="fixed inset-0 z-40"
+                        className="fixed inset-0"
+                        style={{ zIndex: 9998 }}
                         onClick={() => setShowContextMenu(false)}
                     />
                     <div
-                        className="fixed bg-white shadow-xl rounded-lg z-50 py-2 w-56 context-menu border border-gray-200"
+                        className="fixed bg-white shadow-xl rounded-lg py-2 w-56 context-menu border border-gray-200"
                         style={{
                             left: `${Math.min(contextMenuPos.x, window.innerWidth - 240)}px`,
                             top: `${Math.min(contextMenuPos.y, window.innerHeight - 200)}px`,
+                            zIndex: 9999, // Menu contextual siempre encima
                         }}
                         onClick={(e) => e.stopPropagation()}
                     >

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useDrag } from "react-dnd";
-import { Trash2, Type, Copy, CircleDot } from "lucide-react";
+import { Trash2, Type, Copy, CircleDot, Move } from "lucide-react";
 import ContextMenu from "../UI/ContextMenu";
 
 export default function TextElement({
@@ -26,6 +26,11 @@ export default function TextElement({
     const [startPos, setStartPos] = useState({ x: 0, y: 0 });
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
+    const [dragPreview, setDragPreview] = useState({ x: 0, y: 0 });
+    const [isHovering, setIsHovering] = useState(false);
+    const [dragStartTime, setDragStartTime] = useState(0);
+    const [hasMoved, setHasMoved] = useState(false);
+    const [lastMoveTime, setLastMoveTime] = useState(0);
 
     const handleDoubleClick = () => {
         setIsEditing(true);
@@ -52,8 +57,13 @@ export default function TextElement({
     };
 
     const handleMouseDown = (e) => {
-        if (isSelected && !isEditing) {
+        // Permitir drag desde cualquier parte del elemento, no solo cuando está seleccionado
+        if (!isEditing) {
             e.stopPropagation();
+            onSelect(); // Seleccionar el elemento primero
+            
+            setDragStartTime(Date.now());
+            setHasMoved(false);
             setIsDraggingInside(true);
             
             // Calcular posición en porcentajes para responsividad
@@ -65,36 +75,90 @@ export default function TextElement({
                 x: e.clientX - currentX,
                 y: e.clientY - currentY,
             });
+            
+            // Configurar preview inicial
+            setDragPreview({
+                x: currentX,
+                y: currentY
+            });
+            
+            // Agregar clase de cursor global
+            document.body.style.cursor = 'grabbing';
         }
     };
 
     const handleMouseMove = (e) => {
         if (isDraggingInside && elementRef.current) {
-            const parentRect = elementRef.current.parentElement.getBoundingClientRect();
-            const newX = e.clientX - startPos.x;
-            const newY = e.clientY - startPos.y;
+            // Throttle de mouse move para mejor rendimiento
+            const now = Date.now();
+            if (now - lastMoveTime < 16) return; // ~60fps
+            setLastMoveTime(now);
+            
+            // Usar requestAnimationFrame para smoother drag
+            requestAnimationFrame(() => {
+                if (!elementRef.current) return;
+                
+                const parentRect = elementRef.current.parentElement.getBoundingClientRect();
+                const newX = e.clientX - startPos.x;
+                const newY = e.clientY - startPos.y;
 
-            const maxX = parentRect.width - elementRef.current.offsetWidth;
-            const maxY = parentRect.height - elementRef.current.offsetHeight;
+                // Marcar que se ha movido si el movimiento es significativo
+                const moveThreshold = 5; // píxeles
+                if (!hasMoved && (Math.abs(newX - dragPreview.x) > moveThreshold || Math.abs(newY - dragPreview.y) > moveThreshold)) {
+                    setHasMoved(true);
+                }
 
-            const boundedX = Math.max(0, Math.min(newX, maxX));
-            const boundedY = Math.max(0, Math.min(newY, maxY));
+                const maxX = parentRect.width - elementRef.current.offsetWidth;
+                const maxY = parentRect.height - elementRef.current.offsetHeight;
 
-            // Convertir a porcentajes para mantener la responsividad
-            const percentX = boundedX / parentRect.width;
-            const percentY = boundedY / parentRect.height;
+                // Implementar snap-to-grid suave (grid de 5px para más precisión)
+                const gridSize = 5;
+                const snappedX = Math.round(newX / gridSize) * gridSize;
+                const snappedY = Math.round(newY / gridSize) * gridSize;
 
-            onUpdate({ 
-                position: { 
-                    x: percentX, 
-                    y: percentY 
-                } 
+                const boundedX = Math.max(0, Math.min(snappedX, maxX));
+                const boundedY = Math.max(0, Math.min(snappedY, maxY));
+
+                // Actualizar preview
+                setDragPreview({
+                    x: boundedX,
+                    y: boundedY
+                });
+
+                // Convertir a porcentajes para mantener la responsividad
+                const percentX = boundedX / parentRect.width;
+                const percentY = boundedY / parentRect.height;
+
+                onUpdate({ 
+                    position: { 
+                        x: percentX, 
+                        y: percentY 
+                    } 
+                });
             });
         }
     };
 
-    const handleMouseUp = () => {
+    const handleMouseUp = (e) => {
+        const dragDuration = Date.now() - dragStartTime;
+        const wasQuickClick = dragDuration < 200 && !hasMoved; // Clic rápido sin movimiento
+        
         setIsDraggingInside(false);
+        // Restaurar cursor
+        document.body.style.cursor = '';
+        
+        // Si fue un clic rápido sin movimiento y el elemento ya estaba seleccionado, activar edición
+        if (wasQuickClick && isSelected) {
+            setTimeout(() => {
+                setIsEditing(true);
+                setTimeout(() => {
+                    if (inputRef.current) {
+                        inputRef.current.focus();
+                        inputRef.current.select();
+                    }
+                }, 0);
+            }, 50);
+        }
     };
 
     const handleContextMenu = (e) => {
@@ -150,9 +214,9 @@ export default function TextElement({
         const baseStyle = {
             ...element.style,
             position: "absolute",
-            cursor: isSelected && !isEditing ? "move" : "pointer",
+            cursor: isDraggingInside ? "grabbing" : (isHovering && !isEditing ? "grab" : "pointer"),
             textShadow,
-            zIndex: 10,
+            zIndex: element.zIndex || 10, // Z-index fijo - NO cambia al seleccionar para mantener capas
             fontFamily: element.style?.fontFamily || "Arial",
             color: element.style?.color || "#000000",
             fontWeight: element.style?.fontWeight || "normal",
@@ -164,6 +228,12 @@ export default function TextElement({
             borderRadius: element.style?.borderRadius || "0px",
             border: element.style?.border || "none",
             opacity: element.style?.opacity !== undefined ? element.style.opacity : 1,
+            // REMOVER transiciones durante drag para evitar efecto "pegajoso"
+            transition: isDraggingInside ? 'none' : 'all 0.15s ease-out',
+            // Forzar repaint para evitar replicación visual
+            willChange: isDraggingInside ? 'transform' : 'auto',
+            // Ligero scale durante drag para feedback visual
+            transform: isDraggingInside ? 'scale(1.02)' : 'scale(1)',
         };
 
         // Calcular posición (porcentaje o píxeles)
@@ -207,43 +277,30 @@ export default function TextElement({
     return (
         <div
             ref={ref}
-            className={`${isSelected ? "ring-2 ring-purple-500" : ""} ${
-                isDragging ? "opacity-50" : "opacity-100"
-            }`}
-            style={combinedStyle}
-            /* onClick={(e) => {
-                e.stopPropagation();
-                onSelect();
-            }}*/
-            //    onDoubleClick={handleDoubleClick}
-            /* onClick={(e) => {
-                e.stopPropagation();
-                onSelect();
-                if (!isEditing && isSelected) {
-                    setIsEditing(true);
-                    setTimeout(() => {
-                        if (inputRef.current) {
-                            inputRef.current.focus();
-                            inputRef.current.select();
-                        }
-                    }, 0);
-                }
-            }}*/
+            className={`
+                ${isSelected ? "ring-2 ring-purple-500 shadow-lg" : ""} 
+                ${isDragging ? "opacity-50" : "opacity-100"}
+                ${isDraggingInside ? "ring-2 ring-blue-400 shadow-xl select-none" : ""}
+                ${isHovering && !isEditing ? "ring-1 ring-gray-300" : ""}
+                transition-all duration-150 ease-in-out
+            `}
+            style={{
+                ...combinedStyle,
+                // Evitar replicación durante drag
+                userSelect: isDraggingInside ? 'none' : 'auto',
+                pointerEvents: isDraggingInside ? 'none' : 'auto',
+            }}
             onClick={(e) => {
                 e.stopPropagation();
-                onSelect();
-                if (!isEditing && isSelected) {
-                    setIsEditing(true);
-                    setTimeout(() => {
-                        if (inputRef.current) {
-                            inputRef.current.focus();
-                            inputRef.current.select();
-                        }
-                    }, 0);
+                // Solo seleccionar si no está ya seleccionado
+                if (!isSelected) {
+                    onSelect();
                 }
             }}
             onMouseDown={handleMouseDown}
             onContextMenu={handleContextMenu}
+            onMouseEnter={() => setIsHovering(true)}
+            onMouseLeave={() => setIsHovering(false)}
         >
             {isEditing ? (
                 <input
@@ -283,7 +340,20 @@ export default function TextElement({
             )}
 
             {isSelected && (
-                <div className="absolute top-0 right-0 transform translate-y-[-100%] flex gap-1 bg-white rounded-t-md p-1 shadow-sm">
+                <>
+                    {/* Indicador de drag en la esquina superior izquierda */}
+                    <div 
+                        className="absolute top-0 left-0 transform translate-x-[-100%] translate-y-[-100%] bg-white rounded-md p-1 shadow-sm border"
+                        style={{ zIndex: 9999 }} // Controles siempre encima
+                    >
+                        <Move className="h-3 w-3 text-gray-500" />
+                    </div>
+                    
+                    {/* Toolbar en la esquina superior derecha */}
+                    <div 
+                        className="absolute top-0 right-0 transform translate-y-[-100%] flex gap-1 bg-white rounded-t-md p-1 shadow-sm"
+                        style={{ zIndex: 9999 }} // Controles siempre encima
+                    >
                     <button
                         className="p-1 hover:bg-gray-100 rounded"
                         onClick={(e) => {
@@ -369,15 +439,17 @@ export default function TextElement({
                     >
                         <Trash2 className="h-3 w-3 text-gray-700" />
                     </button>
-                </div>
+                    </div>
+                </>
             )}
 
             {showContextMenu && (
                 <div
-                    className="fixed bg-white shadow-lg rounded-md z-50 py-1 w-48"
+                    className="fixed bg-white shadow-lg rounded-md py-1 w-48"
                     style={{
                         left: `${contextMenuPos.x}px`,
                         top: `${contextMenuPos.y}px`,
+                        zIndex: 9999, // Menu contextual siempre encima
                     }}
                     onClick={(e) => e.stopPropagation()}
                 >
