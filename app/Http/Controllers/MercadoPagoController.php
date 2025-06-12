@@ -382,8 +382,13 @@ class MercadoPagoController extends Controller
 
             return response()->json([
                 'status' => true,
-                'public_key' => $config['public_key'],
-                'is_sandbox' => $config['sandbox'] ?? true,
+                'config' => [
+                    'public_key' => $config['public_key'],
+                    'access_token' => $config['access_token'], // Solo para uso interno
+                    'is_sandbox' => $config['sandbox'] ?? true,
+                    'country' => 'PE',
+                    'locale' => 'es-PE'
+                ]
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -772,6 +777,161 @@ class MercadoPagoController extends Controller
                 'success' => false,
                 'message' => 'Error: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    /**
+     * Procesar pago usando Checkout API de MercadoPago (más simple que Checkout Pro)
+     */
+    public function processCheckoutApi(Request $request)
+    {
+        try {
+            Log::info('MercadoPago Checkout API Request:', $request->all());
+
+            // Obtener configuración de MercadoPago
+            $config = $this->getMercadoPagoConfig();
+            if (!$config) {
+                return response()->json([
+                    'message' => 'MercadoPago no está disponible',
+                    'status' => false,
+                ], 400);
+            }
+
+            // Configurar SDK
+            MercadoPagoConfig::setAccessToken($config['access_token']);
+
+            // Generar número de orden
+            $orderNumber = $this->generateOrderNumber();
+
+            // Extraer datos del cliente
+            $checkoutData = $request->all();
+            $cart = json_decode($request->cart, true) ?? [];
+
+            // Crear venta en base de datos
+            $saleStatusPendiente = SaleStatus::getByName('Pendiente');
+            
+            $sale = Sale::create([
+                'code' => $orderNumber,
+                'user_id' => $checkoutData['user_id'] ?? null,
+                'name' => $checkoutData['name'] ?? 'Cliente',
+                'lastname' => $checkoutData['lastname'] ?? '',
+                'fullname' => ($checkoutData['name'] ?? 'Cliente') . ' ' . ($checkoutData['lastname'] ?? ''),
+                'email' => $checkoutData['email'] ?? 'test@example.com',
+                'phone' => $checkoutData['phone'] ?? '',
+                'country' => $checkoutData['country'] ?? 'PE',
+                'department' => $checkoutData['department'] ?? '',
+                'province' => $checkoutData['province'] ?? '',
+                'district' => $checkoutData['district'] ?? '',
+                'address' => $checkoutData['address'] ?? '',
+                'number' => $checkoutData['number'] ?? '',
+                'reference' => $checkoutData['reference'] ?? '',
+                'comment' => $checkoutData['comment'] ?? '',
+                'amount' => $request->amount ?? 0,
+                'delivery' => $checkoutData['delivery'] ?? 0,
+                'payment_status' => 'pendiente',
+                'status_id' => $saleStatusPendiente ? $saleStatusPendiente->id : null,
+            ]);
+
+            // Crear detalles de la venta
+            $totalItems = 0;
+            foreach ($cart as $cartItem) {
+                $item = Item::find($cartItem['id']);
+                if ($item) {
+                    SaleDetail::create([
+                        'sale_id' => $sale->id,
+                        'item_id' => $item->id,
+                        'quantity' => $cartItem['quantity'],
+                        'price' => $cartItem['price'],
+                        'total' => $cartItem['price'] * $cartItem['quantity'],
+                    ]);
+                    $totalItems += $cartItem['quantity'];
+                }
+            }
+
+            // Crear pago usando PaymentClient (Checkout API)
+            $client = new PaymentClient();
+            
+            $paymentData = [
+                "transaction_amount" => floatval($request->amount),
+                "token" => $request->token, // Token generado desde el frontend
+                "description" => "Compra en " . env('APP_NAME', 'Bananalab') . " - Orden #" . $orderNumber,
+                "installments" => intval($request->installments ?? 1),
+                "payment_method_id" => $request->payment_method_id,
+                "issuer_id" => $request->issuer_id ?? null,
+                "payer" => [
+                    "email" => $checkoutData['email'] ?? 'test@example.com',
+                    "identification" => [
+                        "type" => $request->identification_type ?? "DNI",
+                        "number" => $request->identification_number ?? "12345678"
+                    ]
+                ],
+                "external_reference" => $orderNumber,
+                "notification_url" => url('/api/mercadopago/webhook'),
+                "metadata" => [
+                    "sale_id" => $sale->id,
+                    "order_number" => $orderNumber
+                ]
+            ];
+
+            Log::info('MercadoPago Payment Data:', $paymentData);
+
+            $payment = $client->create($paymentData);
+
+            Log::info('MercadoPago Payment Response:', [
+                'id' => $payment->id,
+                'status' => $payment->status,
+                'status_detail' => $payment->status_detail
+            ]);
+
+            // Actualizar la venta con información del pago
+            $sale->update([
+                'payment_id' => $payment->id,
+                'payment_status' => $payment->status,
+                'payment_detail' => json_encode($payment)
+            ]);
+
+            // Determinar el estado de la venta basado en el estado del pago
+            if ($payment->status === 'approved') {
+                $approvedStatus = SaleStatus::getByName('Aprobado');
+                if ($approvedStatus) {
+                    $sale->update(['status_id' => $approvedStatus->id]);
+                }
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Pago procesado exitosamente',
+                'sale' => $sale,
+                'code' => $orderNumber,
+                'delivery' => $sale->delivery,
+                'payment_id' => $payment->id,
+                'payment_status' => $payment->status,
+                'payment_url' => null // No hay URL de redirección con Checkout API
+            ]);
+
+        } catch (MPApiException $e) {
+            Log::error('MercadoPago API Error:', [
+                'message' => $e->getMessage(),
+                'status_code' => $e->getStatusCode(),
+                'api_response' => $e->getApiResponse()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Error en MercadoPago: ' . $e->getMessage(),
+                'details' => $e->getApiResponse()
+            ], 400);
+
+        } catch (\Exception $e) {
+            Log::error('MercadoPago Checkout API Error:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'status' => false,
+                'message' => 'Error procesando el pago: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

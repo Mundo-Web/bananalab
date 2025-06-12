@@ -17,6 +17,7 @@
     },
     "dependencies": {
         "@inertiajs/react": "^1.1.0",
+        "@mercadopago/sdk-js": "^0.0.3",
         "@react-google-maps/api": "^2.19.3",
         "@tailwindcss/typography": "^0.5.16",
         "@tippyjs/react": "^4.2.6",

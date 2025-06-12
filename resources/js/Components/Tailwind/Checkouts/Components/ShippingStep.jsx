@@ -11,8 +11,12 @@ import InputForm from "./InputForm";
 import SelectForm from "./SelectForm";
 import OptionCard from "./OptionCard";
 import PaymentStepsModalFixed from "./PaymentStepsModalFixed";
+import MercadoPagoCheckoutModal from "./MercadoPagoCheckoutModal";
 import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check, User, Copy, QrCode, Clock, ChevronRight } from "lucide-react";
 import { Notify } from "sode-extend-react";
+
+// Importar SDK de MercadoPago
+import { initMercadoPago, CardPayment } from '@mercadopago/sdk-js';
 
 export default function ShippingStep({
     cart,
@@ -56,6 +60,12 @@ export default function ShippingStep({
     // Estados para el modal de pasos de pago
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+
+    // Estados para MercadoPago Checkout API
+    const [mercadoPagoConfig, setMercadoPagoConfig] = useState(null);
+    const [cardPayment, setCardPayment] = useState(null);
+    const [mpInitialized, setMpInitialized] = useState(false);
+    const [showMpModal, setShowMpModal] = useState(false);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -114,6 +124,45 @@ export default function ShippingStep({
         }
     };
 
+    // Procesar pago con MercadoPago Checkout API
+    const processMercadoPagoCheckoutApi = async (baseRequest) => {
+        try {
+            if (!mpInitialized) {
+                throw new Error('MercadoPago SDK no está inicializado');
+            }
+
+            // Abrir modal de MercadoPago
+            setShowMpModal(true);
+
+            // Retornar promesa que se resuelve cuando el modal completa el pago
+            return new Promise((resolve, reject) => {
+                window.mercadoPagoPaymentResolver = { resolve, reject, baseRequest };
+            });
+
+        } catch (error) {
+            console.error('Error en MercadoPago Checkout API:', error);
+            throw error;
+        }
+    };
+
+    // Manejar éxito de pago desde el modal de MercadoPago
+    const handleMercadoPagoSuccess = (result) => {
+        if (window.mercadoPagoPaymentResolver) {
+            window.mercadoPagoPaymentResolver.resolve(result);
+            window.mercadoPagoPaymentResolver = null;
+        }
+        setShowMpModal(false);
+    };
+
+    // Manejar cierre del modal de MercadoPago
+    const handleMercadoPagoClose = () => {
+        if (window.mercadoPagoPaymentResolver) {
+            window.mercadoPagoPaymentResolver.reject(new Error('Pago cancelado por el usuario'));
+            window.mercadoPagoPaymentResolver = null;
+        }
+        setShowMpModal(false);
+    };
+
     // Manejar pago exitoso desde el modal
     const handlePaymentSuccess = async () => {
         const baseRequest = {
@@ -160,7 +209,8 @@ export default function ShippingStep({
                     }
                     response = await processCulqiPayment(baseRequest);
                 } else if (selectedMethod.slug === 'mercadopago') {
-                    response = await processMercadoPagoPayment(baseRequest);
+                    // Usar Checkout API de MercadoPago
+                    response = await processMercadoPagoCheckoutApi(baseRequest);
                 } else {
                     // Otros gateways usando la API unificada
                     response = await paymentAPI.processPayment(baseRequest);
@@ -257,6 +307,33 @@ export default function ShippingStep({
     useEffect(() => {
         fetchPaymentMethods();
     }, []);
+
+    // Inicializar MercadoPago SDK
+    useEffect(() => {
+        initializeMercadoPago();
+    }, []);
+
+    const initializeMercadoPago = async () => {
+        try {
+            // Obtener configuración de MercadoPago
+            const response = await fetch('/api/mercadopago/config');
+            const data = await response.json();
+            
+            if (data.status && data.config) {
+                setMercadoPagoConfig(data.config);
+                
+                // Inicializar SDK con public key
+                await initMercadoPago(data.config.public_key, {
+                    locale: 'es-PE'
+                });
+
+                setMpInitialized(true);
+                console.log('✅ MercadoPago SDK inicializado correctamente');
+            }
+        } catch (error) {
+            console.error('❌ Error inicializando MercadoPago:', error);
+        }
+    };
 
     const fetchPaymentMethods = async () => {
         try {
@@ -1329,6 +1406,16 @@ export default function ShippingStep({
                 amount={totalFinal}
                 onPaymentSuccess={handlePaymentSuccess}
                 checkoutData={getCheckoutData()}
+            />
+
+            {/* Modal de MercadoPago Checkout API */}
+            <MercadoPagoCheckoutModal
+                isOpen={showMpModal}
+                onClose={handleMercadoPagoClose}
+                amount={totalFinal}
+                baseRequest={window.mercadoPagoPaymentResolver?.baseRequest || {}}
+                onPaymentSuccess={handleMercadoPagoSuccess}
+                mercadoPagoConfig={mercadoPagoConfig}
             />
         </div>
     );

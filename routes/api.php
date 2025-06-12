@@ -194,6 +194,7 @@ Route::prefix('payments')->group(function () {
 // Nuevas rutas para MercadoPago
 Route::get('/mercadopago/config', [MercadoPagoController::class, 'getConfig']);
 Route::post('/mercadopago/preference', [MercadoPagoController::class, 'createPreference']);
+Route::post('/mercadopago/checkout-api', [MercadoPagoController::class, 'processCheckoutApi']); // Nueva ruta para Checkout API
 Route::get('/mercadopago/success', [MercadoPagoController::class, 'handleSuccess']);
 Route::get('/mercadopago/failure', [MercadoPagoController::class, 'handleFailure']);
 Route::get('/mercadopago/pending', [MercadoPagoController::class, 'handlePending']);

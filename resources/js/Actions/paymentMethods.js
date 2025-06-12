@@ -160,7 +160,8 @@ const paymentAPI = new PaymentMethodsAPI();
 // Funciones legacy mantenidas por compatibilidad
 export const processMercadoPagoPayment = async (request) => {
     try {
-        const response = await fetch('/api/mercadopago/preference', {
+        // Usar el nuevo Checkout API de MercadoPago (más simple y directo)
+        const response = await fetch('/api/mercadopago/checkout-api', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -174,17 +175,22 @@ export const processMercadoPagoPayment = async (request) => {
         }
 
         const data = await response.json();
-          if (data.status && data.redirect_url) {
-            toast.info("Redirigiendo a MercadoPago", {
-                description: "Te estamos redirigiendo al checkout seguro de MercadoPago...",
-                duration: 1500,
+        
+        if (data.status && data.payment_url) {
+            toast.success("¡Pago exitoso con MercadoPago!", {
+                description: "Procesando tu pago...",
+                duration: 2000,
             });
             
-            setTimeout(() => {
-                window.location.href = data.redirect_url;
-            }, 1500);
-            
-            return data;
+            // Retornar los datos directamente para manejar la respuesta en el componente
+            return {
+                status: true,
+                sale: data.sale,
+                delivery: data.delivery,
+                code: data.code,
+                payment_id: data.payment_id,
+                payment_url: data.payment_url
+            };
         }
         
         return data;

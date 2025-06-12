@@ -41,8 +41,8 @@
       "tippy.css"
     ]
   },
-  "_Base-h9uJupaC.js": {
-    "file": "assets/Base-h9uJupaC.js",
+  "_Base-DK1HYogR.js": {
+    "file": "assets/Base-DK1HYogR.js",
     "name": "Base",
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
@@ -87,8 +87,8 @@
       "_trash-2-DU7LB6-f.js"
     ]
   },
-  "_CardProductBananaLab-B5I1bP5Y.js": {
-    "file": "assets/CardProductBananaLab-B5I1bP5Y.js",
+  "_CardProductBananaLab-Hfje5avN.js": {
+    "file": "assets/CardProductBananaLab-Hfje5avN.js",
     "name": "CardProductBananaLab",
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
@@ -96,7 +96,7 @@
       "resources/js/Components/Tailwind/Components/ProductCard.jsx",
       "_ItemsRest-IeUqNvPX.js",
       "resources/js/Components/Tailwind/Headers/HeaderSearch.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_tippy-react.esm-BktTnHXY.js",
       "_proxy-DTU49k-A.js",
@@ -559,13 +559,6 @@
       "_createLucideIcon-DfjclApS.js"
     ]
   },
-  "_copy-BnGV3h9k.js": {
-    "file": "assets/copy-BnGV3h9k.js",
-    "name": "copy",
-    "imports": [
-      "_createLucideIcon-DfjclApS.js"
-    ]
-  },
   "_createLucideIcon-DfjclApS.js": {
     "file": "assets/createLucideIcon-DfjclApS.js",
     "name": "createLucideIcon",
@@ -716,6 +709,13 @@
       "__commonjsHelpers-D6-XlEtG.js",
       "____vite-browser-external_commonjs-proxy-DDYoOVPM.js",
       "_index-BOnQTV8N.js"
+    ]
+  },
+  "_lock--IIEOUL2.js": {
+    "file": "assets/lock--IIEOUL2.js",
+    "name": "lock",
+    "imports": [
+      "_createLucideIcon-DfjclApS.js"
     ]
   },
   "_login-CjATaXhS.js": {
@@ -938,7 +938,7 @@
     "isEntry": true
   },
   "resources/js/About.jsx": {
-    "file": "assets/About-wh1DSG7R.js",
+    "file": "assets/About-KC18qfTo.js",
     "name": "About",
     "src": "resources/js/About.jsx",
     "isEntry": true,
@@ -947,7 +947,7 @@
       "_index-BOnQTV8N.js",
       "_CreateReactScript-CrlrjA2p.js",
       "resources/js/Utils/ReactAppend.jsx",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_YouTube.esm-CC9Yn20X.js",
       "_em-Dm5QugzS.js",
       "_Weare-C6WTxVX1.js",
@@ -2198,7 +2198,7 @@
     ]
   },
   "resources/js/Blog.jsx": {
-    "file": "assets/Blog-DkeUKqhD.js",
+    "file": "assets/Blog-CTWbslvi.js",
     "name": "Blog",
     "src": "resources/js/Blog.jsx",
     "isEntry": true,
@@ -2207,7 +2207,7 @@
       "_index-BOnQTV8N.js",
       "_CreateReactScript-CrlrjA2p.js",
       "resources/js/Utils/ReactAppend.jsx",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "resources/js/Components/Tailwind/Components/ProductCard.jsx",
       "_SubscriptionsRest-czDmrpdk.js",
       "_Global-BM4Id4Pw.js",
@@ -2234,7 +2234,7 @@
     ]
   },
   "resources/js/BlogArticle.jsx": {
-    "file": "assets/BlogArticle-kx8zpshF.js",
+    "file": "assets/BlogArticle-CBrBHgMn.js",
     "name": "BlogArticle",
     "src": "resources/js/BlogArticle.jsx",
     "isEntry": true,
@@ -2243,7 +2243,7 @@
       "_index-BOnQTV8N.js",
       "_CreateReactScript-CrlrjA2p.js",
       "resources/js/Utils/ReactAppend.jsx",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_HtmlContent-ghmllTyl.js",
       "_tippy-react.esm-BktTnHXY.js",
       "_proxy-DTU49k-A.js",
@@ -3103,7 +3103,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-CQnfLkc0.js",
+    "file": "assets/BananaLab-CcmIOjb4.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -3170,7 +3170,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-h6YKH4Ul.js",
+    "file": "assets/Editor-9oIxcFJA.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isEntry": true,
@@ -3180,7 +3180,7 @@
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
       "_preload-helper-BfFHrpNk.js",
       "_typeof-QjJsDpFa.js",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_main-Bp3JhiuO.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -3671,7 +3671,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Base.jsx": {
-    "file": "assets/Base-H2sJxTaG.js",
+    "file": "assets/Base-j746BzmE.js",
     "name": "Base",
     "src": "resources/js/Components/Tailwind/Base.jsx",
     "isEntry": true,
@@ -4070,7 +4070,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Checkout.jsx": {
-    "file": "assets/Checkout-BJ2tJBLZ.js",
+    "file": "assets/Checkout-CqF4OtTi.js",
     "name": "Checkout",
     "src": "resources/js/Components/Tailwind/Checkout.jsx",
     "isEntry": true,
@@ -4100,7 +4100,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx": {
-    "file": "assets/CheckoutSteps-U9TA5fNk.js",
+    "file": "assets/CheckoutSteps-Ca-1hlEy.js",
     "name": "CheckoutSteps",
     "src": "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
     "isEntry": true,
@@ -4108,10 +4108,11 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "_main-Bp3JhiuO.js",
-      "_index-DE3dzT5W.js",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
       "____vite-browser-external_commonjs-proxy-DDYoOVPM.js",
+      "_index-DE3dzT5W.js",
       "_index-fNjTmf9T.js"
     ]
   },
@@ -4259,6 +4260,20 @@
       "__commonjsHelpers-D6-XlEtG.js"
     ]
   },
+  "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx": {
+    "file": "assets/MercadoPagoCheckoutModal-BWpu80nR.js",
+    "name": "MercadoPagoCheckoutModal",
+    "src": "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
+    "isEntry": true,
+    "imports": [
+      "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
+      "_index-BOnQTV8N.js",
+      "_index-DE3dzT5W.js",
+      "_index-yBjzXJbu.js",
+      "__commonjsHelpers-D6-XlEtG.js",
+      "_index-fNjTmf9T.js"
+    ]
+  },
   "resources/js/Components/Tailwind/Checkouts/Components/OptionCard.jsx": {
     "file": "assets/OptionCard--pJTheE3.js",
     "name": "OptionCard",
@@ -4320,7 +4335,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Checkouts/Components/ShippingStep.jsx": {
-    "file": "assets/ShippingStep-Cpvaa5fD.js",
+    "file": "assets/ShippingStep-Ctoj7LZE.js",
     "name": "ShippingStep",
     "src": "resources/js/Components/Tailwind/Checkouts/Components/ShippingStep.jsx",
     "isEntry": true,
@@ -4328,6 +4343,7 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "_main-Bp3JhiuO.js",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -4644,7 +4660,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Filter.jsx": {
-    "file": "assets/Filter-DI7pEGAa.js",
+    "file": "assets/Filter-D-kdNE6U.js",
     "name": "Filter",
     "src": "resources/js/Components/Tailwind/Filter.jsx",
     "isEntry": true,
@@ -4782,7 +4798,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Filters/FilterBananaLab.jsx": {
-    "file": "assets/FilterBananaLab-Bzzgeo1K.js",
+    "file": "assets/FilterBananaLab-D3KCctc3.js",
     "name": "FilterBananaLab",
     "src": "resources/js/Components/Tailwind/Filters/FilterBananaLab.jsx",
     "isDynamicEntry": true,
@@ -4792,7 +4808,7 @@
       "_ItemsRest-IeUqNvPX.js",
       "_NoResult-C9qZVva5.js",
       "_SelectForm-Dh62I6DI.js",
-      "_CardProductBananaLab-B5I1bP5Y.js",
+      "_CardProductBananaLab-Hfje5avN.js",
       "_proxy-DTU49k-A.js",
       "_chevron-down-uIVDLcM-.js",
       "_index-BNMCJu8J.js",
@@ -4817,7 +4833,7 @@
       "_Number2Currency-e57Tgsuk.js",
       "_minus-Db6MFKEO.js",
       "_plus-CTIomuuF.js",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_Global-BM4Id4Pw.js",
       "_CardItem-CdbVCrTF.js",
@@ -4834,7 +4850,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Filters/FilterCategoryImage.jsx": {
-    "file": "assets/FilterCategoryImage-p4bxRVdR.js",
+    "file": "assets/FilterCategoryImage-D2JAAZ4A.js",
     "name": "FilterCategoryImage",
     "src": "resources/js/Components/Tailwind/Filters/FilterCategoryImage.jsx",
     "isEntry": true,
@@ -4845,7 +4861,7 @@
       "_main-Bp3JhiuO.js",
       "resources/js/Admin/Components/ModalImportItem.jsx",
       "resources/js/Components/Tailwind/Headers/HeaderSearch.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -4918,7 +4934,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Footer.jsx": {
-    "file": "assets/Footer-BvLJc1te.js",
+    "file": "assets/Footer-BF4WXQLl.js",
     "name": "Footer",
     "src": "resources/js/Components/Tailwind/Footer.jsx",
     "isEntry": true,
@@ -4965,7 +4981,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Footer/FooterBananaLab.jsx": {
-    "file": "assets/FooterBananaLab-CTNUDrBq.js",
+    "file": "assets/FooterBananaLab-BG-M-Tgp.js",
     "name": "FooterBananaLab",
     "src": "resources/js/Components/Tailwind/Footer/FooterBananaLab.jsx",
     "isDynamicEntry": true,
@@ -4978,7 +4994,7 @@
       "_SubscriptionsRest-czDmrpdk.js",
       "_Global-BM4Id4Pw.js",
       "_HtmlContent-ghmllTyl.js",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_x-fof_H3Vv.js",
       "_circle-check-big-CYWUGR3Z.js",
       "_index-yBjzXJbu.js",
@@ -5617,7 +5633,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Product.jsx": {
-    "file": "assets/Product-CNQIMT7G.js",
+    "file": "assets/Product-DvQ6QJoj.js",
     "name": "Product",
     "src": "resources/js/Components/Tailwind/Product.jsx",
     "isEntry": true,
@@ -5639,7 +5655,7 @@
     ]
   },
   "resources/js/Components/Tailwind/ProductDetail.jsx": {
-    "file": "assets/ProductDetail-BhYGy4R6.js",
+    "file": "assets/ProductDetail-CrmwpQPR.js",
     "name": "ProductDetail",
     "src": "resources/js/Components/Tailwind/ProductDetail.jsx",
     "isEntry": true,
@@ -5687,7 +5703,7 @@
     ]
   },
   "resources/js/Components/Tailwind/ProductDetails/ProductDetailBananaLab.jsx": {
-    "file": "assets/ProductDetailBananaLab-Conc_s1p.js",
+    "file": "assets/ProductDetailBananaLab-DCqi5cBT.js",
     "name": "ProductDetailBananaLab",
     "src": "resources/js/Components/Tailwind/ProductDetails/ProductDetailBananaLab.jsx",
     "isEntry": true,
@@ -5698,7 +5714,7 @@
       "resources/js/Admin/Components/ModalImportItem.jsx",
       "resources/js/Components/Tailwind/Components/ProductCard.jsx",
       "resources/js/Components/Tailwind/Headers/HeaderSearch.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -5823,7 +5839,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Products/Components/CardProductBananaLab.jsx": {
-    "file": "assets/CardProductBananaLab-p4bxRVdR.js",
+    "file": "assets/CardProductBananaLab-D2JAAZ4A.js",
     "name": "CardProductBananaLab",
     "src": "resources/js/Components/Tailwind/Products/Components/CardProductBananaLab.jsx",
     "isEntry": true,
@@ -5834,7 +5850,7 @@
       "_main-Bp3JhiuO.js",
       "resources/js/Admin/Components/ModalImportItem.jsx",
       "resources/js/Components/Tailwind/Headers/HeaderSearch.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -5877,7 +5893,7 @@
     ]
   },
   "resources/js/Components/Tailwind/Products/ProductBananaLab.jsx": {
-    "file": "assets/ProductBananaLab-p4bxRVdR.js",
+    "file": "assets/ProductBananaLab-D2JAAZ4A.js",
     "name": "ProductBananaLab",
     "src": "resources/js/Components/Tailwind/Products/ProductBananaLab.jsx",
     "isEntry": true,
@@ -5888,7 +5904,7 @@
       "_main-Bp3JhiuO.js",
       "resources/js/Admin/Components/ModalImportItem.jsx",
       "resources/js/Components/Tailwind/Headers/HeaderSearch.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_CartModalBananaLab-qBDxKLZN.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -6659,7 +6675,7 @@
     ]
   },
   "resources/js/Contact.jsx": {
-    "file": "assets/Contact-D6mpsdZY.js",
+    "file": "assets/Contact-C1t4R5F6.js",
     "name": "Contact",
     "src": "resources/js/Contact.jsx",
     "isEntry": true,
@@ -6668,7 +6684,7 @@
       "_index-BOnQTV8N.js",
       "_CreateReactScript-CrlrjA2p.js",
       "resources/js/Utils/ReactAppend.jsx",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_Global-BM4Id4Pw.js",
       "_createLucideIcon-DfjclApS.js",
       "_phone-ZNY-sPqk.js",
@@ -6693,7 +6709,7 @@
     ]
   },
   "resources/js/CourseDetails.jsx": {
-    "file": "assets/CourseDetails-B8R7CE97.js",
+    "file": "assets/CourseDetails-BoKfCJD5.js",
     "name": "CourseDetails",
     "src": "resources/js/CourseDetails.jsx",
     "isEntry": true,
@@ -6702,7 +6718,7 @@
       "_index-BOnQTV8N.js",
       "resources/js/Utils/ReactAppend.jsx",
       "_main-Bp3JhiuO.js",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_CreateReactScript-CrlrjA2p.js",
       "_HtmlContent-ghmllTyl.js",
       "_Number2Currency-e57Tgsuk.js",
@@ -6723,7 +6739,7 @@
     ]
   },
   "resources/js/Courses.jsx": {
-    "file": "assets/Courses-PpvZIRp8.js",
+    "file": "assets/Courses-BazjKeB0.js",
     "name": "Courses",
     "src": "resources/js/Courses.jsx",
     "isEntry": true,
@@ -6732,7 +6748,7 @@
       "_index-BOnQTV8N.js",
       "resources/js/Utils/ReactAppend.jsx",
       "_CreateReactScript-CrlrjA2p.js",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_em-Dm5QugzS.js",
       "_ArrayJoin-Brn2gr7s.js",
       "_CourseCard-BsNNrzSx.js",
@@ -6766,7 +6782,7 @@
     "isEntry": true
   },
   "resources/js/Home.jsx": {
-    "file": "assets/Home-B_hWAk85.js",
+    "file": "assets/Home-JNhzzZ_K.js",
     "name": "Home",
     "src": "resources/js/Home.jsx",
     "isEntry": true,
@@ -6774,7 +6790,7 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "resources/js/Utils/ReactAppend.jsx",
-      "_Base-h9uJupaC.js",
+      "_Base-DK1HYogR.js",
       "_CreateReactScript-CrlrjA2p.js",
       "_Weare-C6WTxVX1.js",
       "resources/js/Components/Tailwind/Blogs/BlogCarousel.jsx",
@@ -6833,7 +6849,7 @@
     ]
   },
   "resources/js/Pages/Editor.jsx": {
-    "file": "assets/Editor-CuXAWAhg.js",
+    "file": "assets/Editor-DekvM1V-.js",
     "name": "Editor",
     "src": "resources/js/Pages/Editor.jsx",
     "isEntry": true,
@@ -6843,7 +6859,7 @@
       "_index.esm-DFiNGWUA.js",
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_main-Bp3JhiuO.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
@@ -6969,7 +6985,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-qOe-0fMB.js",
+    "file": "assets/System-nTK62Xfj.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,
@@ -6985,7 +7001,7 @@
       "_Global-BM4Id4Pw.js",
       "_ItemsRest-IeUqNvPX.js",
       "resources/js/Components/Tailwind/Thanks/ThankSimple.jsx",
-      "resources/js/Components/Tailwind/Checkouts/CheckoutSteps.jsx",
+      "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
       "_index-fNjTmf9T.js",
