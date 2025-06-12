@@ -14,14 +14,15 @@ return new class extends Migration
     {
         //Eliminar la tabla si existe
         Schema::dropIfExists('albums');
-        
+
         if (!Schema::hasTable('albums')) {
             Schema::create('albums', function (Blueprint $table) {
                 $table->id();
                 $table->char('uuid', 36)->unique();
                 $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-                $table->foreignUuid('item_id')->constrained('items')->onDelete('cascade');
-                $table->foreignUuid('item_preset_id')->constrained('item_presets')->onDelete('cascade');
+               $table->uuid('item_id');
+
+                $table->uuid('item_preset_id');
                 $table->string('title');
                 $table->text('description')->nullable();
                 $table->string('cover_image_path')->nullable();
