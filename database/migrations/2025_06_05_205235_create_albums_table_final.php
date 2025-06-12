@@ -20,7 +20,7 @@ return new class extends Migration
                 $table->id();
                 $table->char('uuid', 36)->unique();
                 $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-               $table->uuid('item_id');
+                $table->uuid('item_id');
 
                 $table->uuid('item_preset_id');
                 $table->string('title');
@@ -32,6 +32,10 @@ return new class extends Migration
                 $table->json('custom_options')->nullable(); // Para opciones adicionales futuras
                 $table->enum('status', ['draft', 'saved', 'ordered'])->default('draft');
                 $table->timestamps();
+
+                // ✅ Foreign keys explícitas (esto es lo que faltaba)
+                $table->foreign('item_id')->references('id')->on('items')->onDelete('cascade');
+                $table->foreign('item_preset_id')->references('id')->on('item_presets')->onDelete('cascade');
             });
         }
     }
