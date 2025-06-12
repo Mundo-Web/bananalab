@@ -20,9 +20,11 @@ return new class extends Migration
                 $table->id();
                 $table->char('uuid', 36)->unique();
                 $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
-                $table->uuid('item_id');
+                
+  // 👇 Forzar CHAR(36) exactamente igual al campo en items
+    $table->char('item_id', 36);
+    $table->char('item_preset_id', 36);
 
-                $table->uuid('item_preset_id');
                 $table->string('title');
                 $table->text('description')->nullable();
                 $table->string('cover_image_path')->nullable();
