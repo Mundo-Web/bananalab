@@ -277,6 +277,8 @@ export default function TextElement({
     return (
         <div
             ref={ref}
+            data-element-type="text"
+            data-element-id={element.id}
             className={`
                 ${isSelected ? "ring-2 ring-purple-500 shadow-lg" : ""} 
                 ${isDragging ? "opacity-50" : "opacity-100"}
@@ -350,7 +352,7 @@ export default function TextElement({
                     </div>
                     
                     {/* Toolbar en la esquina superior derecha */}
-                    <div 
+                  {/*  <div 
                         className="absolute top-0 right-0 transform translate-y-[-100%] flex gap-1 bg-white rounded-t-md p-1 shadow-sm"
                         style={{ zIndex: 9999 }} // Controles siempre encima
                     >
@@ -439,7 +441,7 @@ export default function TextElement({
                     >
                         <Trash2 className="h-3 w-3 text-gray-700" />
                     </button>
-                    </div>
+                    </div> */}
                 </>
             )}
 
