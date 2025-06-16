@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Modal from "react-modal";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import HTMLFlipBook from "react-pageflip";
@@ -61,18 +61,226 @@ const flipbookStyles = `
 
 Modal.setAppElement('#app'); // Configurar elemento raíz para accesibilidad
 
-
-
-
-
-const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart, workspaceDimensions = { width: 800, height: 600 }, layouts = [], presetData = null }) => {
+const BookPreviewModal = ({ 
+    isOpen, 
+    onRequestClose, 
+    pages, 
+    pageThumbnails = {}, 
+    addAlbumToCart, 
+    workspaceDimensions = { width: 800, height: 600 }, 
+    layouts = [], 
+    presetData = null 
+}) => {
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
-    const [highResThumbnails, setHighResThumbnails] = useState({});
-    const [isGeneratingHighRes, setIsGeneratingHighRes] = useState(false);
+    const [generatedThumbnails, setGeneratedThumbnails] = useState({});
+    const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
     const flipBook = useRef();
 
-    // Función para crear un placeholder elegante para una página específica
+    // Función para generar thumbnails de alta calidad
+    const generateHighQualityThumbnails = useCallback(async () => {
+        if (!pages || pages.length === 0 || !isOpen) return;
+        
+        console.log('🚀 Iniciando generación de thumbnails para BookPreview...');
+        setIsGeneratingThumbnails(true);
+        setGeneratedThumbnails({});
+        
+        const newThumbnails = {};
+        const scale = 4; // Factor de escala para alta resolución
+        
+        // Definir funciones para aplicar máscaras en canvas
+        const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
+            
+            switch (maskId) {
+                case 'circle':
+                    ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                    break;
+                case 'diamond':
+                    ctx.moveTo(width / 2, 0);
+                    ctx.lineTo(width, height / 2);
+                    ctx.lineTo(width / 2, height);
+                    ctx.lineTo(0, height / 2);
+                    ctx.closePath();
+                    break;
+                case 'triangle':
+                    ctx.moveTo(width / 2, 0);
+                    ctx.lineTo(width, height);
+                    ctx.lineTo(0, height);
+                    ctx.closePath();
+                    break;
+                case 'hexagon':
+                    const hexPoints = [
+                        [width * 0.25, height * 0.05],
+                        [width * 0.75, height * 0.05],
+                        [width * 1.0, height * 0.5],
+                        [width * 0.75, height * 0.95],
+                        [width * 0.25, height * 0.95],
+                        [width * 0.0, height * 0.5]
+                    ];
+                    ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
+                    hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                case 'star':
+                    const starPoints = [
+                        [width * 0.5, height * 0],
+                        [width * 0.61, height * 0.35],
+                        [width * 0.98, height * 0.35],
+                        [width * 0.68, height * 0.57],
+                        [width * 0.79, height * 0.91],
+                        [width * 0.5, height * 0.7],
+                        [width * 0.21, height * 0.91],
+                        [width * 0.32, height * 0.57],
+                        [width * 0.02, height * 0.35],
+                        [width * 0.39, height * 0.35]
+                    ];
+                    ctx.moveTo(starPoints[0][0], starPoints[0][1]);
+                    starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                default:
+                    // Sin máscara - rectángulo completo
+                    ctx.rect(0, 0, width, height);
+                    break;
+            }
+            
+            ctx.clip();
+        };
+
+        for (const page of pages) {
+            try {
+                console.log(`📄 Generando thumbnail para página ${page.id}...`);
+                
+                // Crear canvas personalizado
+                const customCanvas = document.createElement('canvas');
+                const customCtx = customCanvas.getContext('2d');
+                
+                // Usar un factor de escala mayor para mejor calidad
+                customCanvas.width = workspaceDimensions.width * scale;
+                customCanvas.height = workspaceDimensions.height * scale;
+                
+                // Escalar el contexto para dibujar en alta resolución
+                customCtx.scale(scale, scale);
+                
+                // Configuración de alta calidad
+                customCtx.imageSmoothingEnabled = true;
+                customCtx.imageSmoothingQuality = 'high';
+                customCtx.textRendering = 'geometricPrecision';
+                customCtx.webkitImageSmoothingEnabled = true;
+                customCtx.mozImageSmoothingEnabled = true;
+                customCtx.msImageSmoothingEnabled = true;
+                
+                // Fondo blanco
+                customCtx.fillStyle = '#ffffff';
+                customCtx.fillRect(0, 0, workspaceDimensions.width, workspaceDimensions.height);
+                
+                // Simular contenido básico (en lugar de renderizar elementos reales)
+                customCtx.fillStyle = '#f0f0f0';
+                customCtx.fillRect(20, 20, workspaceDimensions.width - 40, workspaceDimensions.height - 40);
+                
+                // Texto de ejemplo
+                customCtx.fillStyle = '#333333';
+                customCtx.font = 'bold 24px Arial';
+                customCtx.textAlign = 'center';
+                customCtx.fillText(`Página ${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : page.pageNumber || 'Contenido'}`, 
+                                  workspaceDimensions.width / 2, 
+                                  workspaceDimensions.height / 2);
+                
+                // Crear thumbnail final con downscaling progresivo
+                const thumbnailCanvas = document.createElement('canvas');
+                const thumbnailCtx = thumbnailCanvas.getContext('2d');
+                
+                // Usar las dimensiones REALES del workspace para calcular la proporción exacta
+                const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
+                
+                // Tamaño base para mejor calidad
+                const thumbnailBaseSize = 900;
+                
+                // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
+                let thumbWidth, thumbHeight;
+                
+                if (workspaceAspectRatio >= 1) {
+                    // Workspace más ancho que alto
+                    thumbWidth = thumbnailBaseSize;
+                    thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
+                } else {
+                    // Workspace más alto que ancho
+                    thumbHeight = thumbnailBaseSize;
+                    thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
+                }
+                
+                thumbWidth = Math.round(thumbWidth);
+                thumbHeight = Math.round(thumbHeight);
+                thumbnailCanvas.width = thumbWidth;
+                thumbnailCanvas.height = thumbHeight;
+                
+                // Configuración de alta calidad para el thumbnail
+                thumbnailCtx.imageSmoothingEnabled = true;
+                thumbnailCtx.imageSmoothingQuality = 'high';
+                thumbnailCtx.webkitImageSmoothingEnabled = true;
+                thumbnailCtx.mozImageSmoothingEnabled = true;
+                thumbnailCtx.msImageSmoothingEnabled = true;
+                
+                // Downscaling progresivo en dos pasos
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Tamaño intermedio (2x tamaño final)
+                const intermediateWidth = thumbWidth * 2;
+                const intermediateHeight = thumbHeight * 2;
+                
+                tempCanvas.width = intermediateWidth;
+                tempCanvas.height = intermediateHeight;
+                
+                // Configurar suavizado en canvas intermedio
+                tempCtx.imageSmoothingEnabled = true;
+                tempCtx.imageSmoothingQuality = 'high';
+                
+                // Paso 1: Escalar a tamaño intermedio
+                tempCtx.drawImage(
+                    customCanvas,
+                    0, 0, intermediateWidth, intermediateHeight
+                );
+                
+                // Paso 2: Escalar de intermedio a tamaño final
+                thumbnailCtx.drawImage(
+                    tempCanvas,
+                    0, 0, intermediateWidth, intermediateHeight,
+                    0, 0, thumbWidth, thumbHeight
+                );
+                
+                newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
+                console.log(`✅ Thumbnail generado para página ${page.id}`);
+                
+                // Actualizar parcialmente para mostrar progreso
+                setGeneratedThumbnails(prev => ({ ...prev, [page.id]: thumbnailCanvas.toDataURL('image/png', 1.0) }));
+                
+            } catch (error) {
+                console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
+                newThumbnails[page.id] = createElegantPlaceholderForPage(page, workspaceDimensions);
+            }
+        }
+        
+        setGeneratedThumbnails(newThumbnails);
+        setIsGeneratingThumbnails(false);
+        console.log('🎉 Generación de thumbnails para BookPreview completada');
+        
+    }, [pages, workspaceDimensions, isOpen]);
+
+    useEffect(() => {
+        if (isOpen) {
+            if (Object.keys(pageThumbnails).length === 0) {
+                generateHighQualityThumbnails();
+            } else {
+                setGeneratedThumbnails(pageThumbnails);
+            }
+        }
+    }, [isOpen, pageThumbnails, generateHighQualityThumbnails]);
+
+     // Función para crear un placeholder elegante para una página específica
     const createElegantPlaceholderForPage = (page, workspaceDimensions) => {
         console.log(`🎨 Creando placeholder para página ${page.id} (${page.type})`);
         
@@ -210,144 +418,12 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
         return canvas.toDataURL('image/png', 1.0);
     };
 
-    // ⚡ SOLUCIÓN MEJORADA: Sistema híbrido inteligente
-    useEffect(() => {
-        if (isOpen && pages && pages.length > 0) {
-            console.log('🚀 Modal abierto - Preparando vista de álbum');
-            console.log(`📊 Total de páginas: ${pages.length}`);
-
-            // Verificar qué thumbnails tenemos del editor
-            const editorThumbnails = Object.keys(pageThumbnails).length;
-            console.log(`📸 Thumbnails del editor: ${editorThumbnails}/${pages.length}`);
-
-            if (editorThumbnails > 0) {
-                // Usar thumbnails del editor y llenar los faltantes con placeholders elegantes
-                console.log('🔀 Modo híbrido: Thumbnails del editor + Placeholders para páginas faltantes');
-                
-                // Crear un objeto combinado
-            
-                const combinedThumbnails = { ...pageThumbnails };
-                
-                // Para páginas sin thumbnail del editor, crear placeholders elegantes
-                pages.forEach(page => {
-                    if (!combinedThumbnails[page.id]) {
-                        console.log(`🎨 Creando placeholder elegante para página ${page.id} (${page.type})`);
-                        combinedThumbnails[page.id] = createElegantPlaceholderForPage(page, workspaceDimensions);
-                    }
-                });
-                
-                setHighResThumbnails(combinedThumbnails);
-                
-                setIsGeneratingHighRes(false);
-            } else {
-                // Si no hay thumbnails del editor, crear placeholders para todas
-                console.log('🎨 Creando placeholders elegantes para todas las páginas...');
-                createHighQualityPlaceholders(pages, workspaceDimensions);
-                setIsGeneratingHighRes(false);
-            }
-        }
-    }, [isOpen, pages, workspaceDimensions, pageThumbnails, layouts, presetData]);
-
-    // Función para crear placeholders inmediatos si falla la generación
-    const createPlaceholderThumbnails = (pages) => {
-        console.log('🔄 Creando placeholders para', pages.length, 'páginas');
-        createHighQualityPlaceholders(pages, workspaceDimensions);
-    };
-
-    // Función para crear placeholders de alta calidad para el preview
-    const createHighQualityPlaceholders = (pages, workspaceDimensions) => {
-        console.log('� Creando placeholders de alta calidad para', pages.length, 'páginas');
-        const placeholders = {};
-
-        // Calcular dimensiones del preview
-        const previewBaseWidht = 600;
-        const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
-        const previewWidth  = previewBaseWidht;
-        const previewHeight = Math.round(previewWidth / workspaceAspectRatio);
-        const ratio = workspaceAspectRatio;
-
-        pages.forEach((page, index) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = previewWidth * ratio;
-            canvas.height = previewHeight * ratio;
-            canvas.style.width = `${previewWidth}px`;
-            canvas.style.height = `${previewHeight}px`;
-            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
-
-            // Usar las dimensiones exactas del preview
-            // Fondo blanco
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, previewWidth, previewHeight);
-
-            // Borde elegante
-            ctx.strokeStyle = '#e2e8f0';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(20, 20, previewWidth - 40, previewHeight - 40);
-
-            // Configurar texto
-            ctx.textAlign = 'center';
-            ctx.fillStyle = '#64748b';
-
-            // Título de la página
-            let pageTitle = '';
-            let pageIcon = '';
-            let pageSubtitle = '';
-
-            switch (page.type) {
-                case 'cover':
-                    pageTitle = 'Portada';
-                    pageIcon = '📚';
-                    pageSubtitle = 'Página de inicio del álbum';
-                    break;
-                case 'final':
-                    pageTitle = 'Contraportada';
-                    pageIcon = '📖';
-                    pageSubtitle = 'Página final del álbum';
-                    break;
-                case 'content':
-                    pageTitle = `Página ${page.pageNumber || index + 1}`;
-                    pageIcon = '📄';
-                    pageSubtitle = 'Página de contenido';
-                    break;
-                default:
-                    pageTitle = `Página ${index + 1}`;
-                    pageIcon = '📄';
-                    pageSubtitle = 'Contenido del álbum';
-            }
-
-            // Dibujar icono grande
-            ctx.font = `${Math.min(previewWidth, previewHeight) * 0.15}px Arial`;
-            ctx.fillText(pageIcon, previewWidth / 2, previewHeight / 2 - 40);
-
-            // Dibujar título
-            ctx.font = `bold ${Math.min(previewWidth, previewHeight) * 0.04}px Arial`;
-            ctx.fillStyle = '#1e293b';
-            ctx.fillText(pageTitle, previewWidth / 2, previewHeight / 2 + 20);
-
-            // Dibujar subtítulo
-            ctx.font = `${Math.min(previewWidth, previewHeight) * 0.025}px Arial`;
-            ctx.fillStyle = '#64748b';
-            ctx.fillText(pageSubtitle, previewWidth / 2, previewHeight / 2 + 50);
-
-            // Información adicional si hay layout
-            if (page.layout) {
-                ctx.font = `${Math.min(previewWidth, previewHeight) * 0.02}px Arial`;
-                ctx.fillStyle = '#94a3b8';
-                ctx.fillText(`Layout: ${page.layout.name || 'Personalizado'}`, previewWidth / 2, previewHeight / 2 + 80);
-            }
-
-            placeholders[page.id] = canvas.toDataURL('image/png', 1.0);
-        });
-
-        setHighResThumbnails(placeholders);
-        console.log('✅ Placeholders de alta calidad creados para todas las páginas');
-    };
-
-    // Usar thumbnails existentes del editor o placeholders de alta calidad
-    const activeThumbnails = Object.keys(highResThumbnails).length > 0 ? highResThumbnails :
-        Object.keys(pageThumbnails).length > 0 ? pageThumbnails :
-            {};
+    // Usar thumbnails en este orden de prioridad:
+    // 1. Thumbnails proporcionados (de Editor.jsx)
+    // 2. Thumbnails generados localmente
+    const activeThumbnails = Object.keys(pageThumbnails).length > 0 ? 
+        pageThumbnails : 
+        generatedThumbnails;
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
         return (
@@ -396,15 +472,9 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
     const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
 
     // Tamaño base para la preview usando la proporción real del workspace
-    const previewBaseWidht = 600; // Aumentar altura base para mejor nitidez
+    const previewBaseWidht = 600;
     const previewHeight = previewBaseWidht;
     const previewWidth = Math.round(previewHeight * workspaceAspectRatio);
-
-    console.log(`📖 BookPreview dimensiones calculadas:`);
-    console.log(`   Workspace: ${workspaceDimensions.width}x${workspaceDimensions.height}`);
-    console.log(`   Proporción workspace: ${workspaceAspectRatio.toFixed(3)}`);
-    console.log(`   Preview: ${previewWidth}x${previewHeight}`);
-    console.log(`   Proporción preview: ${(previewWidth / previewHeight).toFixed(3)}`);
 
     // Función para organizar páginas como libro real con frente y reverso
     const createBookPages = () => {
@@ -465,8 +535,21 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
             {/* Inyectar estilos CSS para eliminar márgenes */}
             <style dangerouslySetInnerHTML={{ __html: flipbookStyles }} />
 
+            {/* Overlay de carga */}
+            {isGeneratingThumbnails && (
+                <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+                    <div className="bg-white p-6 rounded-lg shadow-xl flex flex-col items-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mb-4"></div>
+                        <p className="text-gray-700">Generando vistas previas de alta calidad...</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                            Esto puede tomar unos segundos
+                        </p>
+                    </div>
+                </div>
+            )}
+
             <div className="relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-2xl">
-                {/* Título del modal (oculto visualmente pero accesible) */}
+               {/* Título del modal (oculto visualmente pero accesible) */}
                 <h2 id="modal-title" className="sr-only">Vista previa del álbum</h2>
                 <p id="modal-description" className="sr-only">
                     Navegue por las páginas de su álbum usando los controles de navegación o teclado.
@@ -528,7 +611,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                         ref={flipBook}
                         width={previewWidth}
                         height={previewHeight}
-                        size="stretch"
+                          size="stretch"
                         minWidth={previewWidth * 0.7}
                         maxWidth={previewWidth * 1.3}
                         minHeight={previewHeight * 0.7}
@@ -613,8 +696,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                     </HTMLFlipBook>
                 </div>
             </div>
-
-            {/* Botones de acción */}
+ {/* Botones de acción */}
             <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-md mx-auto">
                 <button
                     className={`flex-1 py-3 px-4 rounded-lg font-semibold shadow transition flex items-center justify-center ${isProcessing
@@ -751,8 +833,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                 >
                     Continuar editando
                 </button>
-            </div>
-        </Modal>
+            </div>        </Modal>
     );
 };
 
