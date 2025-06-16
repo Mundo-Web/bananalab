@@ -1,7 +1,8 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Modal from "react-modal";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import HTMLFlipBook from "react-pageflip";
+import html2canvas from "html2canvas";
 import Global from "../../../../../Utils/Global";
 
 // Estilos para el modal
@@ -50,10 +51,125 @@ const flipbookStyles = `
 
 Modal.setAppElement('#app'); // Configurar elemento raíz para accesibilidad
 
-const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart }) => {
+// Función para generar thumbnails de alta resolución para la vista de álbum
+const generateHighResolutionThumbnails = async (pages, workspaceDimensions) => {
+    console.log('🎯 Generando thumbnails de alta resolución para vista de álbum...');
+    
+    const highResThumbnails = {};
+    
+    for (const page of pages) {
+        try {
+            const pageElement = document.getElementById(`page-${page.id}`);
+            if (!pageElement) {
+                console.warn(`❌ No se encontró elemento para página ${page.id}`);
+                continue;
+            }
+
+            console.log(`📄 Procesando página ${page.id} para alta resolución...`);
+
+            // Obtener dimensiones reales del workspace
+            const rect = pageElement.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
+                continue;
+            }
+
+            // Crear canvas de muy alta resolución para el álbum
+            const scale = 3; // Mayor escala para vista de álbum
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            canvas.width = rect.width * scale;
+            canvas.height = rect.height * scale;
+            ctx.scale(scale, scale);
+            
+            // Configuraciones de máxima calidad
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.textRenderingOptimization = 'optimizeQuality';
+            
+            // Fondo blanco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, rect.width, rect.height);
+            
+            // Usar html2canvas para capturar el elemento completo con mayor calidad
+            try {
+                const html2canvasResult = await html2canvas(pageElement, {
+                    scale: scale,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    imageTimeout: 15000,
+                    removeContainer: true,
+                    width: rect.width,
+                    height: rect.height,
+                    windowWidth: rect.width,
+                    windowHeight: rect.height,
+                    scrollX: 0,
+                    scrollY: 0,
+                    x: 0,
+                    y: 0
+                });
+                
+                // Crear thumbnail final con la proporción exacta del workspace
+                const finalCanvas = document.createElement('canvas');
+                const finalCtx = finalCanvas.getContext('2d');
+                
+                // Usar dimensiones más grandes para la vista de álbum
+                const albumThumbnailScale = 2; // Escala adicional para vista de álbum
+                finalCanvas.width = workspaceDimensions.width * albumThumbnailScale;
+                finalCanvas.height = workspaceDimensions.height * albumThumbnailScale;
+                
+                finalCtx.imageSmoothingEnabled = true;
+                finalCtx.imageSmoothingQuality = 'high';
+                
+                finalCtx.drawImage(html2canvasResult, 0, 0, finalCanvas.width, finalCanvas.height);
+                
+                highResThumbnails[page.id] = finalCanvas.toDataURL('image/png', 0.98);
+                
+                console.log(`✅ Thumbnail alta resolución generado para página ${page.id}: ${finalCanvas.width}x${finalCanvas.height}`);
+                
+            } catch (html2canvasError) {
+                console.warn(`❌ Error con html2canvas para página ${page.id}:`, html2canvasError);
+                // Fallback: usar thumbnail normal
+                continue;
+            }
+            
+        } catch (error) {
+            console.error(`❌ Error generando thumbnail alta resolución para página ${page.id}:`, error);
+        }
+    }
+    
+    console.log('🎉 Generación de thumbnails de alta resolución completada');
+    return highResThumbnails;
+};
+
+const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart, workspaceDimensions = { width: 800, height: 600 } }) => {
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [highResThumbnails, setHighResThumbnails] = useState({});
+    const [isGeneratingHighRes, setIsGeneratingHighRes] = useState(false);
     const flipBook = useRef();
+
+    // Generar thumbnails de alta resolución cuando se abra el modal
+    useEffect(() => {
+        if (isOpen && pages && pages.length > 0 && Object.keys(highResThumbnails).length === 0) {
+            setIsGeneratingHighRes(true);
+            generateHighResolutionThumbnails(pages, workspaceDimensions)
+                .then(newThumbnails => {
+                    setHighResThumbnails(newThumbnails);
+                    setIsGeneratingHighRes(false);
+                    console.log('✅ Thumbnails de alta resolución cargados para vista de álbum');
+                })
+                .catch(error => {
+                    console.error('❌ Error generando thumbnails de alta resolución:', error);
+                    setIsGeneratingHighRes(false);
+                });
+        }
+    }, [isOpen, pages, workspaceDimensions]);
+
+    // Usar thumbnails de alta resolución si están disponibles, sino usar los normales
+    const activeThumbnails = Object.keys(highResThumbnails).length > 0 ? highResThumbnails : pageThumbnails;
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
         return (
@@ -98,10 +214,19 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
         }
     };
 
-    // Tamaño base para la preview - aspect ratio 4:3 como las páginas reales
-    const aspectRatio = 4 / 3;
-    const previewHeight = 450; // Más alto para mejor visualización
-    const previewWidth = Math.round(previewHeight * aspectRatio);
+    // Usar las dimensiones reales del workspace para calcular la proporción exacta
+    const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
+    
+    // Tamaño base para la preview usando la proporción real del workspace
+    const previewBaseHeight = 500; // Altura base mayor para mejor nitidez
+    const previewHeight = previewBaseHeight;
+    const previewWidth = Math.round(previewHeight * workspaceAspectRatio);
+    
+    console.log(`📖 BookPreview dimensiones calculadas:`);
+    console.log(`   Workspace: ${workspaceDimensions.width}x${workspaceDimensions.height}`);
+    console.log(`   Proporción workspace: ${workspaceAspectRatio.toFixed(3)}`);
+    console.log(`   Preview: ${previewWidth}x${previewHeight}`);
+    console.log(`   Proporción preview: ${(previewWidth/previewHeight).toFixed(3)}`);
 
     // Función para organizar páginas como libro real con frente y reverso
     const createBookPages = () => {
@@ -279,10 +404,10 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                                         >
                                             {page.isBack ? 'Reverso' : ''}
                                         </div>
-                                    ) : pageThumbnails[page.id] ? (
+                                    ) : activeThumbnails[page.id] ? (
                                         // Página con contenido
                                         <img
-                                            src={pageThumbnails[page.id]}
+                                            src={activeThumbnails[page.id]}
                                             alt={`${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : `Página ${page.pageNumber || pageIdx + 1}`}`}
                                             style={{ 
                                                 width: '100%',
@@ -291,21 +416,40 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                                                 margin: 0,
                                                 padding: 0,
                                                 border: 'none',
-                                                imageRendering: 'crisp-edges',
-                                                backgroundColor: '#ffffff'
+                                                imageRendering: 'high-quality',
+                                                backgroundColor: '#ffffff',
+                                                // Mejorar la nitidez de la imagen
+                                                filter: 'contrast(1.02) brightness(1.01)',
+                                                // Evitar blur en el escalado
+                                                msInterpolationMode: 'nearest-neighbor',
+                                                WebkitBackfaceVisibility: 'hidden',
+                                                backfaceVisibility: 'hidden',
+                                                WebkitTransform: 'translateZ(0)',
+                                                transform: 'translateZ(0)'
+                                            }}
+                                            onLoad={(e) => {
+                                                // Asegurar que la imagen se renderice con alta calidad
+                                                e.target.style.imageRendering = '-webkit-optimize-contrast';
                                             }}
                                         />
                                     ) : (
                                         // Cargando
                                         <div 
-                                            className="flex items-center justify-center text-gray-400 text-sm"
+                                            className="flex flex-col items-center justify-center text-gray-400 text-sm"
                                             style={{
                                                 width: '100%',
                                                 height: '100%',
                                                 backgroundColor: '#f9fafb'
                                             }}
                                         >
-                                            Generando previsualización...
+                                            {isGeneratingHighRes ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mb-2"></div>
+                                                    <span>Generando vista de alta calidad...</span>
+                                                </>
+                                            ) : (
+                                                <span>Generando previsualización...</span>
+                                            )}
                                         </div>
                                     )}
                                 </div>
