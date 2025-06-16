@@ -2253,7 +2253,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                             {/* Action buttons */}
                             <div className="flex gap-3 items-center">
-                                <Button
+                              {/*  <Button
                                     variant={previewMode ? "secondary" : "outline"}
                                     size="sm"
                                     onClick={togglePreview}
@@ -2261,14 +2261,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     className="border-white/20 text-white hover:bg-white/10 hover:text-white"
                                 >
                                     {previewMode ? "Editar" : "Vista previa"}
-                                </Button>
+                                </Button> */}
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={() => setIsBookPreviewOpen(true)}
                                     icon={<Book className="h-4 w-4" />}
                                 >
-                                    Vista de Álbum
+                                    Comprar Ahora
                                 </Button>
                                 {/*  <Button
                                     variant="primary"
@@ -2280,7 +2280,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     Agregar al Carrito
                                 </Button> */}
                                 {/* Botón para limpiar progreso guardado (opcional, visible solo en desarrollo) */}
-                                {process.env.NODE_ENV !== 'production' && (
+                                {/*process.env.NODE_ENV !== 'production' && (
                                     <>
                                         <Button
                                             variant="outline"
@@ -2421,7 +2421,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             Test Máscaras
                                         </Button>
                                     </>
-                                )}
+                                )*/}
                             </div>
                         </div>
                     </header>
