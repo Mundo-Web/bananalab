@@ -625,14 +625,6 @@
       "__commonjsHelpers-D6-XlEtG.js"
     ]
   },
-  "_html2canvas.esm-DX001pW5.js": {
-    "file": "assets/html2canvas.esm-DX001pW5.js",
-    "name": "html2canvas.esm",
-    "isDynamicEntry": true,
-    "imports": [
-      "_index-BOnQTV8N.js"
-    ]
-  },
   "_html2string-CfCixsO3.js": {
     "file": "assets/html2string-CfCixsO3.js",
     "name": "html2string"
@@ -701,6 +693,13 @@
   "_index-yBjzXJbu.js": {
     "file": "assets/index-yBjzXJbu.js",
     "name": "index"
+  },
+  "_index.es-TZnJvzHg.js": {
+    "file": "assets/index.es-TZnJvzHg.js",
+    "name": "index.es",
+    "imports": [
+      "_index-BOnQTV8N.js"
+    ]
   },
   "_index.esm-DFiNGWUA.js": {
     "file": "assets/index.esm-DFiNGWUA.js",
@@ -3103,7 +3102,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab.jsx": {
-    "file": "assets/BananaLab-CX9wBHrD.js",
+    "file": "assets/BananaLab-Dlh8OZYm.js",
     "name": "BananaLab",
     "src": "resources/js/Components/Tailwind/BananaLab.jsx",
     "isEntry": true,
@@ -3170,7 +3169,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/Editor.jsx": {
-    "file": "assets/Editor-rZhzRsv5.js",
+    "file": "assets/Editor-OFH-HNyJ.js",
     "name": "Editor",
     "src": "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
     "isEntry": true,
@@ -3179,7 +3178,6 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
-      "_html2canvas.esm-DX001pW5.js",
       "_preload-helper-BfFHrpNk.js",
       "_typeof-QjJsDpFa.js",
       "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
@@ -3189,6 +3187,7 @@
       "_index-BtQtP3Fl.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js",
+      "_index.es-TZnJvzHg.js",
       "_Global-BM4Id4Pw.js",
       "_x-fof_H3Vv.js",
       "_createLucideIcon-DfjclApS.js",
@@ -3198,22 +3197,23 @@
       "____vite-browser-external_commonjs-proxy-DDYoOVPM.js"
     ],
     "dynamicImports": [
-      "_html2canvas.esm-DX001pW5.js",
+      "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
       "node_modules/dompurify/dist/purify.es.mjs",
       "node_modules/canvg/lib/index.es.js"
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx": {
-    "file": "assets/V1Edit-CJbS1Xs3.js",
+    "file": "assets/V1Edit-B3PDMD4V.js",
     "name": "V1Edit",
     "src": "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
     "isEntry": true,
+    "isDynamicEntry": true,
     "imports": [
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "__commonjsHelpers-D6-XlEtG.js",
-      "_html2canvas.esm-DX001pW5.js",
       "_index-BtQtP3Fl.js",
+      "_index.es-TZnJvzHg.js",
       "_Global-BM4Id4Pw.js",
       "_x-fof_H3Vv.js",
       "_chevron-left-JcR9Fe4w.js",
@@ -3262,7 +3262,7 @@
     ]
   },
   "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx": {
-    "file": "assets/BookPreview-Z3gymim4.js",
+    "file": "assets/BookPreview-y24xUb9m.js",
     "name": "BookPreview",
     "src": "resources/js/Components/Tailwind/BananaLab/components/Editor/BookPreview.jsx",
     "isEntry": true,
@@ -3270,7 +3270,7 @@
       "resources/js/Components/Tailwind/AboutUs/AboutSimple.jsx",
       "_index-BOnQTV8N.js",
       "_index-BtQtP3Fl.js",
-      "_html2canvas.esm-DX001pW5.js",
+      "_index.es-TZnJvzHg.js",
       "_index-yBjzXJbu.js",
       "__commonjsHelpers-D6-XlEtG.js",
       "_index-fNjTmf9T.js",
@@ -6849,7 +6849,7 @@
     ]
   },
   "resources/js/Pages/Editor.jsx": {
-    "file": "assets/Editor-DHyrpqeI.js",
+    "file": "assets/Editor-B7ZRVjT2.js",
     "name": "Editor",
     "src": "resources/js/Pages/Editor.jsx",
     "isEntry": true,
@@ -6858,7 +6858,6 @@
       "_index-BOnQTV8N.js",
       "_index.esm-DFiNGWUA.js",
       "resources/js/Components/Tailwind/BananaLab/V1Edit.jsx",
-      "_html2canvas.esm-DX001pW5.js",
       "resources/js/Components/Tailwind/BananaLab/Editor.jsx",
       "resources/js/Components/Tailwind/Checkouts/Components/MercadoPagoCheckoutModal.jsx",
       "_main-Bp3JhiuO.js",
@@ -6868,6 +6867,7 @@
       "_index-BtQtP3Fl.js",
       "_index-fNjTmf9T.js",
       "_index-Chjiymov.js",
+      "_index.es-TZnJvzHg.js",
       "_Global-BM4Id4Pw.js",
       "_x-fof_H3Vv.js",
       "_createLucideIcon-DfjclApS.js",
@@ -6985,7 +6985,7 @@
     ]
   },
   "resources/js/System.jsx": {
-    "file": "assets/System-COMsqIkw.js",
+    "file": "assets/System-DcqdZlld.js",
     "name": "System",
     "src": "resources/js/System.jsx",
     "isEntry": true,

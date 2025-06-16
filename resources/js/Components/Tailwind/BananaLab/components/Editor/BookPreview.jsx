@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from "react";
 import Modal from "react-modal";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import HTMLFlipBook from "react-pageflip";
-import html2canvas from "html2canvas";
 import Global from "../../../../../Utils/Global";
 
 // Estilos para el modal
@@ -25,7 +24,7 @@ const customStyles = {
     },
 };
 
-// Estilos CSS adicionales para eliminar márgenes del flipbook
+// Estilos CSS adicionales para eliminar márgenes del flipbook y mantener nitidez nativa
 const flipbookStyles = `
     .stf__wrapper {
         margin: 0 !important;
@@ -46,130 +45,309 @@ const flipbookStyles = `
         padding: 0;
         border: none;
         outline: none;
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: high-quality !important;
+        -webkit-backface-visibility: hidden !important;
+        backface-visibility: hidden !important;
+        -webkit-transform: translateZ(0) !important;
+        transform: translateZ(0) !important;
+        -ms-interpolation-mode: bicubic !important;
+    }
+    .page-container {
+        -webkit-font-smoothing: subpixel-antialiased !important;
+        -moz-osx-font-smoothing: auto !important;
     }
 `;
 
 Modal.setAppElement('#app'); // Configurar elemento raíz para accesibilidad
 
-// Función para generar thumbnails de alta resolución para la vista de álbum
-const generateHighResolutionThumbnails = async (pages, workspaceDimensions) => {
-    console.log('🎯 Generando thumbnails de alta resolución para vista de álbum...');
-    
-    const highResThumbnails = {};
-    
-    for (const page of pages) {
-        try {
-            const pageElement = document.getElementById(`page-${page.id}`);
-            if (!pageElement) {
-                console.warn(`❌ No se encontró elemento para página ${page.id}`);
-                continue;
-            }
 
-            console.log(`📄 Procesando página ${page.id} para alta resolución...`);
 
-            // Obtener dimensiones reales del workspace
-            const rect = pageElement.getBoundingClientRect();
-            if (rect.width === 0 || rect.height === 0) {
-                console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
-                continue;
-            }
 
-            // Crear canvas de muy alta resolución para el álbum
-            const scale = 3; // Mayor escala para vista de álbum
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            canvas.width = rect.width * scale;
-            canvas.height = rect.height * scale;
-            ctx.scale(scale, scale);
-            
-            // Configuraciones de máxima calidad
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.textRenderingOptimization = 'optimizeQuality';
-            
-            // Fondo blanco
-            ctx.fillStyle = '#ffffff';
-            ctx.fillRect(0, 0, rect.width, rect.height);
-            
-            // Usar html2canvas para capturar el elemento completo con mayor calidad
-            try {
-                const html2canvasResult = await html2canvas(pageElement, {
-                    scale: scale,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    imageTimeout: 15000,
-                    removeContainer: true,
-                    width: rect.width,
-                    height: rect.height,
-                    windowWidth: rect.width,
-                    windowHeight: rect.height,
-                    scrollX: 0,
-                    scrollY: 0,
-                    x: 0,
-                    y: 0
-                });
-                
-                // Crear thumbnail final con la proporción exacta del workspace
-                const finalCanvas = document.createElement('canvas');
-                const finalCtx = finalCanvas.getContext('2d');
-                
-                // Usar dimensiones más grandes para la vista de álbum
-                const albumThumbnailScale = 2; // Escala adicional para vista de álbum
-                finalCanvas.width = workspaceDimensions.width * albumThumbnailScale;
-                finalCanvas.height = workspaceDimensions.height * albumThumbnailScale;
-                
-                finalCtx.imageSmoothingEnabled = true;
-                finalCtx.imageSmoothingQuality = 'high';
-                
-                finalCtx.drawImage(html2canvasResult, 0, 0, finalCanvas.width, finalCanvas.height);
-                
-                highResThumbnails[page.id] = finalCanvas.toDataURL('image/png', 0.98);
-                
-                console.log(`✅ Thumbnail alta resolución generado para página ${page.id}: ${finalCanvas.width}x${finalCanvas.height}`);
-                
-            } catch (html2canvasError) {
-                console.warn(`❌ Error con html2canvas para página ${page.id}:`, html2canvasError);
-                // Fallback: usar thumbnail normal
-                continue;
-            }
-            
-        } catch (error) {
-            console.error(`❌ Error generando thumbnail alta resolución para página ${page.id}:`, error);
-        }
-    }
-    
-    console.log('🎉 Generación de thumbnails de alta resolución completada');
-    return highResThumbnails;
-};
 
-const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart, workspaceDimensions = { width: 800, height: 600 } }) => {
+const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, addAlbumToCart, workspaceDimensions = { width: 800, height: 600 }, layouts = [], presetData = null }) => {
     const [currentPage, setCurrentPage] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [highResThumbnails, setHighResThumbnails] = useState({});
     const [isGeneratingHighRes, setIsGeneratingHighRes] = useState(false);
     const flipBook = useRef();
 
-    // Generar thumbnails de alta resolución cuando se abra el modal
-    useEffect(() => {
-        if (isOpen && pages && pages.length > 0 && Object.keys(highResThumbnails).length === 0) {
-            setIsGeneratingHighRes(true);
-            generateHighResolutionThumbnails(pages, workspaceDimensions)
-                .then(newThumbnails => {
-                    setHighResThumbnails(newThumbnails);
-                    setIsGeneratingHighRes(false);
-                    console.log('✅ Thumbnails de alta resolución cargados para vista de álbum');
-                })
-                .catch(error => {
-                    console.error('❌ Error generando thumbnails de alta resolución:', error);
-                    setIsGeneratingHighRes(false);
-                });
-        }
-    }, [isOpen, pages, workspaceDimensions]);
+    // Función para crear un placeholder elegante para una página específica
+    const createElegantPlaceholderForPage = (page, workspaceDimensions) => {
+        console.log(`🎨 Creando placeholder para página ${page.id} (${page.type})`);
+        
+        // Calcular dimensiones del preview con la proporción exacta del workspace
+        const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
+        const previewBaseWidht = 800;
+        const previewHeight = previewBaseWidht;
+        const previewWidth = Math.round(previewHeight * workspaceAspectRatio);
 
-    // Usar thumbnails de alta resolución si están disponibles, sino usar los normales
-    const activeThumbnails = Object.keys(highResThumbnails).length > 0 ? highResThumbnails : pageThumbnails;
+        // HiDPI fix
+        const ratio = window.devicePixelRatio || 1;
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = previewWidth * ratio;
+        canvas.height = previewHeight * ratio;
+        canvas.style.width = `${previewWidth}px`;
+        canvas.style.height = `${previewHeight}px`;
+        ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+        // Fondo blanco limpio
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, previewWidth, previewHeight);
+
+        // Borde elegante
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(20, 20, previewWidth - 40, previewHeight - 40);
+
+        // Configuración de texto
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+
+        // Información de la página
+        let pageTitle = '';
+        let pageIcon = '';
+        let pageSubtitle = '';
+        let backgroundColor = '#f8fafc';
+        let iconColor = '#64748b';
+
+        switch (page.type) {
+            case 'cover':
+                pageTitle = 'Portada';
+                pageIcon = '📚';
+                pageSubtitle = 'Página de inicio del álbum';
+                backgroundColor = '#fef7ef';
+                iconColor = '#ea580c';
+                break;
+            case 'final':
+                pageTitle = 'Contraportada';
+                pageIcon = '📖';
+                pageSubtitle = 'Página final del álbum';
+                backgroundColor = '#f0f9ff';
+                iconColor = '#0284c7';
+                break;
+            case 'content':
+                pageTitle = `Página ${page.pageNumber || 'de contenido'}`;
+                pageIcon = '📄';
+                pageSubtitle = 'Página de contenido';
+                backgroundColor = '#f0fdf4';
+                iconColor = '#16a34a';
+                break;
+            default:
+                pageTitle = `Página ${page.pageNumber || '?'}`;
+                pageIcon = '📄';
+                pageSubtitle = 'Contenido del álbum';
+                backgroundColor = '#f8fafc';
+                iconColor = '#64748b';
+        }
+
+        // Fondo de color suave
+        ctx.fillStyle = backgroundColor;
+        ctx.fillRect(40, 40, previewWidth - 80, previewHeight - 80);
+
+        // Icono principal (emoji grande)
+        ctx.font = `${Math.min(previewWidth, previewHeight) * 0.12}px Arial`;
+        ctx.fillText(pageIcon, previewWidth / 2, previewHeight / 2 - 50);
+
+        // Título de la página
+        ctx.font = `bold ${Math.min(previewWidth, previewHeight) * 0.035}px Arial`;
+        ctx.fillStyle = '#1e293b';
+        ctx.fillText(pageTitle, previewWidth / 2, previewHeight / 2 + 15);
+
+        // Subtítulo
+        ctx.font = `${Math.min(previewWidth, previewHeight) * 0.022}px Arial`;
+        ctx.fillStyle = '#64748b';
+        ctx.fillText(pageSubtitle, previewWidth / 2, previewHeight / 2 + 45);
+
+        // Información adicional si hay layout
+        if (page.layout && layouts.length > 0) {
+            const layout = layouts.find(l => l.id === page.layout);
+            if (layout) {
+                ctx.font = `${Math.min(previewWidth, previewHeight) * 0.018}px Arial`;
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText(`Layout: ${layout.name || 'Personalizado'}`, previewWidth / 2, previewHeight / 2 + 75);
+            }
+        }
+
+        // Decoración sutil en las esquinas
+        ctx.strokeStyle = iconColor;
+        ctx.lineWidth = 3;
+        ctx.lineCap = 'round';
+        
+        // Esquinas decorativas
+        const cornerSize = 15;
+        const margin = 30;
+        
+        // Esquina superior izquierda
+        ctx.beginPath();
+        ctx.moveTo(margin, margin + cornerSize);
+        ctx.lineTo(margin, margin);
+        ctx.lineTo(margin + cornerSize, margin);
+        ctx.stroke();
+        
+        // Esquina superior derecha
+        ctx.beginPath();
+        ctx.moveTo(previewWidth - margin - cornerSize, margin);
+        ctx.lineTo(previewWidth - margin, margin);
+        ctx.lineTo(previewWidth - margin, margin + cornerSize);
+        ctx.stroke();
+        
+        // Esquina inferior izquierda
+        ctx.beginPath();
+        ctx.moveTo(margin, previewHeight - margin - cornerSize);
+        ctx.lineTo(margin, previewHeight - margin);
+        ctx.lineTo(margin + cornerSize, previewHeight - margin);
+        ctx.stroke();
+        
+        // Esquina inferior derecha
+        ctx.beginPath();
+        ctx.moveTo(previewWidth - margin - cornerSize, previewHeight - margin);
+        ctx.lineTo(previewWidth - margin, previewHeight - margin);
+        ctx.lineTo(previewWidth - margin, previewHeight - margin - cornerSize);
+        ctx.stroke();
+
+        return canvas.toDataURL('image/png', 1.0);
+    };
+
+    // ⚡ SOLUCIÓN MEJORADA: Sistema híbrido inteligente
+    useEffect(() => {
+        if (isOpen && pages && pages.length > 0) {
+            console.log('🚀 Modal abierto - Preparando vista de álbum');
+            console.log(`📊 Total de páginas: ${pages.length}`);
+
+            // Verificar qué thumbnails tenemos del editor
+            const editorThumbnails = Object.keys(pageThumbnails).length;
+            console.log(`📸 Thumbnails del editor: ${editorThumbnails}/${pages.length}`);
+
+            if (editorThumbnails > 0) {
+                // Usar thumbnails del editor y llenar los faltantes con placeholders elegantes
+                console.log('🔀 Modo híbrido: Thumbnails del editor + Placeholders para páginas faltantes');
+                
+                // Crear un objeto combinado
+            
+                const combinedThumbnails = { ...pageThumbnails };
+                
+                // Para páginas sin thumbnail del editor, crear placeholders elegantes
+                pages.forEach(page => {
+                    if (!combinedThumbnails[page.id]) {
+                        console.log(`🎨 Creando placeholder elegante para página ${page.id} (${page.type})`);
+                        combinedThumbnails[page.id] = createElegantPlaceholderForPage(page, workspaceDimensions);
+                    }
+                });
+                
+                setHighResThumbnails(combinedThumbnails);
+                
+                setIsGeneratingHighRes(false);
+            } else {
+                // Si no hay thumbnails del editor, crear placeholders para todas
+                console.log('🎨 Creando placeholders elegantes para todas las páginas...');
+                createHighQualityPlaceholders(pages, workspaceDimensions);
+                setIsGeneratingHighRes(false);
+            }
+        }
+    }, [isOpen, pages, workspaceDimensions, pageThumbnails, layouts, presetData]);
+
+    // Función para crear placeholders inmediatos si falla la generación
+    const createPlaceholderThumbnails = (pages) => {
+        console.log('🔄 Creando placeholders para', pages.length, 'páginas');
+        createHighQualityPlaceholders(pages, workspaceDimensions);
+    };
+
+    // Función para crear placeholders de alta calidad para el preview
+    const createHighQualityPlaceholders = (pages, workspaceDimensions) => {
+        console.log('� Creando placeholders de alta calidad para', pages.length, 'páginas');
+        const placeholders = {};
+
+        // Calcular dimensiones del preview
+        const previewBaseWidht = 600;
+        const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
+        const previewWidth  = previewBaseWidht;
+        const previewHeight = Math.round(previewWidth / workspaceAspectRatio);
+        const ratio = workspaceAspectRatio;
+
+        pages.forEach((page, index) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = previewWidth * ratio;
+            canvas.height = previewHeight * ratio;
+            canvas.style.width = `${previewWidth}px`;
+            canvas.style.height = `${previewHeight}px`;
+            ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+            // Usar las dimensiones exactas del preview
+            // Fondo blanco
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, previewWidth, previewHeight);
+
+            // Borde elegante
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(20, 20, previewWidth - 40, previewHeight - 40);
+
+            // Configurar texto
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#64748b';
+
+            // Título de la página
+            let pageTitle = '';
+            let pageIcon = '';
+            let pageSubtitle = '';
+
+            switch (page.type) {
+                case 'cover':
+                    pageTitle = 'Portada';
+                    pageIcon = '📚';
+                    pageSubtitle = 'Página de inicio del álbum';
+                    break;
+                case 'final':
+                    pageTitle = 'Contraportada';
+                    pageIcon = '📖';
+                    pageSubtitle = 'Página final del álbum';
+                    break;
+                case 'content':
+                    pageTitle = `Página ${page.pageNumber || index + 1}`;
+                    pageIcon = '📄';
+                    pageSubtitle = 'Página de contenido';
+                    break;
+                default:
+                    pageTitle = `Página ${index + 1}`;
+                    pageIcon = '📄';
+                    pageSubtitle = 'Contenido del álbum';
+            }
+
+            // Dibujar icono grande
+            ctx.font = `${Math.min(previewWidth, previewHeight) * 0.15}px Arial`;
+            ctx.fillText(pageIcon, previewWidth / 2, previewHeight / 2 - 40);
+
+            // Dibujar título
+            ctx.font = `bold ${Math.min(previewWidth, previewHeight) * 0.04}px Arial`;
+            ctx.fillStyle = '#1e293b';
+            ctx.fillText(pageTitle, previewWidth / 2, previewHeight / 2 + 20);
+
+            // Dibujar subtítulo
+            ctx.font = `${Math.min(previewWidth, previewHeight) * 0.025}px Arial`;
+            ctx.fillStyle = '#64748b';
+            ctx.fillText(pageSubtitle, previewWidth / 2, previewHeight / 2 + 50);
+
+            // Información adicional si hay layout
+            if (page.layout) {
+                ctx.font = `${Math.min(previewWidth, previewHeight) * 0.02}px Arial`;
+                ctx.fillStyle = '#94a3b8';
+                ctx.fillText(`Layout: ${page.layout.name || 'Personalizado'}`, previewWidth / 2, previewHeight / 2 + 80);
+            }
+
+            placeholders[page.id] = canvas.toDataURL('image/png', 1.0);
+        });
+
+        setHighResThumbnails(placeholders);
+        console.log('✅ Placeholders de alta calidad creados para todas las páginas');
+    };
+
+    // Usar thumbnails existentes del editor o placeholders de alta calidad
+    const activeThumbnails = Object.keys(highResThumbnails).length > 0 ? highResThumbnails :
+        Object.keys(pageThumbnails).length > 0 ? pageThumbnails :
+            {};
 
     if (!pages || !Array.isArray(pages) || pages.length === 0) {
         return (
@@ -216,22 +394,22 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
 
     // Usar las dimensiones reales del workspace para calcular la proporción exacta
     const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
-    
+
     // Tamaño base para la preview usando la proporción real del workspace
-    const previewBaseHeight = 500; // Altura base mayor para mejor nitidez
-    const previewHeight = previewBaseHeight;
+    const previewBaseWidht = 600; // Aumentar altura base para mejor nitidez
+    const previewHeight = previewBaseWidht;
     const previewWidth = Math.round(previewHeight * workspaceAspectRatio);
-    
+
     console.log(`📖 BookPreview dimensiones calculadas:`);
     console.log(`   Workspace: ${workspaceDimensions.width}x${workspaceDimensions.height}`);
     console.log(`   Proporción workspace: ${workspaceAspectRatio.toFixed(3)}`);
     console.log(`   Preview: ${previewWidth}x${previewHeight}`);
-    console.log(`   Proporción preview: ${(previewWidth/previewHeight).toFixed(3)}`);
+    console.log(`   Proporción preview: ${(previewWidth / previewHeight).toFixed(3)}`);
 
     // Función para organizar páginas como libro real con frente y reverso
     const createBookPages = () => {
         const bookPages = [];
-        
+
         // Todas las páginas en orden secuencial
         const allPages = [
             ...pages.filter(page => page.type === 'cover'),
@@ -286,15 +464,15 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
         >
             {/* Inyectar estilos CSS para eliminar márgenes */}
             <style dangerouslySetInnerHTML={{ __html: flipbookStyles }} />
-            
+
             <div className="relative flex flex-col items-center justify-center p-6 bg-white rounded-2xl shadow-2xl">
                 {/* Título del modal (oculto visualmente pero accesible) */}
                 <h2 id="modal-title" className="sr-only">Vista previa del álbum</h2>
                 <p id="modal-description" className="sr-only">
-                    Navegue por las páginas de su álbum usando los controles de navegación o teclado. 
+                    Navegue por las páginas de su álbum usando los controles de navegación o teclado.
                     Puede cerrar esta ventana presionando Escape o el botón de cerrar.
                 </p>
-                
+
                 {/* Botón de cerrar */}
                 <button
                     onClick={onRequestClose}
@@ -318,7 +496,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                         {(() => {
                             const currentPageData = bookPages[currentPage];
                             if (!currentPageData) return 'Cargando...';
-                            
+
                             // Manejo especial para reversos y páginas en blanco
                             if (currentPageData.isBack && currentPageData.isEmpty) {
                                 return 'Reverso';
@@ -326,7 +504,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                             if (currentPageData.isBack) {
                                 return 'Reverso de la página';
                             }
-                            
+
                             if (currentPageData.type === 'cover') return 'Portada';
                             if (currentPageData.type === 'final') return 'Contraportada';
                             return `Página ${currentPageData.pageNumber || Math.ceil((currentPage + 1) / 2)}`;
@@ -374,8 +552,9 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                         }}
                     >
                         {bookPages.map((page, pageIdx) => (
-                            <div 
+                            <div
                                 key={`page-${pageIdx}`}
+                                id={`page-${page.id}`}
                                 className="page-container"
                                 style={{
                                     width: previewWidth,
@@ -393,7 +572,7 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                                 <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     {page.isEmpty || page.isBack ? (
                                         // Página en blanco (reverso)
-                                        <div 
+                                        <div
                                             className="flex items-center justify-center text-gray-300 text-xs"
                                             style={{
                                                 width: '100%',
@@ -405,52 +584,28 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                                             {page.isBack ? 'Reverso' : ''}
                                         </div>
                                     ) : activeThumbnails[page.id] ? (
-                                        // Página con contenido
+                                        // Página con contenido usando thumbnails disponibles
                                         <img
                                             src={activeThumbnails[page.id]}
                                             alt={`${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : `Página ${page.pageNumber || pageIdx + 1}`}`}
-                                            style={{ 
+                                            style={{
                                                 width: '100%',
                                                 height: '100%',
                                                 objectFit: 'contain',
                                                 margin: 0,
                                                 padding: 0,
                                                 border: 'none',
-                                                imageRendering: 'high-quality',
+                                                imageRendering: 'auto',
                                                 backgroundColor: '#ffffff',
-                                                // Mejorar la nitidez de la imagen
-                                                filter: 'contrast(1.02) brightness(1.01)',
-                                                // Evitar blur en el escalado
-                                                msInterpolationMode: 'nearest-neighbor',
                                                 WebkitBackfaceVisibility: 'hidden',
                                                 backfaceVisibility: 'hidden',
                                                 WebkitTransform: 'translateZ(0)',
                                                 transform: 'translateZ(0)'
                                             }}
-                                            onLoad={(e) => {
-                                                // Asegurar que la imagen se renderice con alta calidad
-                                                e.target.style.imageRendering = '-webkit-optimize-contrast';
-                                            }}
                                         />
                                     ) : (
-                                        // Cargando
-                                        <div 
-                                            className="flex flex-col items-center justify-center text-gray-400 text-sm"
-                                            style={{
-                                                width: '100%',
-                                                height: '100%',
-                                                backgroundColor: '#f9fafb'
-                                            }}
-                                        >
-                                            {isGeneratingHighRes ? (
-                                                <>
-                                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-500 mb-2"></div>
-                                                    <span>Generando vista de alta calidad...</span>
-                                                </>
-                                            ) : (
-                                                <span>Generando previsualización...</span>
-                                            )}
-                                        </div>
+                                        // Placeholder inline si no hay thumbnail
+                                        <InlinePlaceholder page={page} pageIdx={pageIdx} />
                                     )}
                                 </div>
                             </div>
@@ -462,19 +617,18 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
             {/* Botones de acción */}
             <div className="flex flex-col sm:flex-row gap-3 mt-6 w-full max-w-md mx-auto">
                 <button
-                    className={`flex-1 py-3 px-4 rounded-lg font-semibold shadow transition flex items-center justify-center ${
-                        isProcessing 
-                            ? 'bg-purple-400 text-white cursor-not-allowed' 
+                    className={`flex-1 py-3 px-4 rounded-lg font-semibold shadow transition flex items-center justify-center ${isProcessing
+                            ? 'bg-purple-400 text-white cursor-not-allowed'
                             : 'bg-purple-600 text-white hover:bg-purple-700'
-                    }`}
+                        }`}
                     onClick={async () => {
                         if (isProcessing) return;
-                        
+
                         setIsProcessing(true);
-                        
+
                         try {
                             console.log('🚀 Iniciando proceso de compra...');
-                            
+
                             // Verificar que la función addAlbumToCart esté disponible
                             if (typeof addAlbumToCart !== 'function') {
                                 console.error('❌ addAlbumToCart no es una función');
@@ -483,55 +637,52 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                                 alert('Error: Función de carrito no disponible. Inténtelo nuevamente.');
                                 return;
                             }
-                            
+
                             // Llamar a la función para finalizar el diseño y guardarlo
                             if (typeof window.finalizeAlbumDesign === 'function') {
                                 console.log('📄 Finalizando diseño del álbum...');
                                 const success = await window.finalizeAlbumDesign();
                                 console.log('📄 Resultado de finalizeAlbumDesign:', success);
-                                
+
                                 if (success) {
                                     // Primero agregar al carrito
                                     console.log('📦 Agregando álbum al carrito...');
                                     const addedToCart = addAlbumToCart();
                                     console.log('📦 Resultado de addAlbumToCart:', addedToCart);
-                                    
+
                                     if (addedToCart) {
                                         console.log('✅ Álbum agregado al carrito exitosamente');
-                                        
+
                                         try {
                                             // Esperar un poco para asegurar que el localStorage se actualice
                                             await new Promise(resolve => setTimeout(resolve, 200));
-                                            
+
                                             // Verificar una vez más que el álbum esté en el carrito
                                             const verifyCart = JSON.parse(localStorage.getItem(`${window.Global?.APP_CORRELATIVE || 'bananalab'}_cart`) || '[]');
                                             console.log('🔍 Verificación final del carrito:', verifyCart);
                                             console.log('🔍 Longitud del carrito:', verifyCart.length);
-                                            
+
                                             if (verifyCart.length === 0) {
                                                 console.error('❌ ADVERTENCIA: El carrito parece vacío después de agregar');
                                             }
-                                            
-                                            // Determinar la URL base correcta para el carrito
-                                         
-                                            
+
                                             // Redirigir al carrito
                                             const cartUrl = `${Global.APP_URL}/cart`;
                                             console.log('🔄 Redirigiendo al carrito...');
                                             console.log('🔄 URL del carrito:', cartUrl);
-                                            
+
                                             // Usar window.location.href para la redirección
                                             window.location.href = cartUrl;
-                                            
+
                                         } catch (redirectError) {
                                             console.error('⚠️ Error durante verificación o redirección:', redirectError);
                                             console.log('🔄 Intentando redirección directa...');
-                                            
+
                                             // Redirección de emergencia sin verificaciones adicionales
-                                              const cartUrl = `${Global.APP_URL}/cart`;
+                                            const cartUrl = `${Global.APP_URL}/cart`;
                                             console.log('🔄 Redirigiendo al carrito...');
                                             console.log('🔄 URL del carrito:', cartUrl);
-                                            
+
                                             // Usar window.location.href para la redirección
                                             window.location.href = cartUrl;
                                         }
@@ -553,27 +704,27 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                             console.error('Mensaje:', error.message);
                             console.error('Stack trace:', error.stack);
                             console.error('Error completo:', error);
-                            
+
                             // Si el error ocurrió DESPUÉS de agregar al carrito, intentar redirigir de todas formas
                             try {
                                 const verifyCart = JSON.parse(localStorage.getItem(`${Global?.APP_CORRELATIVE || 'bananalab'}_cart`) || '[]');
                                 console.log('🔍 Verificando carrito después del error:', verifyCart.length > 0 ? 'HAY ITEMS' : 'VACÍO');
-                                
+
                                 if (verifyCart.length > 0) {
                                     console.log('✅ El carrito tiene items, redirigiendo de todas formas...');
                                     // Redirección de emergencia sin verificaciones adicionales
-                                              const cartUrl = `${Global.APP_URL}/cart`;
-                                            console.log('🔄 Redirigiendo al carrito...');
-                                            console.log('🔄 URL del carrito:', cartUrl);
-                                            
-                                            // Usar window.location.href para la redirección
-                                            window.location.href = cartUrl;
+                                    const cartUrl = `${Global.APP_URL}/cart`;
+                                    console.log('🔄 Redirigiendo al carrito...');
+                                    console.log('🔄 URL del carrito:', cartUrl);
+
+                                    // Usar window.location.href para la redirección
+                                    window.location.href = cartUrl;
                                     return; // Salir sin mostrar alert de error
                                 }
                             } catch (recoveryError) {
                                 console.error('❌ Error durante intento de recuperación:', recoveryError);
                             }
-                            
+
                             alert(`Error durante el proceso: ${error.message}. Si el álbum se agregó al carrito, puede ir manualmente a la página del carrito.`);
                         } finally {
                             setIsProcessing(false);
@@ -602,6 +753,46 @@ const BookPreviewModal = ({ isOpen, onRequestClose, pages, pageThumbnails = {}, 
                 </button>
             </div>
         </Modal>
+    );
+};
+
+// Componente para placeholder inline simple
+const InlinePlaceholder = ({ page, pageIdx }) => {
+    let pageTitle = '';
+    let pageIcon = '';
+
+    switch (page.type) {
+        case 'cover':
+            pageTitle = 'Portada';
+            pageIcon = '📚';
+            break;
+        case 'final':
+            pageTitle = 'Contraportada';
+            pageIcon = '📖';
+            break;
+        case 'content':
+            pageTitle = `Página ${page.pageNumber || pageIdx + 1}`;
+            pageIcon = '📄';
+            break;
+        default:
+            pageTitle = `Página ${pageIdx + 1}`;
+            pageIcon = '📄';
+    }
+
+    return (
+        <div
+            className="flex flex-col items-center justify-center w-full h-full bg-gray-50 border-2 border-gray-200 rounded-lg"
+            style={{ minHeight: '400px' }}
+        >
+            <div className="text-6xl mb-4">{pageIcon}</div>
+            <div className="text-lg font-semibold text-gray-700 mb-2">{pageTitle}</div>
+            <div className="text-sm text-gray-500">Vista previa</div>
+            {page.layout && (
+                <div className="text-xs text-gray-400 mt-2">
+                    Layout: {page.layout.name || 'Personalizado'}
+                </div>
+            )}
+        </div>
     );
 };
 

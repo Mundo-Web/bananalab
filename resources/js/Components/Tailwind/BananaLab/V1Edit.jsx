@@ -33,7 +33,7 @@ import WorkspaceControls from "./components/Elements/WorkspaceControls";
 import BookPreviewModal from "./components/Editor/BookPreview";
 
 // Componente principal del editor
-export default function EditorLibro() {
+export default function EditorLibro_2() {
     const [pages, setPages] = useState([
         {
             id: "page-1",

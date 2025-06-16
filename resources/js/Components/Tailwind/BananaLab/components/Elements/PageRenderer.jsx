@@ -76,11 +76,16 @@ const PageRenderer = ({
                 {page.cells.map((cell, cellIndex) => {
                     if (!cell || !cell.elements || !Array.isArray(cell.elements)) return null;
                     
-                    return (
-                        <div
+                    return (                        <div
                             key={cell.id}
                             className="relative bg-gray-50 rounded-lg overflow-hidden"
-                            style={layout.cellStyles?.[cellIndex] || {}}
+                            style={
+                                layout.cellStyles?.[cellIndex] && 
+                                typeof layout.cellStyles[cellIndex] === 'object' && 
+                                !Array.isArray(layout.cellStyles[cellIndex])
+                                    ? layout.cellStyles[cellIndex] 
+                                    : {}
+                            }
                         >
                             {cell.elements.map((element) => {
                                 if (!element || !element.id) return null;
@@ -125,8 +130,7 @@ const PageRenderer = ({
                                             }}
                                         />
                                     </div>
-                                ) : (
-                                    <div
+                                ) : (                                    <div
                                         key={element.id}
                                         className="absolute"
                                         style={{
@@ -143,7 +147,7 @@ const PageRenderer = ({
                                             padding: element.style?.padding || "8px",
                                             borderRadius: element.style?.borderRadius || "0px",
                                             border: element.style?.border || "none",
-                                            opacity: element.style?.opacity || 1,
+                                            opacity: element.style?.opacity !== undefined ? Number(element.style.opacity) : 1,
                                             zIndex: element.zIndex || 1,
                                         }}
                                     >

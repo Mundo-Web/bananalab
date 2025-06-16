@@ -185,7 +185,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const itemResponseData = await itemResponse.json();
             const item = itemResponseData.data || itemResponseData;
             setItemData(item);
-         
+
 
 
             // Solo crear páginas si NO restauramos progreso
@@ -886,505 +886,538 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         return () => window.removeEventListener('resize', handleResize);
     }, [presetData, workspaceSize]);
 
-    useEffect(() => {
-        const generateThumbnails = async () => {
-            if (pages.length === 0) return;
+  useEffect(() => {
+    const generateThumbnails = async () => {
+        if (pages.length === 0) return;
+        
+        console.log('🎯 Iniciando generación de thumbnails...');
+
+        const newThumbnails = {};
+
+        // Definir funciones para aplicar máscaras en canvas
+        const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.beginPath();
             
-            console.log('🎯 Iniciando generación de thumbnails...');
-
-            const newThumbnails = {};
-
-            // Definir funciones para aplicar máscaras en canvas
-            const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
-                ctx.save();
-                ctx.translate(x, y);
-                ctx.beginPath();
-                
-                switch (maskId) {
-                    case 'circle':
-                        ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
-                        break;
-                    case 'diamond':
-                        ctx.moveTo(width / 2, 0);
-                        ctx.lineTo(width, height / 2);
-                        ctx.lineTo(width / 2, height);
-                        ctx.lineTo(0, height / 2);
-                        ctx.closePath();
-                        break;
-                    case 'triangle':
-                        ctx.moveTo(width / 2, 0);
-                        ctx.lineTo(width, height);
-                        ctx.lineTo(0, height);
-                        ctx.closePath();
-                        break;
-                    case 'hexagon':
-                        const hexPoints = [
-                            [width * 0.25, height * 0.05],
-                            [width * 0.75, height * 0.05],
-                            [width * 1.0, height * 0.5],
-                            [width * 0.75, height * 0.95],
-                            [width * 0.25, height * 0.95],
-                            [width * 0.0, height * 0.5]
-                        ];
-                        ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
-                        hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    case 'star':
-                        const starPoints = [
-                            [width * 0.5, height * 0],
-                            [width * 0.61, height * 0.35],
-                            [width * 0.98, height * 0.35],
-                            [width * 0.68, height * 0.57],
-                            [width * 0.79, height * 0.91],
-                            [width * 0.5, height * 0.7],
-                            [width * 0.21, height * 0.91],
-                            [width * 0.32, height * 0.57],
-                            [width * 0.02, height * 0.35],
-                            [width * 0.39, height * 0.35]
-                        ];
-                        ctx.moveTo(starPoints[0][0], starPoints[0][1]);
-                        starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    default:
-                        // Sin máscara - rectángulo completo
-                        ctx.rect(0, 0, width, height);
-                        break;
-                }
-                
-                ctx.clip();
-            };
-
-            // Procesar páginas secuencialmente
-            for (const page of pages) {
-                try {
-                    const pageElement = document.getElementById(`page-${page.id}`);
-                    if (!pageElement) {
-                        console.warn(`❌ No se encontró elemento para página ${page.id}`);
-                        continue;
-                    }
-
-                    console.log(`📄 Procesando página ${page.id}...`);
-
-                    // Obtener dimensiones reales del workspace
-                    const rect = pageElement.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) {
-                        console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
-                        continue;
-                    }
-
-                    console.log(`📐 Dimensiones del workspace: ${rect.width}x${rect.height}`);
-
-                    // Crear canvas personalizado que respete exactamente el layout
-                    const customCanvas = document.createElement('canvas');
-                    const customCtx = customCanvas.getContext('2d');
-                    
-                    // Usar un factor de escala mayor para mejor calidad
-                    const scale = 2; // Mayor resolución para mejor nitidez
-                    customCanvas.width = rect.width * scale;
-                    customCanvas.height = rect.height * scale;
-                    
-                    // Escalar el contexto para dibujar en alta resolución
-                    customCtx.scale(scale, scale);
-                    
-                    // Mejorar la calidad del renderizado
-                    customCtx.imageSmoothingEnabled = true;
-                    customCtx.imageSmoothingQuality = 'high';
-                    customCtx.textRenderingOptimization = 'optimizeQuality';
-                    
-                    // Fondo blanco
-                    customCtx.fillStyle = '#ffffff';
-                    customCtx.fillRect(0, 0, rect.width, rect.height);
-                    
-                    // 1. Renderizar imagen de fondo si existe
-                    const bgImage = pageElement.querySelector('img[alt="background"]');
-                    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
-                        try {
-                            customCtx.drawImage(bgImage, 0, 0, rect.width, rect.height);
-                            console.log('✅ Fondo renderizado');
-                        } catch (error) {
-                            console.warn('❌ Error dibujando fondo:', error);
-                        }
-                    }
-                    
-                    // 2. Obtener el grid container real
-                    const gridContainer = pageElement.querySelector('[class*="grid"]');
-                    if (!gridContainer) {
-                        console.warn('❌ No se encontró grid container');
-                        continue;
-                    }
-
-                    const gridRect = gridContainer.getBoundingClientRect();
-                    const pageRect = pageElement.getBoundingClientRect();
-                    
-                    // Calcular offset del grid respecto al contenedor de la página
-                    const gridOffsetX = gridRect.left - pageRect.left;
-                    const gridOffsetY = gridRect.top - pageRect.top;
-                    
-                    console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
-                    console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
-                    
-                    // 3. Procesar cada celda del grid
-                    const cellElements = Array.from(gridContainer.children);
-                    console.log(`📦 Celdas encontradas: ${cellElements.length}`);
-                    
-                    for (let cellIndex = 0; cellIndex < cellElements.length; cellIndex++) {
-                        const cellElement = cellElements[cellIndex];
-                        const cellRect = cellElement.getBoundingClientRect();
-                        
-                        // Posición de la celda relativa al workspace
-                        const cellX = cellRect.left - pageRect.left;
-                        const cellY = cellRect.top - pageRect.top;
-                        const cellWidth = cellRect.width;
-                        const cellHeight = cellRect.height;
-                        
-                        console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
-                        
-                        // Buscar elementos dentro de la celda
-                        const imageElements = cellElement.querySelectorAll('img:not([alt="background"])');
-                        // Buscar elementos de texto usando el atributo específico
-                        const textElements = cellElement.querySelectorAll('[data-element-type="text"]');
-                        
-                        console.log(`� En celda ${cellIndex}: ${imageElements.length} imágenes, ${textElements.length} textos`);
-                        
-                        // 3.1. Procesar imágenes
-                        for (const imgElement of imageElements) {
-                            if (!imgElement.complete || imgElement.naturalWidth === 0) {
-                                console.log('⏳ Imagen no cargada, saltando...');
-                                continue;
-                            }
-                            
-                            // Obtener información de la máscara del contenedor de la imagen
-                            let maskId = 'none';
-                            let maskContainer = imgElement.parentElement;
-                            
-                            // Buscar el contenedor con la clase de máscara
-                            while (maskContainer && maskContainer !== cellElement) {
-                                const maskClass = Array.from(maskContainer.classList).find(cls => cls.startsWith('mask-'));
-                                if (maskClass) {
-                                    maskId = maskClass.replace('mask-', '');
-                                    break;
-                                }
-                                maskContainer = maskContainer.parentElement;
-                            }
-                            
-                            console.log(`🎭 Imagen encontrada con máscara: ${maskId}`);
-                            
-                            // Obtener el contenedor de la imagen (que define el tamaño del area visible)
-                            const imgContainer = imgElement.parentElement;
-                            const containerRect = imgContainer.getBoundingClientRect();
-                            const containerX = containerRect.left - pageRect.left;
-                            const containerY = containerRect.top - pageRect.top;
-                            const containerWidth = containerRect.width;
-                            const containerHeight = containerRect.height;
-                            
-                            console.log(`📦 Contenedor: x=${containerX}, y=${containerY}, w=${containerWidth}, h=${containerHeight}`);
-                            
-                            // Obtener dimensiones naturales de la imagen
-                            const naturalWidth = imgElement.naturalWidth;
-                            const naturalHeight = imgElement.naturalHeight;
-                            
-                            console.log(`📷 Imagen natural: ${naturalWidth}x${naturalHeight}`);
-                            
-                            // Obtener propiedades CSS de object-fit y object-position
-                            const computedStyle = window.getComputedStyle(imgElement);
-                            const objectFit = computedStyle.objectFit || 'cover';
-                            const objectPosition = computedStyle.objectPosition || 'center center';
-                            
-                            console.log(`🎨 CSS: object-fit=${objectFit}, object-position=${objectPosition}`);
-                            
-                            // Calcular cómo CSS renderizaría la imagen con object-fit: cover
-                            let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
-                            let destX = containerX, destY = containerY, destWidth = containerWidth, destHeight = containerHeight;
-                            
-                            if (objectFit === 'cover') {
-                                // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
-                                const scaleX = containerWidth / naturalWidth;
-                                const scaleY = containerHeight / naturalHeight;
-                                const scale = Math.max(scaleX, scaleY); // Mayor escala para cubrir completamente
-                                
-                                // Dimensiones de la imagen escalada
-                                const scaledWidth = naturalWidth * scale;
-                                const scaledHeight = naturalHeight * scale;
-                                
-                                // Parsear object-position (por defecto center center)
-                                const positions = objectPosition.split(' ');
-                                let posX = 'center', posY = 'center';
-                                
-                                if (positions.length >= 1) posX = positions[0];
-                                if (positions.length >= 2) posY = positions[1];
-                                
-                                // Convertir posiciones a porcentajes
-                                let offsetXPercent = 0.5; // center por defecto
-                                let offsetYPercent = 0.5; // center por defecto
-                                
-                                if (posX.includes('%')) {
-                                    offsetXPercent = parseFloat(posX) / 100;
-                                } else if (posX === 'left') {
-                                    offsetXPercent = 0;
-                                } else if (posX === 'right') {
-                                    offsetXPercent = 1;
-                                }
-                                
-                                if (posY.includes('%')) {
-                                    offsetYPercent = parseFloat(posY) / 100;
-                                } else if (posY === 'top') {
-                                    offsetYPercent = 0;
-                                } else if (posY === 'bottom') {
-                                    offsetYPercent = 1;
-                                }
-                                
-                                // Calcular qué parte de la imagen se mostrará (crop)
-                                if (scaledWidth > containerWidth) {
-                                    // La imagen es más ancha que el contenedor, recortar horizontalmente
-                                    const cropWidth = containerWidth / scale;
-                                    const maxOffsetX = naturalWidth - cropWidth;
-                                    sourceX = maxOffsetX * offsetXPercent;
-                                    sourceWidth = cropWidth;
-                                } else {
-                                    // La imagen encaja horizontalmente
-                                    sourceX = 0;
-                                    sourceWidth = naturalWidth;
-                                }
-                                
-                                if (scaledHeight > containerHeight) {
-                                    // La imagen es más alta que el contenedor, recortar verticalmente
-                                    const cropHeight = containerHeight / scale;
-                                    const maxOffsetY = naturalHeight - cropHeight;
-                                    sourceY = maxOffsetY * offsetYPercent;
-                                    sourceHeight = cropHeight;
-                                } else {
-                                    // La imagen encaja verticalmente
-                                    sourceY = 0;
-                                    sourceHeight = naturalHeight;
-                                }
-                                
-                                console.log(`✂️ Recorte calculado con ${objectPosition}: sourceX=${sourceX}, sourceY=${sourceY}, sourceW=${sourceWidth}, sourceH=${sourceHeight}`);
-                            }
-                            
-                            // Aplicar máscara y dibujar imagen
-                            customCtx.save();
-                            
-                            // Si hay máscara, aplicarla al área del contenedor
-                            if (maskId && maskId !== 'none') {
-                                applyMaskToCanvas(customCtx, maskId, containerX, containerY, containerWidth, containerHeight);
-                            } else {
-                                // Sin máscara, solo recortar al área del contenedor
-                                customCtx.beginPath();
-                                customCtx.rect(containerX, containerY, containerWidth, containerHeight);
-                                customCtx.clip();
-                            }
-                            
-                            // Aplicar filtros si los hay
-                            const filter = computedStyle.filter;
-                            
-                            if (filter && filter !== 'none') {
-                                const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
-                                if (brightnessMatch) {
-                                    const brightness = parseFloat(brightnessMatch[1]);
-                                    customCtx.globalAlpha *= brightness;
-                                }
-                            }
-                            
-                            // Dibujar la imagen aplicando el recorte de object-fit: cover
-                            try {
-                                customCtx.drawImage(
-                                    imgElement,
-                                    sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
-                                    destX, destY, destWidth, destHeight           // Área destino (contenedor)
-                                );
-                                console.log(`✅ Imagen dibujada con object-fit:cover y máscara ${maskId}`);
-                            } catch (error) {
-                                console.warn('❌ Error dibujando imagen:', error);
-                            }
-                            
-                            customCtx.restore();
-                        }
-                        
-                        // 3.2. Procesar elementos de texto
-                        console.log(`📝 Procesando ${textElements.length} elementos de texto en celda ${cellIndex}...`);
-                        
-                        for (let textIndex = 0; textIndex < textElements.length; textIndex++) {
-                            const textElement = textElements[textIndex];
-                            
-                            try {
-                                const textRect = textElement.getBoundingClientRect();
-                                const textX = textRect.left - pageRect.left;
-                                const textY = textRect.top - pageRect.top;
-                                const textWidth = textRect.width;
-                                const textHeight = textRect.height;
-                                
-                                console.log(`📝 Elemento de texto #${textIndex}:`);
-                                console.log(`   - BoundingRect: ${textRect.left}, ${textRect.top}, ${textRect.width}x${textRect.height}`);
-                                console.log(`   - Posición relativa al workspace: x=${textX}, y=${textY}`);
-                                console.log(`   - Dimensiones: ${textWidth}x${textHeight}`);
-                                
-                                // Obtener estilos computados del elemento de texto
-                                const computedStyle = window.getComputedStyle(textElement);
-                                let fontSize = computedStyle.fontSize || '16px';
-                                const fontFamily = computedStyle.fontFamily || 'Arial';
-                                const fontWeight = computedStyle.fontWeight || 'normal';
-                                const fontStyle = computedStyle.fontStyle || 'normal';
-                                const color = computedStyle.color || '#000000';
-                                const textAlign = computedStyle.textAlign || 'left';
-                                const opacity = parseFloat(computedStyle.opacity) || 1;
-                                const padding = computedStyle.padding || '8px';
-                                
-                                // Obtener el contenido del texto
-                                const textContent = textElement.textContent || textElement.innerText || '';
-                                
-                                console.log(`   - Contenido: "${textContent}"`);
-                                console.log(`   - Estilos: ${fontSize} ${fontFamily} ${fontWeight} ${color}`);
-                                
-                                if (textContent.trim()) {
-                                    // Ajustar el tamaño de fuente para la alta resolución del canvas
-                                    const fontSizeNumber = parseFloat(fontSize);
-                                    const scaledFontSize = Math.round(fontSizeNumber); // No escalar aquí porque ya tenemos scale en el context
-                                    
-                                    console.log(`📝 Renderizando texto: "${textContent}"`);
-                                    console.log(`   - Posición canvas: ${textX}, ${textY}`);
-                                    console.log(`   - Fuente escalada: ${scaledFontSize}px ${fontFamily}`);
-                                    
-                                    // Configurar el contexto para el texto
-                                    customCtx.save();
-                                    customCtx.globalAlpha = opacity;
-                                    
-                                    // Configurar fuente con alta calidad
-                                    customCtx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}`;
-                                    customCtx.fillStyle = color;
-                                    customCtx.textBaseline = 'top';
-                                    
-                                    // Mejorar la calidad del renderizado de texto
-                                    customCtx.textRenderingOptimization = 'optimizeQuality';
-                                    customCtx.textRendering = 'geometricPrecision';
-                                    
-                                    // Configurar alineación
-                                    if (textAlign === 'center') {
-                                        customCtx.textAlign = 'center';
-                                    } else if (textAlign === 'right') {
-                                        customCtx.textAlign = 'right';
-                                    } else {
-                                        customCtx.textAlign = 'left';
-                                    }
-                                    
-                                    // Calcular posición X según alineación
-                                    let drawX = textX;
-                                    if (textAlign === 'center') {
-                                        drawX = textX + textWidth / 2;
-                                    } else if (textAlign === 'right') {
-                                        drawX = textX + textWidth;
-                                    }
-                                    
-                                    // Ajustar por padding si existe
-                                    const paddingValue = parseFloat(padding) || 8;
-                                    const finalX = drawX + (textAlign === 'left' ? paddingValue : 0);
-                                    const finalY = textY + paddingValue;
-                                    
-                                    console.log(`   - Dibujando en coordenadas finales: x=${finalX}, y=${finalY}`);
-                                    console.log(`   - Padding aplicado: ${paddingValue}px`);
-                                    
-                                    // Dibujar fondo si existe
-                                    const backgroundColor = computedStyle.backgroundColor;
-                                    if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                                        const borderRadius = parseFloat(computedStyle.borderRadius) || 0;
-                                        customCtx.fillStyle = backgroundColor;
-                                        
-                                        if (borderRadius > 0) {
-                                            // Dibujar rectángulo con bordes redondeados
-                                            customCtx.beginPath();
-                                            customCtx.roundRect(textX, textY, textWidth, textHeight, borderRadius);
-                                            customCtx.fill();
-                                        } else {
-                                            customCtx.fillRect(textX, textY, textWidth, textHeight);
-                                        }
-                                        
-                                        customCtx.fillStyle = color; // Restaurar color del texto
-                                    }
-                                    
-                                    // Dibujar el texto
-                                    customCtx.fillText(textContent, finalX, finalY);
-                                    
-                                    console.log(`✅ Texto renderizado exitosamente: "${textContent}"`);
-                                    
-                                    customCtx.restore();
-                                } else {
-                                    console.log(`⚠️ Elemento de texto está vacío`);
-                                }
-                            } catch (error) {
-                                console.warn(`❌ Error renderizando texto #${textIndex}:`, error);
-                            }
-                        }
-                    }
-                    
-                    // 4. Crear thumbnail final que respete la proporción EXACTA del workspace
-                    const thumbnailCanvas = document.createElement('canvas');
-                    const thumbnailCtx = thumbnailCanvas.getContext('2d');
-                    
-                    // Usar las dimensiones REALES del workspace para calcular la proporción exacta
-                    const workspaceAspectRatio = rect.width / rect.height;
-                    
-                    // Definir tamaño base del thumbnail (ajustable)
-                    const thumbnailBaseSize = 200; // Tamaño base
-                    
-                    // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
-                    let thumbWidth, thumbHeight;
-                    
-                    if (workspaceAspectRatio >= 1) {
-                        // Workspace más ancho que alto
-                        thumbWidth = thumbnailBaseSize;
-                        thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
-                    } else {
-                        // Workspace más alto que ancho
-                        thumbHeight = thumbnailBaseSize;
-                        thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
-                    }
-                    
-                    console.log(`📏 Workspace proporción: ${workspaceAspectRatio.toFixed(3)} (${rect.width}x${rect.height})`);
-                    console.log(`📏 Thumbnail calculado: ${thumbWidth.toFixed(1)}x${thumbHeight.toFixed(1)}`);
-                    
-                    thumbnailCanvas.width = Math.round(thumbWidth);
-                    thumbnailCanvas.height = Math.round(thumbHeight);
-                    
-                    // Aplicar configuraciones de alta calidad
-                    thumbnailCtx.imageSmoothingEnabled = true;
-                    thumbnailCtx.imageSmoothingQuality = 'high';
-                    
-                    // Dibujar la imagen escalada manteniendo la proporción exacta
-                    thumbnailCtx.drawImage(customCanvas, 0, 0, thumbnailCanvas.width, thumbnailCanvas.height);
-                    
-                    // Convertir a base64 con mayor calidad
-                    newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 0.95);
-                    
-                    console.log(`✅ Thumbnail generado para página ${page.id}: ${thumbnailCanvas.width}x${thumbnailCanvas.height} (proporción: ${(thumbnailCanvas.width/thumbnailCanvas.height).toFixed(3)})`);
-                    
-                } catch (error) {
-                    console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
-                    newThumbnails[page.id] = null;
-                }
+            switch (maskId) {
+                case 'circle':
+                    ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                    break;
+                case 'diamond':
+                    ctx.moveTo(width / 2, 0);
+                    ctx.lineTo(width, height / 2);
+                    ctx.lineTo(width / 2, height);
+                    ctx.lineTo(0, height / 2);
+                    ctx.closePath();
+                    break;
+                case 'triangle':
+                    ctx.moveTo(width / 2, 0);
+                    ctx.lineTo(width, height);
+                    ctx.lineTo(0, height);
+                    ctx.closePath();
+                    break;
+                case 'hexagon':
+                    const hexPoints = [
+                        [width * 0.25, height * 0.05],
+                        [width * 0.75, height * 0.05],
+                        [width * 1.0, height * 0.5],
+                        [width * 0.75, height * 0.95],
+                        [width * 0.25, height * 0.95],
+                        [width * 0.0, height * 0.5]
+                    ];
+                    ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
+                    hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                case 'star':
+                    const starPoints = [
+                        [width * 0.5, height * 0],
+                        [width * 0.61, height * 0.35],
+                        [width * 0.98, height * 0.35],
+                        [width * 0.68, height * 0.57],
+                        [width * 0.79, height * 0.91],
+                        [width * 0.5, height * 0.7],
+                        [width * 0.21, height * 0.91],
+                        [width * 0.32, height * 0.57],
+                        [width * 0.02, height * 0.35],
+                        [width * 0.39, height * 0.35]
+                    ];
+                    ctx.moveTo(starPoints[0][0], starPoints[0][1]);
+                    starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                default:
+                    // Sin máscara - rectángulo completo
+                    ctx.rect(0, 0, width, height);
+                    break;
             }
             
-            console.log('🎉 Generación de thumbnails completada');
-            setPageThumbnails(prev => ({ ...prev, ...newThumbnails }));
+            ctx.clip();
         };
 
-        const debouncedGenerate = setTimeout(() => {
-            generateThumbnails();
-        }, 1500);
+        // Procesar páginas secuencialmente
+        for (const page of pages) {
+            try {
+                const pageElement = document.getElementById(`page-${page.id}`);
+                if (!pageElement) {
+                    console.warn(`❌ No se encontró elemento para página ${page.id}`);
+                    continue;
+                }
 
-        return () => clearTimeout(debouncedGenerate);
-    }, [pages, currentPage, workspaceDimensions]);
+                console.log(`📄 Procesando página ${page.id}...`);
+
+                // Obtener dimensiones reales del workspace
+                const rect = pageElement.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
+                    continue;
+                }
+
+                console.log(`📐 Dimensiones del workspace: ${rect.width}x${rect.height}`);
+
+                // Crear canvas personalizado que respete exactamente el layout
+                const customCanvas = document.createElement('canvas');
+                const customCtx = customCanvas.getContext('2d');
+                
+                // Usar un factor de escala mayor para mejor calidad
+                const scale = 4; // Factor más alto para máxima nitidez
+                customCanvas.width = rect.width * scale;
+                customCanvas.height = rect.height * scale;
+                
+                // Escalar el contexto para dibujar en alta resolución
+                customCtx.scale(scale, scale);
+                
+                // MEJORA 1: Habilitar suavizado de alta calidad
+                customCtx.imageSmoothingEnabled = true;
+                customCtx.imageSmoothingQuality = 'high';
+                customCtx.textRenderingOptimization = 'optimizeQuality';
+                // Configuración adicional para máxima nitidez
+                customCtx.webkitImageSmoothingEnabled = true;
+                customCtx.mozImageSmoothingEnabled = true;
+                customCtx.msImageSmoothingEnabled = true;
+                
+                // Fondo blanco
+                customCtx.fillStyle = '#ffffff';
+                customCtx.fillRect(0, 0, rect.width, rect.height);
+                
+                // 1. Renderizar imagen de fondo si existe
+                const bgImage = pageElement.querySelector('img[alt="background"]');
+                if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
+                    try {
+                        customCtx.drawImage(bgImage, 0, 0, rect.width, rect.height);
+                        console.log('✅ Fondo renderizado');
+                    } catch (error) {
+                        console.warn('❌ Error dibujando fondo:', error);
+                    }
+                }
+                
+                // 2. Obtener el grid container real
+                const gridContainer = pageElement.querySelector('[class*="grid"]');
+                if (!gridContainer) {
+                    console.warn('❌ No se encontró grid container');
+                    continue;
+                }
+
+                const gridRect = gridContainer.getBoundingClientRect();
+                const pageRect = pageElement.getBoundingClientRect();
+                
+                // Calcular offset del grid respecto al contenedor de la página
+                const gridOffsetX = gridRect.left - pageRect.left;
+                const gridOffsetY = gridRect.top - pageRect.top;
+                
+                console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
+                console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
+                
+                // 3. Procesar cada celda del grid
+                const cellElements = Array.from(gridContainer.children);
+                console.log(`📦 Celdas encontradas: ${cellElements.length}`);
+                
+                for (let cellIndex = 0; cellIndex < cellElements.length; cellIndex++) {
+                    const cellElement = cellElements[cellIndex];
+                    const cellRect = cellElement.getBoundingClientRect();
+                    
+                    // Posición de la celda relativa al workspace
+                    const cellX = Math.round(cellRect.left - pageRect.left);
+                    const cellY = Math.round(cellRect.top - pageRect.top);
+                    const cellWidth = Math.round(cellRect.width);
+                    const cellHeight = Math.round(cellRect.height);
+                    
+                    console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
+                    
+                    // Buscar elementos dentro de la celda
+                    const imageElements = cellElement.querySelectorAll('img:not([alt="background"])');
+                    // Buscar elementos de texto usando el atributo específico
+                    const textElements = cellElement.querySelectorAll('[data-element-type="text"]');
+                    
+                    console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes, ${textElements.length} textos`);
+                    
+                    // 3.1. Procesar imágenes
+                    for (const imgElement of imageElements) {
+                        if (!imgElement.complete || imgElement.naturalWidth === 0) {
+                            console.log('⏳ Imagen no cargada, saltando...');
+                            continue;
+                        }
+                        
+                        // Obtener información de la máscara del contenedor de la imagen
+                        let maskId = 'none';
+                        let maskContainer = imgElement.parentElement;
+                        
+                        // Buscar el contenedor con la clase de máscara
+                        while (maskContainer && maskContainer !== cellElement) {
+                            const maskClass = Array.from(maskContainer.classList).find(cls => cls.startsWith('mask-'));
+                            if (maskClass) {
+                                maskId = maskClass.replace('mask-', '');
+                                break;
+                            }
+                            maskContainer = maskContainer.parentElement;
+                        }
+                        
+                        console.log(`🎭 Imagen encontrada con máscara: ${maskId}`);
+                        
+                        // Obtener el contenedor de la imagen (que define el tamaño del area visible)
+                        const imgContainer = imgElement.parentElement;
+                        const containerRect = imgContainer.getBoundingClientRect();
+                        const containerX = Math.round(containerRect.left - pageRect.left);
+                        const containerY = Math.round(containerRect.top - pageRect.top);
+                        const containerWidth = Math.round(containerRect.width);
+                        const containerHeight = Math.round(containerRect.height);
+                        
+                        console.log(`📦 Contenedor: x=${containerX}, y=${containerY}, w=${containerWidth}, h=${containerHeight}`);
+                        
+                        // Obtener dimensiones naturales de la imagen
+                        const naturalWidth = imgElement.naturalWidth;
+                        const naturalHeight = imgElement.naturalHeight;
+                        
+                        console.log(`📷 Imagen natural: ${naturalWidth}x${naturalHeight}`);
+                        
+                        // Obtener propiedades CSS de object-fit y object-position
+                        const computedStyle = window.getComputedStyle(imgElement);
+                        const objectFit = computedStyle.objectFit || 'cover';
+                        const objectPosition = computedStyle.objectPosition || 'center center';
+                        
+                        console.log(`🎨 CSS: object-fit=${objectFit}, object-position=${objectPosition}`);
+                        
+                        // Calcular cómo CSS renderizaría la imagen con object-fit: cover
+                        let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
+                        let destX = containerX, destY = containerY, destWidth = containerWidth, destHeight = containerHeight;
+                        
+                        if (objectFit === 'cover') {
+                            // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
+                            const scaleX = containerWidth / naturalWidth;
+                            const scaleY = containerHeight / naturalHeight;
+                            const scale = Math.max(scaleX, scaleY); // Mayor escala para cubrir completamente
+                            
+                            // Dimensiones de la imagen escalada
+                            const scaledWidth = naturalWidth * scale;
+                            const scaledHeight = naturalHeight * scale;
+                            
+                            // Parsear object-position (por defecto center center)
+                            const positions = objectPosition.split(' ');
+                            let posX = 'center', posY = 'center';
+                            
+                            if (positions.length >= 1) posX = positions[0];
+                            if (positions.length >= 2) posY = positions[1];
+                            
+                            // Convertir posiciones a porcentajes
+                            let offsetXPercent = 0.5; // center por defecto
+                            let offsetYPercent = 0.5; // center por defecto
+                            
+                            if (posX.includes('%')) {
+                                offsetXPercent = parseFloat(posX) / 100;
+                            } else if (posX === 'left') {
+                                offsetXPercent = 0;
+                            } else if (posX === 'right') {
+                                offsetXPercent = 1;
+                            }
+                            
+                            if (posY.includes('%')) {
+                                offsetYPercent = parseFloat(posY) / 100;
+                            } else if (posY === 'top') {
+                                offsetYPercent = 0;
+                            } else if (posY === 'bottom') {
+                                offsetYPercent = 1;
+                            }
+                            
+                            // Calcular qué parte de la imagen se mostrará (crop)
+                            if (scaledWidth > containerWidth) {
+                                // La imagen es más ancha que el contenedor, recortar horizontalmente
+                                const cropWidth = containerWidth / scale;
+                                const maxOffsetX = naturalWidth - cropWidth;
+                                sourceX = Math.round(maxOffsetX * offsetXPercent);
+                                sourceWidth = Math.round(cropWidth);
+                            } else {
+                                // La imagen encaja horizontalmente
+                                sourceX = 0;
+                                sourceWidth = naturalWidth;
+                            }
+                            
+                            if (scaledHeight > containerHeight) {
+                                // La imagen es más alta que el contenedor, recortar verticalmente
+                                const cropHeight = containerHeight / scale;
+                                const maxOffsetY = naturalHeight - cropHeight;
+                                sourceY = Math.round(maxOffsetY * offsetYPercent);
+                                sourceHeight = Math.round(cropHeight);
+                            } else {
+                                // La imagen encaja verticalmente
+                                sourceY = 0;
+                                sourceHeight = naturalHeight;
+                            }
+                            
+                            console.log(`✂️ Recorte calculado con ${objectPosition}: sourceX=${sourceX}, sourceY=${sourceY}, sourceW=${sourceWidth}, sourceH=${sourceHeight}`);
+                        }
+                        
+                        // Aplicar máscara y dibujar imagen
+                        customCtx.save();
+                        
+                        // Si hay máscara, aplicarla al área del contenedor
+                        if (maskId && maskId !== 'none') {
+                            applyMaskToCanvas(customCtx, maskId, containerX, containerY, containerWidth, containerHeight);
+                        } else {
+                            // Sin máscara, solo recortar al área del contenedor
+                            customCtx.beginPath();
+                            customCtx.rect(containerX, containerY, containerWidth, containerHeight);
+                            customCtx.clip();
+                        }
+                        
+                        // Aplicar filtros si los hay
+                        const filter = computedStyle.filter;
+                        
+                        if (filter && filter !== 'none') {
+                            const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
+                            if (brightnessMatch) {
+                                const brightness = parseFloat(brightnessMatch[1]);
+                                customCtx.globalAlpha *= brightness;
+                            }
+                        }
+                        
+                        // Dibujar la imagen aplicando el recorte de object-fit: cover
+                        // MEJORA 2: Usar valores enteros para evitar desenfoque
+                        try {
+                            customCtx.drawImage(
+                                imgElement,
+                                sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
+                                destX, destY, destWidth, destHeight           // Área destino (contenedor)
+                            );
+                            console.log(`✅ Imagen dibujada con object-fit:cover y máscara ${maskId}`);
+                        } catch (error) {
+                            console.warn('❌ Error dibujando imagen:', error);
+                        }
+                        
+                        customCtx.restore();
+                    }
+                    
+                    // 3.2. Procesar elementos de texto
+                    console.log(`📝 Procesando ${textElements.length} elementos de texto en celda ${cellIndex}...`);
+                    
+                    for (let textIndex = 0; textIndex < textElements.length; textIndex++) {
+                        const textElement = textElements[textIndex];
+                        
+                        try {
+                            const textRect = textElement.getBoundingClientRect();
+                            // MEJORA 3: Redondear coordenadas para evitar subpíxeles
+                            const textX = Math.round(textRect.left - pageRect.left);
+                            const textY = Math.round(textRect.top - pageRect.top);
+                            const textWidth = Math.round(textRect.width);
+                            const textHeight = Math.round(textRect.height);
+                            
+                            console.log(`📝 Elemento de texto #${textIndex}:`);
+                            console.log(`   - Posición relativa al workspace: x=${textX}, y=${textY}`);
+                            console.log(`   - Dimensiones: ${textWidth}x${textHeight}`);
+                            
+                            // Obtener estilos computados del elemento de texto
+                            const computedStyle = window.getComputedStyle(textElement);
+                            let fontSize = computedStyle.fontSize || '16px';
+                            const fontFamily = computedStyle.fontFamily || 'Arial';
+                            const fontWeight = computedStyle.fontWeight || 'normal';
+                            const fontStyle = computedStyle.fontStyle || 'normal';
+                            const color = computedStyle.color || '#000000';
+                            const textAlign = computedStyle.textAlign || 'left';
+                            const opacity = parseFloat(computedStyle.opacity) || 1;
+                            const padding = computedStyle.padding || '8px';
+                            
+                            // Obtener el contenido del texto
+                            const textContent = textElement.textContent || textElement.innerText || '';
+                            
+                            console.log(`   - Contenido: "${textContent}"`);
+                            console.log(`   - Estilos: ${fontSize} ${fontFamily} ${fontWeight} ${color}`);
+                            
+                            if (textContent.trim()) {
+                                // Ajustar el tamaño de fuente para la alta resolución del canvas
+                                const fontSizeNumber = parseFloat(fontSize);
+                                const scaledFontSize = Math.round(fontSizeNumber * scale); // Escalar fuente para alta resolución
+                                
+                                console.log(`📝 Renderizando texto: "${textContent}"`);
+                                console.log(`   - Fuente original: ${fontSizeNumber}px, escalada: ${scaledFontSize}px`);
+                                
+                                // Configurar el contexto para el texto
+                                customCtx.save();
+                                customCtx.globalAlpha = opacity;
+                                
+                                // Configurar fuente con alta calidad y escala apropiada
+                                customCtx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}`;
+                                customCtx.fillStyle = color;
+                                customCtx.textBaseline = 'top';
+                                
+                                // Mejorar la calidad del renderizado de texto
+                                customCtx.textRendering = 'geometricPrecision';
+                                
+                                // Configurar alineación
+                                if (textAlign === 'center') {
+                                    customCtx.textAlign = 'center';
+                                } else if (textAlign === 'right') {
+                                    customCtx.textAlign = 'right';
+                                } else {
+                                    customCtx.textAlign = 'left';
+                                }
+                                
+                                // Calcular posición X según alineación
+                                let drawX = textX;
+                                if (textAlign === 'center') {
+                                    drawX = textX + textWidth / 2;
+                                } else if (textAlign === 'right') {
+                                    drawX = textX + textWidth;
+                                }
+                                
+                                // Ajustar por padding si existe
+                                const paddingValue = parseFloat(padding) || 8;
+                                // MEJORA 4: Redondear coordenadas finales
+                                const finalX = Math.round(drawX + (textAlign === 'left' ? paddingValue : 0));
+                                const finalY = Math.round(textY + paddingValue);
+                                
+                                console.log(`   - Dibujando en coordenadas finales: x=${finalX}, y=${finalY}`);
+                                
+                                // Dibujar fondo si existe
+                                const backgroundColor = computedStyle.backgroundColor;
+                                if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
+                                    const borderRadius = parseFloat(computedStyle.borderRadius) || 0;
+                                    customCtx.fillStyle = backgroundColor;
+                                    
+                                    if (borderRadius > 0) {
+                                        // Dibujar rectángulo con bordes redondeados
+                                        customCtx.beginPath();
+                                        customCtx.roundRect(textX, textY, textWidth, textHeight, borderRadius);
+                                        customCtx.fill();
+                                    } else {
+                                        customCtx.fillRect(textX, textY, textWidth, textHeight);
+                                    }
+                                    
+                                    customCtx.fillStyle = color; // Restaurar color del texto
+                                }
+                                
+                                // Dibujar el texto
+                                customCtx.fillText(textContent, finalX, finalY);
+                                
+                                console.log(`✅ Texto renderizado exitosamente: "${textContent}"`);
+                                
+                                customCtx.restore();
+                            } else {
+                                console.log(`⚠️ Elemento de texto está vacío`);
+                            }
+                        } catch (error) {
+                            console.warn(`❌ Error renderizando texto #${textIndex}:`, error);
+                        }
+                    }
+                }
+                
+                // 4. Crear thumbnail final con downscaling progresivo
+                const thumbnailCanvas = document.createElement('canvas');
+                const thumbnailCtx = thumbnailCanvas.getContext('2d');
+                
+                // Usar las dimensiones REALES del workspace para calcular la proporción exacta
+                const workspaceAspectRatio = rect.width / rect.height;
+                
+                // MEJORA 5: Aumentar tamaño base para mejor calidad
+                const thumbnailBaseSize = 900; // Incrementado de 600 a 900
+                
+                // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
+                let thumbWidth, thumbHeight;
+                
+                if (workspaceAspectRatio >= 1) {
+                    // Workspace más ancho que alto
+                    thumbWidth = thumbnailBaseSize;
+                    thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
+                } else {
+                    // Workspace más alto que ancho
+                    thumbHeight = thumbnailBaseSize;
+                    thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
+                }
+                
+                console.log(`📏 Workspace proporción: ${workspaceAspectRatio.toFixed(3)} (${rect.width}x${rect.height})`);
+                console.log(`📏 Thumbnail calculado: ${thumbWidth.toFixed(1)}x${thumbHeight.toFixed(1)}`);
+                
+                thumbWidth = Math.round(thumbWidth);
+                thumbHeight = Math.round(thumbHeight);
+                thumbnailCanvas.width = thumbWidth;
+                thumbnailCanvas.height = thumbHeight;
+                
+                // MEJORA 6: Configuración de alta calidad para el thumbnail
+                thumbnailCtx.imageSmoothingEnabled = true;
+                thumbnailCtx.imageSmoothingQuality = 'high';
+                thumbnailCtx.webkitImageSmoothingEnabled = true;
+                thumbnailCtx.mozImageSmoothingEnabled = true;
+                thumbnailCtx.msImageSmoothingEnabled = true;
+                
+                // MEJORA 7: Downscaling progresivo en dos pasos
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                // Tamaño intermedio (2x tamaño final)
+                const intermediateWidth = thumbWidth * 2;
+                const intermediateHeight = thumbHeight * 2;
+                
+                tempCanvas.width = intermediateWidth;
+                tempCanvas.height = intermediateHeight;
+                
+                // Configurar suavizado en canvas intermedio
+                tempCtx.imageSmoothingEnabled = true;
+                tempCtx.imageSmoothingQuality = 'high';
+                
+                // Paso 1: Escalar a tamaño intermedio
+                tempCtx.drawImage(
+                    customCanvas,
+                    0, 0, intermediateWidth, intermediateHeight
+                );
+                
+                // Paso 2: Escalar de intermedio a tamaño final
+                thumbnailCtx.drawImage(
+                    tempCanvas,
+                    0, 0, intermediateWidth, intermediateHeight,
+                    0, 0, thumbWidth, thumbHeight
+                );
+                
+                // Convertir a base64 con alta calidad
+                newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
+                
+                console.log(`✅ Thumbnail generado para página ${page.id}: ${thumbWidth}x${thumbHeight} (proporción: ${(thumbWidth/thumbHeight).toFixed(3)})`);
+                
+            } catch (error) {
+                console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
+                newThumbnails[page.id] = null;
+            }
+        }
+        
+        console.log('🎉 Generación de thumbnails completada');
+        setPageThumbnails(prev => ({ ...prev, ...newThumbnails }));
+    };
+
+    const debouncedGenerate = setTimeout(() => {
+        generateThumbnails();
+    }, 800);
+
+    return () => clearTimeout(debouncedGenerate);
+}, [pages, currentPage, workspaceDimensions]);
 
 
 
     // --- Función para agregar álbum al carrito ---
     const addAlbumToCart = () => {
         console.log('🛒 === INICIO addAlbumToCart ===');
-        
+
         try {
-            console.log('📊 Estado actual:', { 
-                albumData: albumData, 
-                presetData: presetData, 
+            console.log('📊 Estado actual:', {
+                albumData: albumData,
+                presetData: presetData,
                 cartLength: cart?.length,
                 hasAlbumData: !!albumData,
                 hasPresetData: !!presetData,
@@ -1398,7 +1431,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('Global type:', typeof Global);
             console.log('Local object:', Local);
             console.log('Global object:', Global);
-            
+
             if (typeof Local === 'undefined') {
                 console.error('❌ Local no está definido');
                 toast.error("Error del sistema", {
@@ -1408,7 +1441,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 });
                 return false;
             }
-            
+
             if (typeof Global === 'undefined') {
                 console.error('❌ Global no está definido');
                 toast.error("Error del sistema", {
@@ -1421,7 +1454,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Verificar APP_CORRELATIVE
             console.log('Global.APP_CORRELATIVE:', Global.APP_CORRELATIVE);
-            
+
             if (!Global.APP_CORRELATIVE) {
                 console.error('❌ Global.APP_CORRELATIVE no está definido');
                 toast.error("Error del sistema", {
@@ -1443,7 +1476,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 });
                 return false;
             }
-            
+
             if (!presetData) {
                 console.error('❌ presetData no está disponible');
                 console.log('presetData actual:', presetData);
@@ -1468,11 +1501,11 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     }
                 }
                 console.log('📊 Tamaño actual del localStorage:', (totalSize / 1024 / 1024).toFixed(2), 'MB');
-                
+
                 // Si el localStorage está muy lleno (más de 8MB), limpiar datos innecesarios
                 if (totalSize > 8 * 1024 * 1024) {
                     console.log('⚠️ localStorage lleno, limpiando datos innecesarios...');
-                    
+
                     // Limpiar thumbnails viejos y datos temporales
                     for (let key in localStorage) {
                         if (key.includes('thumbnail') || key.includes('temp') || key.includes('cache')) {
@@ -1499,7 +1532,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Crear el producto del álbum para el carrito
             console.log('📦 Creando producto del álbum...');
-            
+
             // Optimizar los datos del álbum para reducir el tamaño del carrito
             const optimizedAlbumData = {
                 album_id: albumData.id,
@@ -1551,7 +1584,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('🛒 Obteniendo carrito actual...');
             const cartKey = `${Global.APP_CORRELATIVE}_cart`;
             console.log('🔑 Clave del carrito:', cartKey);
-            
+
             const currentCart = Local.get(cartKey) || [];
             console.log('🛒 Carrito actual desde localStorage:', currentCart);
             console.log('🛒 Longitud del carrito actual:', currentCart.length);
@@ -1564,9 +1597,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Actualizar tanto el estado local como localStorage
             console.log('💾 Guardando en estado y localStorage...');
-            
+
             let storageError = null;
-            
+
             try {
                 setCart(newCart);
                 Local.set(cartKey, newCart);
@@ -1575,34 +1608,34 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 storageError = error;
                 if (error.name === 'QuotaExceededError') {
                     console.error('❌ Error de cuota de localStorage excedida');
-                    
+
                     // Intentar liberar espacio eliminando elementos del carrito antiguos
                     console.log('🧹 Intentando liberar espacio del carrito...');
-                    
+
                     try {
                         // Mantener solo los últimos 3 elementos del carrito
                         const reducedCart = currentCart.slice(-2); // Solo los últimos 2
                         const finalCart = [...reducedCart, albumProduct]; // Más el nuevo
-                        
+
                         console.log('📦 Carrito reducido:', finalCart);
-                        
+
                         setCart(finalCart);
                         Local.set(cartKey, finalCart);
-                        
+
                         console.log('✅ Carrito guardado con espacio reducido');
-                        
+
                         // Actualizar la referencia del carrito para las verificaciones
                         newCart = finalCart;
-                        
+
                         toast.success("Álbum agregado al carrito", {
                             description: "Se liberó espacio eliminando productos antiguos.",
                             duration: 4000,
                             position: "bottom-center",
                         });
-                        
+
                     } catch (secondError) {
                         console.error('❌ No se pudo liberar espacio suficiente:', secondError);
-                        
+
                         // Como último recurso, guardar solo la información esencial
                         try {
                             const minimalProduct = {
@@ -1618,20 +1651,20 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     title: albumData.title
                                 }
                             };
-                            
+
                             const minimalCart = [minimalProduct];
                             setCart(minimalCart);
                             Local.set(cartKey, minimalCart);
-                            
+
                             console.log('✅ Guardado con datos mínimos');
                             newCart = minimalCart;
-                            
+
                             toast.success("Álbum agregado al carrito", {
                                 description: "Guardado con información esencial.",
                                 duration: 3000,
                                 position: "bottom-center",
                             });
-                            
+
                         } catch (finalError) {
                             console.error('❌ Error final al guardar:', finalError);
                             throw new Error('No se pudo guardar en el carrito por falta de espacio');
@@ -1652,7 +1685,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const albumInCart = verifyCart?.find(item => item.id === albumId);
             console.log('📦 Álbum encontrado en carrito:', albumInCart ? 'SÍ' : 'NO');
             console.log('📦 Datos del álbum en carrito:', albumInCart);
-            
+
             if (!albumInCart) {
                 console.error('❌ ERROR: El álbum no se encontró en el carrito después de guardarlo');
                 toast.error("Error al verificar carrito", {
@@ -1677,19 +1710,19 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Disparar evento personalizado para notificar otros componentes
             console.log('📡 Disparando evento cartUpdated...');
-            window.dispatchEvent(new CustomEvent('cartUpdated', { 
+            window.dispatchEvent(new CustomEvent('cartUpdated', {
                 detail: { cart: newCart, action: 'add', product: albumProduct }
             }));
 
             console.log('🛒 === FIN addAlbumToCart EXITOSO ===');
             return true;
-            
+
         } catch (error) {
             console.error('❌ === ERROR EN addAlbumToCart ===');
             console.error('Error completo:', error);
             console.error('Stack trace:', error.stack);
             console.error('Mensaje del error:', error.message);
-            
+
             toast.error("Error al agregar al carrito", {
                 description: `Error específico: ${error.message}`,
                 duration: 5000,
@@ -1738,7 +1771,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 } else {
                                     optimizedElement.content = element.content;
                                 }
-                                
+
                                 // Solo incluir filtros no vacíos
                                 if (element.filters) {
                                     const activeFilters = Object.entries(element.filters)
@@ -1747,12 +1780,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             acc[key] = value;
                                             return acc;
                                         }, {});
-                                    
+
                                     if (Object.keys(activeFilters).length > 0) {
                                         optimizedElement.filters = activeFilters;
                                     }
                                 }
-                                
+
                                 if (element.mask && element.mask !== 'none') {
                                     optimizedElement.mask = element.mask;
                                 }
@@ -1778,7 +1811,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             acc[key] = value;
                                             return acc;
                                         }, {});
-                                    
+
                                     if (Object.keys(nonDefaultStyles).length > 0) {
                                         optimizedElement.style = nonDefaultStyles;
                                     }
@@ -1821,13 +1854,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const dataString = JSON.stringify({ design_data: designData });
             const dataSizeKB = Math.round(dataString.length / 1024);
             const dataSizeMB = Math.round(dataSizeKB / 1024 * 100) / 100;
-            
+
             console.log(`Tamaño del payload: ${dataSizeKB} KB (${dataSizeMB} MB)`);
-            
+
             // Mostrar información detallada sobre el contenido
             let base64Images = 0;
             let totalBase64Size = 0;
-            
+
             pages.forEach(page => {
                 page.cells?.forEach(cell => {
                     cell.elements?.forEach(element => {
@@ -1838,10 +1871,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     });
                 });
             });
-            
+
             const base64SizeMB = Math.round(totalBase64Size / (1024 * 1024) * 100) / 100;
             console.log(`Imágenes base64 encontradas: ${base64Images}, Tamaño total: ${base64SizeMB} MB`);
-            
+
             // Advertir si el payload es muy grande
             if (dataSizeKB > 1024) { // Más de 1MB
                 const proceed = confirm(
@@ -1888,23 +1921,23 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             }
 
             const result = await response.json();
-            
+
             console.log('✅ Diseño finalizado exitosamente en el servidor');
             console.log('📄 Respuesta del servidor:', result);
-            
+
             return true;
 
         } catch (error) {
             console.error('Error al finalizar diseño:', error);
             let userMessage = error.message;
-            
+
             // Mejorar mensajes de error específicos
             if (error.message.includes('Failed to fetch')) {
                 userMessage = 'Error de conexión. Verifique su conexión a internet e intente nuevamente.';
             } else if (error.message.includes('NetworkError') || error.message.includes('net::')) {
                 userMessage = 'Error de red. Intente nuevamente más tarde.';
             }
-            
+
             alert('Error al finalizar el diseño: ' + userMessage);
             return false;
         }
@@ -1919,7 +1952,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const jsPDF = (await import('jspdf')).default;
 
             console.log('🎯 Iniciando generación de PDF del álbum...');
-            
+
             // 1. Crear un contenedor oculto para renderizado
             let hiddenContainer = document.getElementById('pdf-hidden-pages');
             if (!hiddenContainer) {
@@ -1984,7 +2017,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             const imgContainer = document.createElement('div');
                             const maskClass = imageMasks.find(m => m.id === element.mask)?.class || '';
                             if (maskClass) imgContainer.className = maskClass;
-                            
+
                             imgContainer.style.cssText = `
                                 position: absolute;
                                 left: ${element.position.x}px;
@@ -2030,7 +2063,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 opacity: ${element.style?.opacity || 1};
                                 z-index: ${element.zIndex || 1};
                             `;
-                            
+
                             cellDiv.appendChild(textDiv);
                         }
                     });
@@ -2050,15 +2083,15 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             await new Promise(resolve => setTimeout(resolve, 1000));
 
             // 4. Crear PDF y capturar cada página
-            const pdf = new jsPDF({ 
-                orientation: 'landscape', 
-                unit: 'px', 
-                format: [workspaceDimensions.originalWidth || 800, workspaceDimensions.originalHeight || 600] 
+            const pdf = new jsPDF({
+                orientation: 'landscape',
+                unit: 'px',
+                format: [workspaceDimensions.originalWidth || 800, workspaceDimensions.originalHeight || 600]
             });
 
             for (let i = 0; i < pages.length; i++) {
                 console.log(`📄 Procesando página ${i + 1} de ${pages.length}...`);
-                
+
                 const pageDiv = document.getElementById(`pdf-page-${pages[i].id}`);
                 if (!pageDiv) continue;
 
@@ -2083,20 +2116,20 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     });
 
                     const imgData = canvas.toDataURL('image/jpeg', 0.95);
-                    
+
                     if (i > 0) {
                         pdf.addPage([workspaceDimensions.originalWidth || 800, workspaceDimensions.originalHeight || 600], 'landscape');
                     }
-                    
+
                     pdf.addImage(
-                        imgData, 
-                        'JPEG', 
-                        0, 
-                        0, 
-                        workspaceDimensions.originalWidth || 800, 
+                        imgData,
+                        'JPEG',
+                        0,
+                        0,
+                        workspaceDimensions.originalWidth || 800,
                         workspaceDimensions.originalHeight || 600
                     );
-                    
+
                     console.log(`✅ Página ${i + 1} capturada correctamente`);
                 } catch (error) {
                     console.error(`❌ Error capturando página ${i + 1}:`, error);
@@ -2106,7 +2139,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             // 5. Guardar PDF
             const albumTitle = albumData?.title || 'Album';
             const fileName = `${albumTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
-            
+
             pdf.save(fileName);
             console.log(`🎉 PDF generado exitosamente: ${fileName}`);
 
@@ -2171,6 +2204,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             return layouts.find((l) => l.id === page.layout) || layouts[0];
                         }}
                         presetData={presetData}
+                        layouts={layouts}
                         pageThumbnails={pageThumbnails}
                         addAlbumToCart={addAlbumToCart}
                     />
@@ -2207,12 +2241,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 {isCurrentPageEditable() ? (
                                     <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Pencil className="h-3 w-3" />
-                                      
+
                                     </span>
                                 ) : (
                                     <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Lock className="h-3 w-3" />
-                                      
+
                                     </span>
                                 )}
                             </div>
@@ -2236,7 +2270,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 >
                                     Vista de Álbum
                                 </Button>
-                              {/*  <Button
+                                {/*  <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={addAlbumToCart}
@@ -2263,42 +2297,42 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             onClick={async () => {
                                                 console.log('🔍 === DIAGNÓSTICO DE MÁSCARAS ===');
                                                 const pageElement = document.getElementById(`page-${pages[currentPage].id}`);
-                                                
+
                                                 if (!pageElement) {
                                                     console.error('❌ No se encontró el elemento de la página');
                                                     alert('No se encontró el elemento de la página');
                                                     return;
                                                 }
-                                                
+
                                                 // Buscar elementos con máscaras
                                                 const maskedElements = pageElement.querySelectorAll('[class*="mask-"]');
                                                 console.log(`� Elementos con máscara encontrados: ${maskedElements.length}`);
-                                                
+
                                                 maskedElements.forEach((element, index) => {
                                                     const maskClass = Array.from(element.classList).find(cls => cls.startsWith('mask-'));
                                                     console.log(`🎭 Elemento ${index}: ${maskClass}`);
-                                                    
+
                                                     const img = element.querySelector('img');
                                                     if (img) {
                                                         console.log(`📷 Imagen encontrada: ${img.src}`);
                                                         console.log(`� Dimensiones imagen: ${img.naturalWidth}x${img.naturalHeight}`);
                                                     }
                                                 });
-                                                
+
                                                 // Crear canvas de prueba con máscaras aplicadas manualmente
                                                 const testCanvas = document.createElement('canvas');
                                                 const testCtx = testCanvas.getContext('2d');
                                                 testCanvas.width = 400;
                                                 testCanvas.height = 300;
-                                                
+
                                                 // Fondo blanco
                                                 testCtx.fillStyle = '#ffffff';
                                                 testCtx.fillRect(0, 0, 400, 300);
-                                                
+
                                                 // Función para aplicar máscaras
                                                 const applyMask = (ctx, maskId, width, height) => {
                                                     ctx.beginPath();
-                                                    
+
                                                     switch (maskId) {
                                                         case 'diamond':
                                                             ctx.moveTo(width / 2, 0);
@@ -2320,43 +2354,43 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             ctx.rect(0, 0, width, height);
                                                             break;
                                                     }
-                                                    
+
                                                     ctx.clip();
                                                 };
-                                                
+
                                                 // Procesar cada elemento con máscara
                                                 let yOffset = 0;
                                                 for (const element of maskedElements) {
                                                     const maskClass = Array.from(element.classList).find(cls => cls.startsWith('mask-'));
                                                     const maskId = maskClass ? maskClass.replace('mask-', '') : 'none';
-                                                    
+
                                                     const img = element.querySelector('img');
                                                     if (img && img.complete) {
                                                         testCtx.save();
                                                         testCtx.translate(10, yOffset + 10);
-                                                        
+
                                                         const testWidth = 150;
                                                         const testHeight = 100;
-                                                        
+
                                                         // Aplicar máscara
                                                         applyMask(testCtx, maskId, testWidth, testHeight);
-                                                        
+
                                                         // Dibujar imagen
                                                         testCtx.drawImage(img, 0, 0, testWidth, testHeight);
                                                         testCtx.restore();
-                                                        
+
                                                         // Añadir etiqueta
                                                         testCtx.fillStyle = '#000000';
                                                         testCtx.font = '12px Arial';
                                                         testCtx.fillText(`Máscara: ${maskId}`, 170, yOffset + 30);
-                                                        
+
                                                         yOffset += 120;
                                                     }
                                                 }
-                                                
+
                                                 const testDataUrl = testCanvas.toDataURL('image/jpeg', 0.9);
                                                 console.log('✅ Canvas de prueba generado');
-                                                
+
                                                 // Mostrar en una nueva ventana
                                                 const newWindow = window.open('', '_blank', 'width=600,height=500');
                                                 if (newWindow) {
@@ -2372,9 +2406,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                 <h3>Análisis:</h3>
                                                                 <ul>
                                                                     ${Array.from(maskedElements).map((el, i) => {
-                                                                        const maskClass = Array.from(el.classList).find(cls => cls.startsWith('mask-'));
-                                                                        return `<li>Elemento ${i + 1}: ${maskClass || 'sin máscara'}</li>`;
-                                                                    }).join('')}
+                                                        const maskClass = Array.from(el.classList).find(cls => cls.startsWith('mask-'));
+                                                        return `<li>Elemento ${i + 1}: ${maskClass || 'sin máscara'}</li>`;
+                                                    }).join('')}
                                                                 </ul>
                                                             </body>
                                                         </html>
@@ -2610,134 +2644,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     </div>
                                 )}
                             </div>
-                            
-                            {/* Test section - Debugging tools */}
-                            <div className="p-3 border-t bg-gray-50">
-                                <h4 className="text-xs font-medium text-gray-500 mb-2">🧪 Herramientas de Test</h4>
-                                <div className="space-y-2">
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={async () => {
-                                            console.log('🎯 Test: Análisis de object-fit en página actual');
-                                            
-                                            const pageElement = document.getElementById(`page-${pages[currentPage].id}`);
-                                            if (!pageElement) {
-                                                console.error('❌ No se encontró el elemento de la página');
-                                                return;
-                                            }
-                                            
-                                            // Encontrar todas las imágenes con contenedores
-                                            const imageElements = pageElement.querySelectorAll('img:not([alt="background"])');
-                                            console.log(`🖼️ Imágenes encontradas: ${imageElements.length}`);
-                                            
-                                            const analysis = [];
-                                            
-                                            imageElements.forEach((img, index) => {
-                                                const container = img.parentElement;
-                                                const computedStyle = window.getComputedStyle(img);
-                                                
-                                                const imgRect = img.getBoundingClientRect();
-                                                const containerRect = container.getBoundingClientRect();
-                                                
-                                                analysis.push({
-                                                    index,
-                                                    naturalSize: { w: img.naturalWidth, h: img.naturalHeight },
-                                                    displaySize: { w: imgRect.width, h: imgRect.height },
-                                                    containerSize: { w: containerRect.width, h: containerRect.height },
-                                                    objectFit: computedStyle.objectFit,
-                                                    objectPosition: computedStyle.objectPosition,
-                                                    maskClass: Array.from(container.classList).find(cls => cls.startsWith('mask-')) || 'none',
-                                                    aspectRatio: {
-                                                        natural: (img.naturalWidth / img.naturalHeight).toFixed(3),
-                                                        display: (imgRect.width / imgRect.height).toFixed(3),
-                                                        container: (containerRect.width / containerRect.height).toFixed(3)
-                                                    }
-                                                });
-                                            });
-                                            
-                                            console.table(analysis);
-                                            
-                                            // Mostrar ventana con análisis
-                                            const newWindow = window.open('', '_blank', 'width=800,height=600');
-                                            if (newWindow) {
-                                                newWindow.document.write(`
-                                                    <html>
-                                                        <head><title>Análisis object-fit - Página ${pages[currentPage].id}</title></head>
-                                                        <body style="margin:0; padding:20px; font-family:monospace; background:#f9f9f9;">
-                                                            <h2>🔍 Análisis de object-fit: cover</h2>
-                                                            <p><strong>Página:</strong> ${pages[currentPage].id} (${pages[currentPage].type})</p>
-                                                            <p><strong>Imágenes analizadas:</strong> ${analysis.length}</p>
-                                                            
-                                                            ${analysis.map((item, i) => `
-                                                                <div style="border:1px solid #ddd; margin:10px 0; padding:15px; background:white;">
-                                                                    <h3>🖼️ Imagen ${i + 1}</h3>
-                                                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                                                                        <div>
-                                                                            <h4>📐 Dimensiones</h4>
-                                                                            <p><strong>Natural:</strong> ${item.naturalSize.w} × ${item.naturalSize.h}</p>
-                                                                            <p><strong>Display:</strong> ${item.displaySize.w.toFixed(1)} × ${item.displaySize.h.toFixed(1)}</p>
-                                                                            <p><strong>Container:</strong> ${item.containerSize.w.toFixed(1)} × ${item.containerSize.h.toFixed(1)}</p>
-                                                                        </div>
-                                                                        <div>
-                                                                            <h4>🎨 CSS & Máscaras</h4>
-                                                                            <p><strong>object-fit:</strong> ${item.objectFit}</p>
-                                                                            <p><strong>object-position:</strong> ${item.objectPosition}</p>
-                                                                            <p><strong>Máscara:</strong> ${item.maskClass}</p>
-                                                                        </div>
-                                                                    </div>
-                                                                    <div>
-                                                                        <h4>📊 Aspect Ratios</h4>
-                                                                        <p><strong>Natural:</strong> ${item.aspectRatio.natural}</p>
-                                                                        <p><strong>Display:</strong> ${item.aspectRatio.display}</p>
-                                                                        <p><strong>Container:</strong> ${item.aspectRatio.container}</p>
-                                                                        <p style="color:${item.objectFit === 'cover' ? '#22c55e' : '#ef4444'};">
-                                                                            <strong>Object-fit status:</strong> ${item.objectFit === 'cover' ? '✅ COVER aplicado' : '❌ NO es cover'}
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            `).join('')}
-                                                            
-                                                            <div style="margin-top:20px; padding:15px; background:#eff6ff; border:1px solid #93c5fd;">
-                                                                <h3>💡 Información técnica</h3>
-                                                                <p>• <strong>object-fit: cover</strong> significa que la imagen se escala para llenar completamente el contenedor manteniendo su proporción</p>
-                                                                <p>• Si el aspect ratio natural difiere del container, la imagen se recortará</p>
-                                                                <p>• <strong>object-position</strong> controla qué parte de la imagen se muestra cuando hay recorte</p>
-                                                                <p>• Las máscaras (diamond, circle, etc.) se aplican encima del object-fit</p>
-                                                            </div>
-                                                        </body>
-                                                    </html>
-                                                `);
-                                            }
-                                        }}
-                                        className="w-full justify-start text-xs"
-                                    >
-                                        🔍 Analizar Object-fit
-                                    </Button>
-                                    
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => {
-                                            console.log('🎯 Test: Forzar regeneración de thumbnail');
-                                            
-                                            // Forzar regeneración inmediata
-                                            setPageThumbnails(prev => {
-                                                const updated = { ...prev };
-                                                delete updated[pages[currentPage].id];
-                                                return updated;
-                                            });
-                                            
-                                            setTimeout(() => {
-                                                console.log('🔄 Thumbnail eliminado, se regenerará automáticamente...');
-                                            }, 100);
-                                        }}
-                                        className="w-full justify-start text-xs"
-                                    >
-                                        🔄 Regenerar Thumbnail
-                                    </Button>
-                                </div>
-                            </div>
+
+
                         </aside>
 
                         {/* Main canvas area */}
@@ -3182,7 +3090,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     </span>
                                 </div>
 
-                          {/*      <div className="flex gap-1.5 mt-3">
+                                {/*      <div className="flex gap-1.5 mt-3">
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -3246,12 +3154,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         <img
                                                             src={pageThumbnails[page.id]}
                                                             alt="Portada"
-                                                            className="max-w-full max-h-full object-contain"
-                                                            style={{ 
-                                                                width: 'auto', 
-                                                                height: 'auto',
-                                                                display: 'block'
-                                                            }}
+                                                            className="w-full h-full object-cover"
+                                                            style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
@@ -3294,12 +3198,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             <img
                                                                 src={pageThumbnails[page.id]}
                                                                 alt={`Página ${page.pageNumber}`}
-                                                                className="max-w-full max-h-full object-contain"
-                                                                style={{ 
-                                                                    width: 'auto', 
-                                                                    height: 'auto',
-                                                                    display: 'block'
-                                                                }}
+                                                                className="w-full h-full object-cover"
+                                                                style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
@@ -3349,7 +3249,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                 </div>
                                                             </div>
                                                         </div>*/}
-                                                      
+
                                                     </div>
                                                 </div>
                                             ))}
@@ -3377,12 +3277,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         <img
                                                             src={pageThumbnails[page.id]}
                                                             alt="Contraportada"
-                                                            className="max-w-full max-h-full object-contain"
-                                                            style={{ 
-                                                                width: 'auto', 
-                                                                height: 'auto',
-                                                                display: 'block'
-                                                            }}
+                                                            className="w-full h-full object-cover"
+                                                            style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
@@ -3408,7 +3304,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             )}
-            
+
             {/* Toaster para notificaciones */}
             <Toaster />
         </DndProvider>
