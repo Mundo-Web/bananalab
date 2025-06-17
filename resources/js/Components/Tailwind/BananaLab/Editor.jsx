@@ -974,6 +974,93 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
                     ctx.closePath();
                     break;
+                case 'rounded':
+                    const radius = Math.min(width, height) * 0.1;
+                    if (ctx.roundRect) {
+                        ctx.roundRect(0, 0, width, height, radius);
+                    } else {
+                        // Fallback para navegadores que no soportan roundRect
+                        ctx.moveTo(radius, 0);
+                        ctx.lineTo(width - radius, 0);
+                        ctx.quadraticCurveTo(width, 0, width, radius);
+                        ctx.lineTo(width, height - radius);
+                        ctx.quadraticCurveTo(width, height, width - radius, height);
+                        ctx.lineTo(radius, height);
+                        ctx.quadraticCurveTo(0, height, 0, height - radius);
+                        ctx.lineTo(0, radius);
+                        ctx.quadraticCurveTo(0, 0, radius, 0);
+                        ctx.closePath();
+                    }
+                    break;
+                case 'polaroid':
+                    // Simular clip-path: inset(5% 5% 20% 5%)
+                    const insetTop = height * 0.05;
+                    const insetRight = width * 0.05;
+                    const insetBottom = height * 0.20;
+                    const insetLeft = width * 0.05;
+                    ctx.rect(insetLeft, insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
+                    break;
+                case 'vintage':
+                    // Simular ellipse(45% 45% at 50% 50%)
+                    ctx.ellipse(width / 2, height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
+                    break;
+                case 'diagonal':
+                    // Simular polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
+                    ctx.moveTo(0, 0);
+                    ctx.lineTo(width, height * 0.1);
+                    ctx.lineTo(width, height * 0.9);
+                    ctx.lineTo(0, height);
+                    ctx.closePath();
+                    break;
+                case 'speech':
+                    // Simular polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
+                    const speechPoints = [
+                        [width * 0.1, 0],
+                        [width * 0.9, 0],
+                        [width * 0.9, height * 0.8],
+                        [width * 0.6, height * 0.8],
+                        [width * 0.5, height],
+                        [width * 0.4, height * 0.8],
+                        [width * 0.1, height * 0.8]
+                    ];
+                    ctx.moveTo(speechPoints[0][0], speechPoints[0][1]);
+                    speechPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                case 'burst':
+                    // Simular el burst de 16 puntos
+                    const burstPoints = [
+                        [width * 0.5, 0], [width * 0.6, height * 0.2],
+                        [width * 0.8, height * 0.1], [width * 0.7, height * 0.3],
+                        [width * 0.9, height * 0.5], [width * 0.7, height * 0.7],
+                        [width * 0.8, height * 0.9], [width * 0.6, height * 0.8],
+                        [width * 0.5, height], [width * 0.4, height * 0.8],
+                        [width * 0.2, height * 0.9], [width * 0.3, height * 0.7],
+                        [width * 0.1, height * 0.5], [width * 0.3, height * 0.3],
+                        [width * 0.2, height * 0.1], [width * 0.4, height * 0.2]
+                    ];
+                    ctx.moveTo(burstPoints[0][0], burstPoints[0][1]);
+                    burstPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                    ctx.closePath();
+                    break;
+                case 'blob1':
+                case 'blob2':
+                case 'blob3':
+                    // Crear formas blob orgánicas simplificadas
+                    const blobRadius = Math.min(width, height) / 2;
+                    const centerX = width / 2;
+                    const centerY = height / 2;
+                    const points = 8;
+                    for (let i = 0; i < points; i++) {
+                        const angle = (i / points) * 2 * Math.PI;
+                        const variation = 0.3 + Math.sin(angle * 3) * 0.2;
+                        const x = centerX + Math.cos(angle) * blobRadius * variation;
+                        const y = centerY + Math.sin(angle) * blobRadius * variation;
+                        if (i === 0) ctx.moveTo(x, y);
+                        else ctx.lineTo(x, y);
+                    }
+                    ctx.closePath();
+                    break;
                 default:
                     // Sin máscara - rectángulo completo
                     ctx.rect(0, 0, width, height);
@@ -1056,15 +1143,23 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
                 console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
                 
-                // 3. Procesar cada celda del grid
+                // Obtener elementos de celdas del DOM para calcular dimensiones
                 const cellElements = Array.from(gridContainer.children);
-                console.log(`📦 Celdas encontradas: ${cellElements.length}`);
+                console.log(`📦 Celdas DOM encontradas: ${cellElements.length}`);
                 
-                for (let cellIndex = 0; cellIndex < cellElements.length; cellIndex++) {
+                // 3. Procesar elementos directamente desde los datos de la página en lugar del DOM
+                console.log(`📦 Procesando ${page.cells.length} celdas de datos`);
+                
+                for (let cellIndex = 0; cellIndex < page.cells.length; cellIndex++) {
+                    const cellData = page.cells[cellIndex];
                     const cellElement = cellElements[cellIndex];
-                    const cellRect = cellElement.getBoundingClientRect();
                     
-                    // Posición de la celda relativa al workspace
+                    if (!cellElement) {
+                        console.warn(`❌ No se encontró elemento DOM para celda ${cellIndex}`);
+                        continue;
+                    }
+                    
+                    const cellRect = cellElement.getBoundingClientRect();
                     const cellX = Math.round(cellRect.left - pageRect.left);
                     const cellY = Math.round(cellRect.top - pageRect.top);
                     const cellWidth = Math.round(cellRect.width);
@@ -1072,45 +1167,49 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     
                     console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
                     
-                    // Buscar elementos dentro de la celda
-                    const imageElements = cellElement.querySelectorAll('img:not([alt="background"])');
-                    // Buscar elementos de texto usando el atributo específico
-                    const textElements = cellElement.querySelectorAll('[data-element-type="text"]');
+                    // 3.1. Procesar elementos de imagen desde los datos
+                    const imageElements = cellData.elements.filter(el => el.type === 'image');
+                    console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes de datos`);
                     
-                    console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes, ${textElements.length} textos`);
-                    
-                    // 3.1. Procesar imágenes
-                    for (const imgElement of imageElements) {
-                        if (!imgElement.complete || imgElement.naturalWidth === 0) {
-                            console.log('⏳ Imagen no cargada, saltando...');
+                    for (const imageElement of imageElements) {
+                        // Buscar el elemento IMG correspondiente en el DOM por su contenido (src)
+                        const imgElement = cellElement.querySelector(`img[src="${imageElement.content}"]`);
+                        
+                        if (!imgElement || !imgElement.complete || imgElement.naturalWidth === 0) {
+                            console.log('⏳ Imagen no encontrada o no cargada, saltando...');
                             continue;
                         }
                         
-                        // Obtener información de la máscara del contenedor de la imagen
-                        let maskId = 'none';
-                        let maskContainer = imgElement.parentElement;
+                        // Usar la máscara directamente desde los datos del elemento
+                        const maskId = imageElement.mask || 'none';
                         
-                        // Buscar el contenedor con la clase de máscara
-                        while (maskContainer && maskContainer !== cellElement) {
-                            const maskClass = Array.from(maskContainer.classList).find(cls => cls.startsWith('mask-'));
-                            if (maskClass) {
-                                maskId = maskClass.replace('mask-', '');
-                                break;
-                            }
-                            maskContainer = maskContainer.parentElement;
+                        console.log(`🎭 Imagen encontrada con máscara: ${maskId} (desde datos)`);
+                        
+                        // Calcular posición y tamaño basado en los datos del elemento y las dimensiones de la celda
+                        const elementX = imageElement.position.x;
+                        const elementY = imageElement.position.y;
+                        
+                        // Si las coordenadas son <= 1, son porcentajes; si son > 1, son píxeles
+                        const containerX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
+                        const containerY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
+                        
+                        // Calcular el tamaño del contenedor de la imagen
+                        let containerWidth, containerHeight;
+                        if (imageElement.size) {
+                            // Si tiene size definido, usarlo
+                            containerWidth = imageElement.size.width <= 1 ? 
+                                imageElement.size.width * cellWidth : 
+                                imageElement.size.width;
+                            containerHeight = imageElement.size.height <= 1 ? 
+                                imageElement.size.height * cellHeight : 
+                                imageElement.size.height;
+                        } else {
+                            // Fallback: usar toda la celda
+                            containerWidth = cellWidth;
+                            containerHeight = cellHeight;
                         }
                         
-                        console.log(`🎭 Imagen encontrada con máscara: ${maskId}`);
-                        
-                        // Obtener el contenedor de la imagen (que define el tamaño del area visible)
-                        const imgContainer = imgElement.parentElement;
-                        const containerRect = imgContainer.getBoundingClientRect();
-                        const containerX = Math.round(containerRect.left - pageRect.left);
-                        const containerY = Math.round(containerRect.top - pageRect.top);
-                        const containerWidth = Math.round(containerRect.width);
-                        const containerHeight = Math.round(containerRect.height);
-                        
-                        console.log(`📦 Contenedor: x=${containerX}, y=${containerY}, w=${containerWidth}, h=${containerHeight}`);
+                        console.log(`📦 Contenedor calculado: x=${Math.round(containerX)}, y=${Math.round(containerY)}, w=${Math.round(containerWidth)}, h=${Math.round(containerHeight)}`);
                         
                         // Obtener dimensiones naturales de la imagen
                         const naturalWidth = imgElement.naturalWidth;
@@ -1127,7 +1226,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         
                         // Calcular cómo CSS renderizaría la imagen con object-fit: cover
                         let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
-                        let destX = containerX, destY = containerY, destWidth = containerWidth, destHeight = containerHeight;
+                        let destX = Math.round(containerX), destY = Math.round(containerY), destWidth = Math.round(containerWidth), destHeight = Math.round(containerHeight);
                         
                         if (objectFit === 'cover') {
                             // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
@@ -1197,13 +1296,16 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         // Aplicar máscara y dibujar imagen
                         customCtx.save();
                         
-                        // Si hay máscara, aplicarla al área del contenedor
+                        // Trasladar el origen del canvas a la posición del elemento
+                        customCtx.translate(destX, destY);
+                        
+                        // Si hay máscara, aplicarla al área del elemento (desde 0,0)
                         if (maskId && maskId !== 'none') {
-                            applyMaskToCanvas(customCtx, maskId, containerX, containerY, containerWidth, containerHeight);
+                            applyMaskToCanvas(customCtx, maskId, 0, 0, destWidth, destHeight);
                         } else {
-                            // Sin máscara, solo recortar al área del contenedor
+                            // Sin máscara, solo recortar al área del elemento
                             customCtx.beginPath();
-                            customCtx.rect(containerX, containerY, containerWidth, containerHeight);
+                            customCtx.rect(0, 0, destWidth, destHeight);
                             customCtx.clip();
                         }
                         
@@ -1246,9 +1348,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             const scaleYMatch = transform.match(/scaleY\(([^)]+)\)/);
                             
                             if (scaleMatch || rotateMatch || scaleXMatch || scaleYMatch) {
-                                // Aplicar transformaciones en el centro de la imagen
-                                const centerX = containerX + containerWidth / 2;
-                                const centerY = containerY + containerHeight / 2;
+                                // Aplicar transformaciones en el centro de la imagen (relativo al origen trasladado)
+                                const centerX = destWidth / 2;
+                                const centerY = destHeight / 2;
                                 
                                 customCtx.translate(centerX, centerY);
                                 
@@ -1286,7 +1388,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             customCtx.drawImage(
                                 imgElement,
                                 sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
-                                destX, destY, destWidth, destHeight           // Área destino (contenedor)
+                                0, 0, destWidth, destHeight                   // Área destino (desde origen trasladado)
                             );
                             console.log(`✅ Imagen dibujada con filtros, transformaciones y máscara ${maskId}`);
                         } catch (error) {
@@ -1301,62 +1403,39 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                         }
                     }
                     
-                    // 3.2. Procesar elementos de texto
-                    console.log(`📝 Procesando ${textElements.length} elementos de texto en celda ${cellIndex}...`);
+                    // 3.2. Procesar elementos de texto desde los datos
+                    const textElements = cellData.elements.filter(el => el.type === 'text');
+                    console.log(`📝 Procesando ${textElements.length} elementos de texto desde datos en celda ${cellIndex}...`);
                     
-                    for (let textIndex = 0; textIndex < textElements.length; textIndex++) {
-                        const textElement = textElements[textIndex];
-                        
+                    for (const textElement of textElements) {
                         try {
-                            const textRect = textElement.getBoundingClientRect();
-                            // MEJORA 3: Redondear coordenadas para evitar subpíxeles
-                            const textX = Math.round(textRect.left - pageRect.left);
-                            const textY = Math.round(textRect.top - pageRect.top);
-                            const textWidth = Math.round(textRect.width);
-                            const textHeight = Math.round(textRect.height);
-                            
-                            console.log(`📝 Elemento de texto #${textIndex}:`);
-                            console.log(`   - Posición relativa al workspace: x=${textX}, y=${textY}`);
-                            console.log(`   - Dimensiones: ${textWidth}x${textHeight}`);
-                            
-                            // Obtener estilos computados del elemento de texto
-                            const computedStyle = window.getComputedStyle(textElement);
-                            let fontSize = computedStyle.fontSize || '16px';
-                            const fontFamily = computedStyle.fontFamily || 'Arial';
-                            const fontWeight = computedStyle.fontWeight || 'normal';
-                            const fontStyle = computedStyle.fontStyle || 'normal';
-                            const color = computedStyle.color || '#000000';
-                            const textAlign = computedStyle.textAlign || 'left';
-                            const opacity = parseFloat(computedStyle.opacity) || 1;
-                            const padding = computedStyle.padding || '8px';
-                            
-                            // Obtener el contenido del texto
-                            const textContent = textElement.textContent || textElement.innerText || '';
-                            
-                            console.log(`   - Contenido: "${textContent}"`);
-                            console.log(`   - Estilos: ${fontSize} ${fontFamily} ${fontWeight} ${color}`);
-                            
+                            // Calcular posición y tamaño basado en los datos del elemento
+                            const elementX = textElement.position.x;
+                            const elementY = textElement.position.y;
+                            // Si las coordenadas son <= 1, son porcentajes; si son > 1, son píxeles
+                            const textX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
+                            const textY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
+                            // Usar estilos desde los datos del elemento
+                            const style = textElement.style || {};
+                            const fontSize = style.fontSize || '16px';
+                            const fontFamily = style.fontFamily || 'Arial';
+                            const fontWeight = style.fontWeight || 'normal';
+                            const fontStyle = style.fontStyle || 'normal';
+                            const color = style.color || '#000000';
+                            const textAlign = style.textAlign || 'left';
+                            // Opacidad puede venir como 1 o 100
+                            let opacity = style.opacity;
+                            if (opacity === undefined) opacity = 1;
+                            if (opacity > 1) opacity = opacity / 100;
+                            const textContent = textElement.content || '';
                             if (textContent.trim()) {
-                                // Ajustar el tamaño de fuente para la alta resolución del canvas
-                                const fontSizeNumber = parseFloat(fontSize);
-                                const scaledFontSize = Math.round(fontSizeNumber * scale); // Escalar fuente para alta resolución
-                                
-                                console.log(`📝 Renderizando texto: "${textContent}"`);
-                                console.log(`   - Fuente original: ${fontSizeNumber}px, escalada: ${scaledFontSize}px`);
-                                
-                                // Configurar el contexto para el texto
                                 customCtx.save();
                                 customCtx.globalAlpha = opacity;
-                                
-                                // Configurar fuente con alta calidad y escala apropiada
-                                customCtx.font = `${fontStyle} ${fontWeight} ${scaledFontSize}px ${fontFamily}`;
+                                // Usar fontSize directamente (con unidad)
+                                customCtx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
                                 customCtx.fillStyle = color;
                                 customCtx.textBaseline = 'top';
-                                
-                                // Mejorar la calidad del renderizado de texto
-                                customCtx.textRendering = 'geometricPrecision';
-                                
-                                // Configurar alineación
+                                // Alineación horizontal
                                 if (textAlign === 'center') {
                                     customCtx.textAlign = 'center';
                                 } else if (textAlign === 'right') {
@@ -1364,52 +1443,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 } else {
                                     customCtx.textAlign = 'left';
                                 }
-                                
-                                // Calcular posición X según alineación
-                                let drawX = textX;
-                                if (textAlign === 'center') {
-                                    drawX = textX + textWidth / 2;
-                                } else if (textAlign === 'right') {
-                                    drawX = textX + textWidth;
-                                }
-                                
-                                // Ajustar por padding si existe
-                                const paddingValue = parseFloat(padding) || 8;
-                                // MEJORA 4: Redondear coordenadas finales
-                                const finalX = Math.round(drawX + (textAlign === 'left' ? paddingValue : 0));
-                                const finalY = Math.round(textY + paddingValue);
-                                
-                                console.log(`   - Dibujando en coordenadas finales: x=${finalX}, y=${finalY}`);
-                                
-                                // Dibujar fondo si existe
-                                const backgroundColor = computedStyle.backgroundColor;
-                                if (backgroundColor && backgroundColor !== 'transparent' && backgroundColor !== 'rgba(0, 0, 0, 0)') {
-                                    const borderRadius = parseFloat(computedStyle.borderRadius) || 0;
-                                    customCtx.fillStyle = backgroundColor;
-                                    
-                                    if (borderRadius > 0) {
-                                        // Dibujar rectángulo con bordes redondeados
-                                        customCtx.beginPath();
-                                        customCtx.roundRect(textX, textY, textWidth, textHeight, borderRadius);
-                                        customCtx.fill();
-                                    } else {
-                                        customCtx.fillRect(textX, textY, textWidth, textHeight);
-                                    }
-                                    
-                                    customCtx.fillStyle = color; // Restaurar color del texto
-                                }
-                                
                                 // Dibujar el texto
-                                customCtx.fillText(textContent, finalX, finalY);
-                                
-                                console.log(`✅ Texto renderizado exitosamente: "${textContent}"`);
-                                
+                                customCtx.fillText(textContent, textX, textY);
                                 customCtx.restore();
-                            } else {
-                                console.log(`⚠️ Elemento de texto está vacío`);
                             }
                         } catch (error) {
-                            console.warn(`❌ Error renderizando texto #${textIndex}:`, error);
+                            console.warn(`❌ Error renderizando texto "${textElement.id}":`, error);
                         }
                     }
                 }
@@ -2400,7 +2439,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                                                 // Buscar elementos con máscaras
                                                 const maskedElements = pageElement.querySelectorAll('[class*="mask-"]');
-                                                console.log(`� Elementos con máscara encontrados: ${maskedElements.length}`);
+                                                console.log(`  Elementos con máscara encontrados: ${maskedElements.length}`);
 
                                                 maskedElements.forEach((element, index) => {
                                                     const maskClass = Array.from(element.classList).find(cls => cls.startsWith('mask-'));
@@ -2409,7 +2448,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                     const img = element.querySelector('img');
                                                     if (img) {
                                                         console.log(`📷 Imagen encontrada: ${img.src}`);
-                                                        console.log(`� Dimensiones imagen: ${img.naturalWidth}x${img.naturalHeight}`);
+                                                        console.log(`  Dimensiones imagen: ${img.naturalWidth}x${img.naturalHeight}`);
                                                     }
                                                 });
 
