@@ -21,6 +21,7 @@ export default function ImageElement({
     }));
 
     const elementRef = useRef(null);
+    const imageRef = useRef(null);
     
     // Estados para manipulación robusta de imagen
     const [isManipulating, setIsManipulating] = useState(false);
@@ -39,7 +40,32 @@ export default function ImageElement({
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPos, setContextMenuPos] = useState({ x: 0, y: 0 });
 
-    // Aplicar filtros CSS mejorados
+    // Effect para forzar re-render cuando cambian los filtros
+    useEffect(() => {
+        if (imageRef.current && element.filters) {
+            // Forzar repaint aplicando los estilos directamente
+            const img = imageRef.current;
+            img.style.filter = `
+                brightness(${(element.filters?.brightness || 100) / 100})
+                contrast(${(element.filters?.contrast || 100) / 100})
+                saturate(${(element.filters?.saturation || 100) / 100})
+                sepia(${(element.filters?.tint || 0) / 100})
+                hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
+                blur(${element.filters?.blur || 0}px)
+            `.replace(/\s+/g, ' ').trim();
+            
+            img.style.transform = `scale(${element.filters?.scale || 1}) rotate(${
+                element.filters?.rotate || 0
+            }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${
+                element.filters?.flipVertical ? "scaleY(-1)" : ""
+            }`.replace(/\s+/g, ' ').trim();
+            
+            img.style.mixBlendMode = element.filters?.blendMode || "normal";
+            img.style.opacity = (element.filters?.opacity || 100) / 100;
+        }
+    }, [element.filters]);
+
+    // Aplicar filtros CSS mejorados - optimizado para mejor renderizado
     const filterStyle = {
         filter: `
             brightness(${(element.filters?.brightness || 100) / 100})
@@ -48,14 +74,18 @@ export default function ImageElement({
             sepia(${(element.filters?.tint || 0) / 100})
             hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
             blur(${element.filters?.blur || 0}px)
-        `,
+        `.replace(/\s+/g, ' ').trim(),
         transform: `scale(${element.filters?.scale || 1}) rotate(${
             element.filters?.rotate || 0
         }deg) ${element.filters?.flipHorizontal ? "scaleX(-1)" : ""} ${
             element.filters?.flipVertical ? "scaleY(-1)" : ""
-        }`,
+        }`.replace(/\s+/g, ' ').trim(),
         mixBlendMode: element.filters?.blendMode || "normal",
         opacity: (element.filters?.opacity || 100) / 100,
+        // Forzar repaint para asegurar que los filtros se apliquen
+        willChange: 'filter, transform, opacity',
+        backfaceVisibility: 'hidden',
+        WebkitBackfaceVisibility: 'hidden',
     };
 
     const mask = imageMasks.find((m) => m.id === element.mask) || imageMasks[0];
@@ -444,6 +474,7 @@ export default function ImageElement({
             {/* Contenedor de la imagen */}
             <div className="w-full h-full overflow-hidden relative bg-transparent">
                 <img
+                    ref={imageRef}
                     src={element.content}
                     alt="Imagen editada"
                     className="w-full h-full object-cover select-none"
@@ -453,6 +484,14 @@ export default function ImageElement({
                         // Asegurar que la imagen se renderice correctamente
                         if (elementRef.current) {
                             elementRef.current.style.visibility = 'visible';
+                        }
+                        // Aplicar filtros nuevamente después de cargar
+                        if (imageRef.current && element.filters) {
+                            const img = imageRef.current;
+                            img.style.filter = filterStyle.filter;
+                            img.style.transform = filterStyle.transform;
+                            img.style.mixBlendMode = filterStyle.mixBlendMode;
+                            img.style.opacity = filterStyle.opacity;
                         }
                     }}
                 />                {/* Controles de redimensionamiento mejorados */}

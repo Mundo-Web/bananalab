@@ -679,6 +679,8 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             (cell) => cell.id === cellId
         );
 
+        let shouldRegenerateThumbnails = false;
+
         if (cellIndex !== -1) {
             if (isDuplicate) {
                 // Añadir como nuevo elemento
@@ -688,6 +690,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     ),
                     ...updates,
                 });
+                shouldRegenerateThumbnails = true;
             } else {
                 // Actualizar elemento existente
                 const elementIndex = updatedPages[currentPage].cells[
@@ -695,17 +698,41 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 ].elements.findIndex((el) => el.id === elementId);
 
                 if (elementIndex !== -1) {
+                    const currentElement = updatedPages[currentPage].cells[cellIndex].elements[elementIndex];
+                    
+                    // Verificar si se están actualizando filtros, contenido o posición
+                    const isUpdatingFilters = updates.filters && JSON.stringify(updates.filters) !== JSON.stringify(currentElement.filters);
+                    const isUpdatingContent = updates.content && updates.content !== currentElement.content;
+                    const isUpdatingPosition = updates.position && JSON.stringify(updates.position) !== JSON.stringify(currentElement.position);
+                    const isUpdatingSize = updates.size && JSON.stringify(updates.size) !== JSON.stringify(currentElement.size);
+                    
+                    if (isUpdatingFilters || isUpdatingContent || isUpdatingPosition || isUpdatingSize) {
+                        shouldRegenerateThumbnails = true;
+                        console.log('🔄 Cambio detectado que requiere regenerar thumbnails:', {
+                            filters: isUpdatingFilters,
+                            content: isUpdatingContent,
+                            position: isUpdatingPosition,
+                            size: isUpdatingSize
+                        });
+                    }
+                    
                     updatedPages[currentPage].cells[cellIndex].elements[
                         elementIndex
                     ] = {
-                        ...updatedPages[currentPage].cells[cellIndex].elements[
-                        elementIndex
-                        ],
+                        ...currentElement,
                         ...updates,
                     };
                 }
             }
             updatePages(updatedPages);
+            
+            // Regenerar thumbnails si es necesario
+            if (shouldRegenerateThumbnails) {
+                // Usar setTimeout para que se regenere después de que el DOM se actualice
+                setTimeout(() => {
+                    generateThumbnails();
+                }, 100);
+            }
         }
     };
 
@@ -1180,14 +1207,76 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             customCtx.clip();
                         }
                         
-                        // Aplicar filtros si los hay
+                        // Aplicar filtros CSS completos si los hay
                         const filter = computedStyle.filter;
+                        const transform = computedStyle.transform;
+                        const mixBlendMode = computedStyle.mixBlendMode;
+                        const opacity = parseFloat(computedStyle.opacity) || 1;
                         
+                        // Aplicar opacity
+                        customCtx.globalAlpha = opacity;
+                        
+                        // Aplicar mix-blend-mode si está disponible
+                        if (mixBlendMode && mixBlendMode !== 'normal') {
+                            customCtx.globalCompositeOperation = mixBlendMode;
+                        }
+                        
+                        // Aplicar filtros CSS - usar la propiedad filter del contexto si está disponible
                         if (filter && filter !== 'none') {
-                            const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
-                            if (brightnessMatch) {
-                                const brightness = parseFloat(brightnessMatch[1]);
-                                customCtx.globalAlpha *= brightness;
+                            // Para navegadores modernos que soportan CanvasRenderingContext2D.filter
+                            if ('filter' in customCtx) {
+                                customCtx.filter = filter;
+                                console.log(`🎨 Filtros CSS aplicados: ${filter}`);
+                            } else {
+                                // Fallback: aplicar brightness manualmente
+                                const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
+                                if (brightnessMatch) {
+                                    const brightness = parseFloat(brightnessMatch[1]);
+                                    customCtx.globalAlpha *= brightness;
+                                    console.log(`🎨 Brightness aplicado manualmente: ${brightness}`);
+                                }
+                            }
+                        }
+                        
+                        // Aplicar transformaciones básicas (scale y rotate)
+                        if (transform && transform !== 'none') {
+                            const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+                            const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
+                            const scaleXMatch = transform.match(/scaleX\(([^)]+)\)/);
+                            const scaleYMatch = transform.match(/scaleY\(([^)]+)\)/);
+                            
+                            if (scaleMatch || rotateMatch || scaleXMatch || scaleYMatch) {
+                                // Aplicar transformaciones en el centro de la imagen
+                                const centerX = containerX + containerWidth / 2;
+                                const centerY = containerY + containerHeight / 2;
+                                
+                                customCtx.translate(centerX, centerY);
+                                
+                                if (scaleMatch) {
+                                    const scaleValue = parseFloat(scaleMatch[1]);
+                                    customCtx.scale(scaleValue, scaleValue);
+                                    console.log(`🔄 Scale aplicado: ${scaleValue}`);
+                                }
+                                
+                                if (scaleXMatch) {
+                                    const scaleXValue = parseFloat(scaleXMatch[1]);
+                                    customCtx.scale(scaleXValue, 1);
+                                    console.log(`🔄 ScaleX aplicado: ${scaleXValue}`);
+                                }
+                                
+                                if (scaleYMatch) {
+                                    const scaleYValue = parseFloat(scaleYMatch[1]);
+                                    customCtx.scale(1, scaleYValue);
+                                    console.log(`🔄 ScaleY aplicado: ${scaleYValue}`);
+                                }
+                                
+                                if (rotateMatch) {
+                                    const rotateValue = parseFloat(rotateMatch[1]) * Math.PI / 180;
+                                    customCtx.rotate(rotateValue);
+                                    console.log(`🔄 Rotate aplicado: ${rotateMatch[1]}°`);
+                                }
+                                
+                                customCtx.translate(-centerX, -centerY);
                             }
                         }
                         
@@ -1199,12 +1288,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
                                 destX, destY, destWidth, destHeight           // Área destino (contenedor)
                             );
-                            console.log(`✅ Imagen dibujada con object-fit:cover y máscara ${maskId}`);
+                            console.log(`✅ Imagen dibujada con filtros, transformaciones y máscara ${maskId}`);
                         } catch (error) {
                             console.warn('❌ Error dibujando imagen:', error);
                         }
                         
                         customCtx.restore();
+                        
+                        // Resetear filtros para la siguiente imagen
+                        if ('filter' in customCtx) {
+                            customCtx.filter = 'none';
+                        }
                     }
                     
                     // 3.2. Procesar elementos de texto
@@ -2934,7 +3028,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                             sepia(${(element.filters?.tint || 0) / 100})
                                                                             hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
                                                                             blur(${element.filters?.blur || 0}px)
-                                                                        `,
+                                                                        `.replace(/\s+/g, ' ').trim(),
                                                                             transform: `scale(${element.filters?.scale || 1
                                                                                 }) rotate(${element.filters?.rotate || 0
                                                                                 }deg) ${element.filters?.flipHorizontal
@@ -2943,9 +3037,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                                 } ${element.filters?.flipVertical
                                                                                     ? "scaleY(-1)"
                                                                                     : ""
-                                                                                }`,
+                                                                                }`.replace(/\s+/g, ' ').trim(),
                                                                             mixBlendMode: element.filters?.blendMode || "normal",
                                                                             opacity: (element.filters?.opacity || 100) / 100,
+                                                                            // Forzar repaint para asegurar que los filtros se apliquen
+                                                                            willChange: 'filter, transform, opacity',
+                                                                            backfaceVisibility: 'hidden',
+                                                                            WebkitBackfaceVisibility: 'hidden',
                                                                         }}
                                                                     />
                                                                 </div>
