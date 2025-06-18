@@ -24,6 +24,9 @@ class Album extends Model
         'selected_finish',
         'custom_options',
         'album_pages_data',
+        'design_data',
+        'pdf_path',
+        'design_finalized_at',
         'status',
     ];
 

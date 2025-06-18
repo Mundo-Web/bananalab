@@ -401,4 +401,171 @@ class AlbumController extends Controller
 
         return response($response->toArray(), $response->status);
     }
+
+    /**
+     * Generate and save album PDF for purchase.
+     */
+    public function generatePDF(Request $request, $uuid)
+    {
+        $response = new Response();
+        
+        try {
+            // Verificar que el usuario esté autenticado
+            if (!Auth::check()) {
+                $response->status = 401;
+                $response->message = 'Debes iniciar sesión para generar el PDF del álbum';
+                return response($response->toArray(), $response->status);
+            }
+
+            $user = Auth::user();
+            $album = Album::where('uuid', $uuid)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$album) {
+                $response->status = 404;
+                $response->message = 'Álbum no encontrado';
+                return response($response->toArray(), $response->status);
+            }
+
+            // Verificar que el álbum esté finalizado
+            if ($album->status !== 'finalized') {
+                $response->status = 400;
+                $response->message = 'El álbum debe estar finalizado antes de generar el PDF';
+                return response($response->toArray(), $response->status);
+            }
+
+            // Validar los datos de diseño del PDF
+            $request->validate([
+                'pdf_blob' => 'required|string', // Base64 encoded PDF
+            ]);
+
+            try {
+                // Decodificar el PDF desde base64
+                $pdfContent = base64_decode($request->pdf_blob);
+                
+                if (!$pdfContent) {
+                    throw new Exception('Datos de PDF inválidos');
+                }
+
+                // Generar nombre único para el PDF
+                $uuid_pdf = Crypto::randomUUID();
+                $timestamp = date('YmdHis');
+                $filename = "album_{$album->id}_{$timestamp}_{$uuid_pdf}.pdf";
+                
+                // Guardar el PDF en storage/images/albums/clients
+                $pdfPath = "images/albums/clients/{$filename}";
+                Storage::put($pdfPath, $pdfContent);
+
+                // Actualizar el álbum con la ruta del PDF
+                $album->update([
+                    'pdf_path' => $filename,
+                    'status' => 'ready_for_purchase'
+                ]);
+
+                Log::info("PDF generado para álbum {$album->id}: {$pdfPath}, Tamaño: " . round(strlen($pdfContent) / 1024, 2) . " KB");
+
+                $response->status = 200;
+                $response->message = 'PDF generado y guardado exitosamente';
+                $response->data = [
+                    'album_id' => $album->id,
+                    'uuid' => $album->uuid,
+                    'pdf_path' => $filename,
+                    'status' => $album->status,
+                    'pdf_size_kb' => round(strlen($pdfContent) / 1024, 2),
+                    'full_path' => $pdfPath
+                ];
+
+            } catch (\Exception $e) {
+                Log::error("Error procesando PDF para álbum {$album->id}: " . $e->getMessage());
+                
+                $response->status = 500;
+                $response->message = 'Error al procesar el PDF: ' . $e->getMessage();
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Error general al generar PDF: " . $e->getMessage());
+            $response->status = 400;
+            $response->message = $e->getMessage();
+        }
+
+        return response($response->toArray(), $response->status);
+    }
+
+    /**
+     * Serve album PDF for download (admin only).
+     */
+    public function servePDF($uuid)
+    {
+        try {
+            $album = Album::where('uuid', $uuid)->first();
+            
+            if (!$album || !$album->pdf_path) {
+                throw new Exception('PDF no encontrado');
+            }
+
+            $pdfPath = "images/albums/clients/{$album->pdf_path}";
+            $content = Storage::get($pdfPath);
+            
+            if (!$content) {
+                throw new Exception('Archivo PDF no encontrado');
+            }
+
+            return response($content, 200, [
+                'Content-Type' => 'application/pdf',
+                'Content-Disposition' => 'inline; filename="album_' . $album->title . '.pdf"',
+                'Cache-Control' => 'public, max-age=31536000',
+            ]);
+
+        } catch (\Throwable $th) {
+            return response('', 404);
+        }
+    }
+
+    /**
+     * Check album status and PDF availability.
+     */
+    public function checkStatus(Request $request, $uuid)
+    {
+        $response = new Response();
+        
+        try {
+            // Verificar que el usuario esté autenticado
+            if (!Auth::check()) {
+                $response->status = 401;
+                $response->message = 'Debes iniciar sesión para verificar el estado del álbum';
+                return response($response->toArray(), $response->status);
+            }
+
+            $user = Auth::user();
+            $album = Album::where('uuid', $uuid)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if (!$album) {
+                $response->status = 404;
+                $response->message = 'Álbum no encontrado';
+                return response($response->toArray(), $response->status);
+            }
+
+            $response->status = 200;
+            $response->message = 'Estado del álbum obtenido exitosamente';
+            $response->data = [
+                'album_id' => $album->id,
+                'uuid' => $album->uuid,
+                'title' => $album->title,
+                'status' => $album->status,
+                'has_pdf' => !empty($album->pdf_path),
+                'pdf_path' => $album->pdf_path,
+                'design_finalized_at' => $album->design_finalized_at,
+                'can_purchase' => $album->status === 'ready_for_purchase' && !empty($album->pdf_path)
+            ];
+
+        } catch (Exception $e) {
+            $response->status = 400;
+            $response->message = $e->getMessage();
+        }
+
+        return response($response->toArray(), $response->status);
+    }
 }

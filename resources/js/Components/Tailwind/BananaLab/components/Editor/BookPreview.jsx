@@ -709,7 +709,7 @@ const BookPreviewModal = ({
                         setIsProcessing(true);
 
                         try {
-                            console.log('🚀 Iniciando proceso de compra...');
+                            console.log('🚀 Iniciando proceso de compra con generación de PDF...');
 
                             // Verificar que la función addAlbumToCart esté disponible
                             if (typeof addAlbumToCart !== 'function') {
@@ -720,14 +720,69 @@ const BookPreviewModal = ({
                                 return;
                             }
 
-                            // Llamar a la función para finalizar el diseño y guardarlo
+                            // Paso 1: Finalizar el diseño del álbum
                             if (typeof window.finalizeAlbumDesign === 'function') {
                                 console.log('📄 Finalizando diseño del álbum...');
                                 const success = await window.finalizeAlbumDesign();
                                 console.log('📄 Resultado de finalizeAlbumDesign:', success);
 
                                 if (success) {
-                                    // Primero agregar al carrito
+                                    // Paso 2: Generar PDF del álbum
+                                    console.log('📄 Generando PDF del álbum...');
+                                    if (typeof window.generateAlbumPDF === 'function') {
+                                        try {
+                                            const pdfBlob = await window.generateAlbumPDF();
+                                            console.log('📄 PDF generado exitosamente:', pdfBlob);
+
+                                            // Paso 3: Enviar PDF al servidor para guardarlo
+                                            console.log('💾 Guardando PDF en el servidor...');
+                                            const albumUuid = window.currentAlbumUuid || window.albumUuid;
+                                            
+                                            if (!albumUuid) {
+                                                throw new Error('No se encontró el UUID del álbum');
+                                            }
+
+                                            // Convertir blob a base64
+                                            const base64PDF = await new Promise((resolve, reject) => {
+                                                const reader = new FileReader();
+                                                reader.onload = () => {
+                                                    const base64 = reader.result.split(',')[1];
+                                                    resolve(base64);
+                                                };
+                                                reader.onerror = reject;
+                                                reader.readAsDataURL(pdfBlob);
+                                            });
+
+                                            // Enviar PDF al servidor
+                                            const generatePDFResponse = await fetch(`/api/albums/${albumUuid}/generate-pdf`, {
+                                                method: 'POST',
+                                                headers: {
+                                                    'Content-Type': 'application/json',
+                                                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
+                                                },
+                                                body: JSON.stringify({
+                                                    pdf_blob: base64PDF
+                                                })
+                                            });
+
+                                            if (!generatePDFResponse.ok) {
+                                                const errorData = await generatePDFResponse.json();
+                                                throw new Error(errorData.message || 'Error al guardar el PDF en el servidor');
+                                            }
+
+                                            const pdfResult = await generatePDFResponse.json();
+                                            console.log('💾 PDF guardado en servidor:', pdfResult);
+
+                                        } catch (pdfError) {
+                                            console.error('❌ Error generando/guardando PDF:', pdfError);
+                                            // Continuar con el proceso aunque falle el PDF
+                                            console.log('⚠️ Continuando sin PDF...');
+                                        }
+                                    } else {
+                                        console.warn('⚠️ window.generateAlbumPDF no está disponible, continuando sin PDF...');
+                                    }
+
+                                    // Paso 4: Agregar al carrito
                                     console.log('📦 Agregando álbum al carrito...');
                                     const addedToCart = addAlbumToCart();
                                     console.log('📦 Resultado de addAlbumToCart:', addedToCart);
@@ -748,7 +803,7 @@ const BookPreviewModal = ({
                                                 console.error('❌ ADVERTENCIA: El carrito parece vacío después de agregar');
                                             }
 
-                                            // Redirigir al carrito
+                                            // Paso 5: Redirigir al carrito
                                             const cartUrl = `${Global.APP_URL}/cart`;
                                             console.log('🔄 Redirigiendo al carrito...');
                                             console.log('🔄 URL del carrito:', cartUrl);

@@ -148,6 +148,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const albumResponseData = await albumResponse.json();
             const album = albumResponseData.data || albumResponseData;
             setAlbumData(album);
+            
+            // Establecer el UUID del álbum en window para acceso desde BookPreview
+            window.currentAlbumUuid = album.uuid;
+            console.log('🔗 Album UUID establecido en window:', album.uuid);
 
             // Cargar datos del preset
             const presetResponse = await fetch(presetEndpoint, {
@@ -2220,215 +2224,129 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         }
     };
 
-    // --- Generar PDF del álbum (fiel al render del editor) ---
-    // Renderiza cada página usando el mismo componente React en un contenedor oculto
+    // --- Generar PDF del álbum usando thumbnails ya generados ---
     window.generateAlbumPDF = async () => {
         try {
             // Importar dependencias dinámicamente
-            const html2canvas = (await import('html2canvas')).default;
             const jsPDF = (await import('jspdf')).default;
 
-            console.log('🎯 Iniciando generación de PDF del álbum...');
+            console.log('🎯 Iniciando generación de PDF del álbum usando thumbnails...');
 
-            // 1. Crear un contenedor oculto para renderizado
-            let hiddenContainer = document.getElementById('pdf-hidden-pages');
-            if (!hiddenContainer) {
-                hiddenContainer = document.createElement('div');
-                hiddenContainer.id = 'pdf-hidden-pages';
-                hiddenContainer.style.cssText = `
-                    position: fixed;
-                    left: -99999px;
-                    top: 0;
-                    width: ${workspaceDimensions.originalWidth || 800}px;
-                    z-index: -1;
-                    background: white;
-                `;
-                document.body.appendChild(hiddenContainer);
+            // Verificar que tenemos thumbnails disponibles
+            console.log('🖼️ Thumbnails disponibles:', Object.keys(pageThumbnails));
+            
+            if (Object.keys(pageThumbnails).length === 0) {
+                console.warn('⚠️ No hay thumbnails disponibles, regenerando...');
+                // Disparar regeneración de thumbnails y esperar un poco
+                await new Promise(resolve => setTimeout(resolve, 2000));
             }
-            hiddenContainer.innerHTML = '';
 
-            // 2. Renderizar cada página usando React (idéntico al editor)
-            const renderPage = (page, idx) => {
-                const layout = layouts.find(l => l.id === page.layout) || layouts[0];
-                const pageDiv = document.createElement('div');
-                pageDiv.id = `pdf-page-${page.id}`;
-                pageDiv.style.cssText = `
-                    width: ${workspaceDimensions.originalWidth || 800}px;
-                    height: ${workspaceDimensions.originalHeight || 600}px;
-                    background: #fff;
-                    overflow: hidden;
-                    position: relative;
-                    box-sizing: border-box;
-                    display: block;
-                    margin: 0;
-                    padding: 0;
-                `;
+            // Determinar las dimensiones del PDF basadas en el workspace
+            const pdfWidth = workspaceDimensions.originalWidthPx || workspaceDimensions.originalWidth || 800;
+            const pdfHeight = workspaceDimensions.originalHeightPx || workspaceDimensions.originalHeight || 600;
+            
+            console.log(`📄 Dimensiones del PDF: ${pdfWidth}x${pdfHeight}px`);
 
-                // Crear estructura del grid
-                const gridDiv = document.createElement('div');
-                gridDiv.className = `grid ${layout.template}`;
-                gridDiv.style.cssText = `
-                    width: 100%;
-                    height: 100%;
-                    gap: ${layout.style?.gap || '16px'};
-                    padding: ${layout.style?.padding || '16px'};
-                    box-sizing: border-box;
-                    position: relative;
-                `;
-
-                // Renderizar cada celda
-                page.cells.forEach((cell, cellIdx) => {
-                    const cellDiv = document.createElement('div');
-                    cellDiv.style.cssText = `
-                        position: relative;
-                        width: 100%;
-                        height: 100%;
-                        background: #f9fafb;
-                        border-radius: 8px;
-                        overflow: hidden;
-                    `;
-
-                    // Renderizar elementos de la celda
-                    cell.elements.forEach((element) => {
-                        if (element.type === 'image') {
-                            const imgContainer = document.createElement('div');
-                            const maskClass = imageMasks.find(m => m.id === element.mask)?.class || '';
-                            if (maskClass) imgContainer.className = maskClass;
-
-                            imgContainer.style.cssText = `
-                                position: absolute;
-                                left: ${element.position.x}px;
-                                top: ${element.position.y}px;
-                                width: 100%;
-                                height: 100%;
-                                z-index: ${element.zIndex || 1};
-                            `;
-
-                            const img = document.createElement('img');
-                            img.src = element.content;
-                            img.alt = '';
-                            img.style.cssText = `
-                                width: 100%;
-                                height: 100%;
-                                object-fit: cover;
-                                filter: brightness(${(element.filters?.brightness || 100) / 100}) contrast(${(element.filters?.contrast || 100) / 100}) saturate(${(element.filters?.saturation || 100) / 100}) sepia(${(element.filters?.tint || 0) / 100}) hue-rotate(${(element.filters?.hue || 0) * 3.6}deg) blur(${element.filters?.blur || 0}px);
-                                transform: scale(${element.filters?.scale || 1}) rotate(${element.filters?.rotate || 0}deg)${element.filters?.flipHorizontal ? ' scaleX(-1)' : ''}${element.filters?.flipVertical ? ' scaleY(-1)' : ''};
-                                mix-blend-mode: ${element.filters?.blendMode || 'normal'};
-                                opacity: ${(element.filters?.opacity || 100) / 100};
-                            `;
-
-                            imgContainer.appendChild(img);
-                            cellDiv.appendChild(imgContainer);
-                        } else if (element.type === 'text') {
-                            const textDiv = document.createElement('div');
-                            textDiv.textContent = element.content;
-                            textDiv.style.cssText = `
-                                position: absolute;
-                                left: ${element.position.x}px;
-                                top: ${element.position.y}px;
-                                font-family: ${element.style?.fontFamily || 'Arial'};
-                                font-size: ${element.style?.fontSize || '16px'};
-                                font-weight: ${element.style?.fontWeight || 'normal'};
-                                font-style: ${element.style?.fontStyle || 'normal'};
-                                text-decoration: ${element.style?.textDecoration || 'none'};
-                                color: ${element.style?.color || '#000000'};
-                                text-align: ${element.style?.textAlign || 'left'};
-                                background: ${element.style?.backgroundColor || 'transparent'};
-                                padding: ${element.style?.padding || '8px'};
-                                border-radius: ${element.style?.borderRadius || '0px'};
-                                border: ${element.style?.border || 'none'};
-                                opacity: ${element.style?.opacity || 1};
-                                z-index: ${element.zIndex || 1};
-                            `;
-
-                            cellDiv.appendChild(textDiv);
-                        }
-                    });
-
-                    gridDiv.appendChild(cellDiv);
-                });
-
-                pageDiv.appendChild(gridDiv);
-                return pageDiv;
-            };
-
-            // 3. Renderizar todas las páginas
-            const pageElements = pages.map((page, idx) => renderPage(page, idx));
-            pageElements.forEach(pageEl => hiddenContainer.appendChild(pageEl));
-
-            // Esperar a que las imágenes se carguen
-            await new Promise(resolve => setTimeout(resolve, 1000));
-
-            // 4. Crear PDF y capturar cada página
+            // Crear PDF con las dimensiones correctas
             const pdf = new jsPDF({
-                orientation: 'landscape',
+                orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
                 unit: 'px',
-                format: [workspaceDimensions.originalWidth || 800, workspaceDimensions.originalHeight || 600]
+                format: [pdfWidth, pdfHeight]
             });
 
+            let addedPages = 0;
+
+            // Procesar cada página en orden
             for (let i = 0; i < pages.length; i++) {
-                console.log(`📄 Procesando página ${i + 1} de ${pages.length}...`);
+                const page = pages[i];
+                console.log(`📄 Procesando página ${i + 1} de ${pages.length}: ${page.id} (${page.type})`);
 
-                const pageDiv = document.getElementById(`pdf-page-${pages[i].id}`);
-                if (!pageDiv) continue;
-
-                try {
-                    const canvas = await html2canvas(pageDiv, {
-                        width: workspaceDimensions.originalWidth || 800,
-                        height: workspaceDimensions.originalHeight || 600,
-                        scale: 2, // Alta resolución para el PDF
-                        backgroundColor: '#ffffff',
-                        useCORS: true,
-                        allowTaint: true,
-                        logging: false,
-                        foreignObjectRendering: true,
-                        onclone: (clonedDoc, element) => {
-                            // Asegurar estilos en el clon
-                            const clonedPage = clonedDoc.getElementById(`pdf-page-${pages[i].id}`);
-                            if (clonedPage) {
-                                clonedPage.style.transform = 'none';
-                                clonedPage.style.position = 'static';
-                            }
-                        }
-                    });
-
-                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-                    if (i > 0) {
-                        pdf.addPage([workspaceDimensions.originalWidth || 800, workspaceDimensions.originalHeight || 600], 'landscape');
+                // Verificar si existe thumbnail para esta página
+                const thumbnailDataUrl = pageThumbnails[page.id];
+                
+                if (!thumbnailDataUrl) {
+                    console.warn(`⚠️ No se encontró thumbnail para página ${page.id}, intentando generar...`);
+                    
+                    // Intentar usar el elemento visible en el DOM como fallback
+                    const pageElement = document.getElementById(`page-${page.id}`);
+                    if (!pageElement) {
+                        console.warn(`❌ Página ${page.id} no encontrada en DOM, saltando...`);
+                        continue;
                     }
 
-                    pdf.addImage(
-                        imgData,
-                        'JPEG',
-                        0,
-                        0,
-                        workspaceDimensions.originalWidth || 800,
-                        workspaceDimensions.originalHeight || 600
-                    );
+                    try {
+                        // Generar thumbnail on-the-fly usando html2canvas
+                        const html2canvas = (await import('html2canvas')).default;
+                        const canvas = await html2canvas(pageElement, {
+                            width: pdfWidth,
+                            height: pdfHeight,
+                            scale: 2,
+                            backgroundColor: '#ffffff',
+                            useCORS: true,
+                            allowTaint: true,
+                            logging: false
+                        });
+                        
+                        const fallbackDataUrl = canvas.toDataURL('image/jpeg', 0.95);
+                        
+                        if (addedPages > 0) {
+                            pdf.addPage([pdfWidth, pdfHeight]);
+                        }
+                        
+                        pdf.addImage(fallbackDataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
+                        addedPages++;
+                        
+                        console.log(`✅ Página ${page.id} generada como fallback`);
+                        
+                    } catch (error) {
+                        console.error(`❌ Error generando fallback para página ${page.id}:`, error);
+                        continue;
+                    }
+                } else {
+                    // Usar el thumbnail existente
+                    try {
+                        // Agregar nueva página si no es la primera
+                        if (addedPages > 0) {
+                            pdf.addPage([pdfWidth, pdfHeight]);
+                        }
 
-                    console.log(`✅ Página ${i + 1} capturada correctamente`);
-                } catch (error) {
-                    console.error(`❌ Error capturando página ${i + 1}:`, error);
+                        // Agregar la imagen del thumbnail al PDF
+                        pdf.addImage(
+                            thumbnailDataUrl,
+                            'JPEG',
+                            0,
+                            0,
+                            pdfWidth,
+                            pdfHeight
+                        );
+                        
+                        addedPages++;
+                        console.log(`✅ Página ${page.id} agregada al PDF usando thumbnail`);
+                        
+                    } catch (error) {
+                        console.error(`❌ Error agregando página ${page.id} al PDF:`, error);
+                        continue;
+                    }
                 }
             }
 
-            // 5. Guardar PDF
+            if (addedPages === 0) {
+                throw new Error('No se pudo agregar ninguna página al PDF');
+            }
+
+            // Crear el nombre del archivo
             const albumTitle = albumData?.title || 'Album';
             const fileName = `${albumTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
 
-            pdf.save(fileName);
-            console.log(`🎉 PDF generado exitosamente: ${fileName}`);
+            // Obtener el PDF como blob
+            const pdfBlob = pdf.output('blob');
+            console.log(`🎉 PDF generado exitosamente: ${fileName} con ${addedPages} páginas`);
 
-            // 6. Limpiar el DOM
-            if (hiddenContainer) {
-                hiddenContainer.innerHTML = '';
-            }
-
-            return true;
+            return pdfBlob;
+            
         } catch (error) {
             console.error('❌ Error generando PDF:', error);
-            return false;
+            throw error;
         }
     };
 
