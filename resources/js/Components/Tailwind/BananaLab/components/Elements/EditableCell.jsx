@@ -113,7 +113,7 @@ export default function EditableCell({
                 isOver ? "ring-2 ring-purple-500 bg-transparent" : ""
             } ${
                 !hasContent 
-                    ? "border-2 border-dashed border-gray-300 bg-transparent hover:border-gray-400 hover:bg-gray-100" 
+                    ? "border-2 border-dashed border-gray-300 bg-transparent hover:border-gray-400 hover:bg-transparent hover:text-white" 
                     : "bg-transparent"
             }`}
             onClick={(e) => {
@@ -129,14 +129,14 @@ export default function EditableCell({
         >
             {elements.length === 0 ? (
                 <div
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
+                    className="absolute group inset-0 flex flex-col items-center justify-center gap-2 cursor-pointer transition-colors"
                     onClick={(e) => {
                         e.stopPropagation();
                         openFileExplorer();
                     }}
                 >
-                    <Upload className="h-8 w-8 text-gray-300" />
-                    <p className="text-sm text-gray-400">
+                    <Upload className="h-8 w-8 text-gray-300 group-hover:text-white" />
+                    <p className="text-sm text-gray-400 group-hover:text-white">
                         Haz clic o arrastra una imagen
                     </p>
                 </div>

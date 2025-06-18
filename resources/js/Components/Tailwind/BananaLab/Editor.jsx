@@ -921,123 +921,137 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             const newThumbnails = {};
 
-            // Definir funciones para aplicar máscaras en canvas
+            // Importar máscaras desde el archivo de constantes
+            const { imageMasks } = await import('./constants/masks.js');
+
+            // Función mejorada para aplicar máscaras usando las definiciones CSS
             const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
-                ctx.save();
-                ctx.translate(x, y);
+                // No hacer translate aquí, trabajar directamente en las coordenadas finales
                 ctx.beginPath();
 
                 switch (maskId) {
                     case 'circle':
-                        ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                        // clip-path: circle(50% at 50% 50%)
+                        ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
                         break;
                     case 'diamond':
-                        ctx.moveTo(width / 2, 0);
-                        ctx.lineTo(width, height / 2);
-                        ctx.lineTo(width / 2, height);
-                        ctx.lineTo(0, height / 2);
+                        // clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)
+                        ctx.moveTo(x + width / 2, y);
+                        ctx.lineTo(x + width, y + height / 2);
+                        ctx.lineTo(x + width / 2, y + height);
+                        ctx.lineTo(x, y + height / 2);
                         ctx.closePath();
                         break;
                     case 'triangle':
-                        ctx.moveTo(width / 2, 0);
-                        ctx.lineTo(width, height);
-                        ctx.lineTo(0, height);
+                        // clip-path: polygon(50% 0%, 100% 100%, 0% 100%)
+                        ctx.moveTo(x + width / 2, y);
+                        ctx.lineTo(x + width, y + height);
+                        ctx.lineTo(x, y + height);
                         ctx.closePath();
                         break;
                     case 'hexagon':
+                        // clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)
                         const hexPoints = [
-                            [width * 0.25, height * 0.05],
-                            [width * 0.75, height * 0.05],
-                            [width * 1.0, height * 0.5],
-                            [width * 0.75, height * 0.95],
-                            [width * 0.25, height * 0.95],
-                            [width * 0.0, height * 0.5]
+                            [x + width * 0.25, y + height * 0.05],
+                            [x + width * 0.75, y + height * 0.05],
+                            [x + width * 1.0, y + height * 0.5],
+                            [x + width * 0.75, y + height * 0.95],
+                            [x + width * 0.25, y + height * 0.95],
+                            [x + width * 0.0, y + height * 0.5]
                         ];
                         ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
                         hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
                         ctx.closePath();
                         break;
                     case 'star':
+                        // clip-path de star-2: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)
                         const starPoints = [
-                            [width * 0.5, height * 0],
-                            [width * 0.61, height * 0.35],
-                            [width * 0.98, height * 0.35],
-                            [width * 0.68, height * 0.57],
-                            [width * 0.79, height * 0.91],
-                            [width * 0.5, height * 0.7],
-                            [width * 0.21, height * 0.91],
-                            [width * 0.32, height * 0.57],
-                            [width * 0.02, height * 0.35],
-                            [width * 0.39, height * 0.35]
+                            [x + width * 0.5, y + height * 0],
+                            [x + width * 0.61, y + height * 0.35],
+                            [x + width * 0.98, y + height * 0.35],
+                            [x + width * 0.68, y + height * 0.57],
+                            [x + width * 0.79, y + height * 0.91],
+                            [x + width * 0.5, y + height * 0.7],
+                            [x + width * 0.21, y + height * 0.91],
+                            [x + width * 0.32, y + height * 0.57],
+                            [x + width * 0.02, y + height * 0.35],
+                            [x + width * 0.39, y + height * 0.35]
                         ];
                         ctx.moveTo(starPoints[0][0], starPoints[0][1]);
                         starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
                         ctx.closePath();
                         break;
                     case 'rounded':
-                        const radius = Math.min(width, height) * 0.1;
+                    case 'rounded-sm':
+                    case 'rounded-lg':
+                    case 'rounded-rect':
+                        // Las máscaras rounded usan border-radius en CSS, no clip-path
+                        // Para canvas, aproximamos con un rectángulo redondeado
+                        const radius = maskId === 'rounded-sm' ? 6 : 
+                                     maskId === 'rounded' ? 12 : 
+                                     maskId === 'rounded-lg' ? 24 : 16;
                         if (ctx.roundRect) {
-                            ctx.roundRect(0, 0, width, height, radius);
+                            ctx.roundRect(x, y, width, height, radius);
                         } else {
                             // Fallback para navegadores que no soportan roundRect
-                            ctx.moveTo(radius, 0);
-                            ctx.lineTo(width - radius, 0);
-                            ctx.quadraticCurveTo(width, 0, width, radius);
-                            ctx.lineTo(width, height - radius);
-                            ctx.quadraticCurveTo(width, height, width - radius, height);
-                            ctx.lineTo(radius, height);
-                            ctx.quadraticCurveTo(0, height, 0, height - radius);
-                            ctx.lineTo(0, radius);
-                            ctx.quadraticCurveTo(0, 0, radius, 0);
+                            ctx.moveTo(x + radius, y);
+                            ctx.lineTo(x + width - radius, y);
+                            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+                            ctx.lineTo(x + width, y + height - radius);
+                            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+                            ctx.lineTo(x + radius, y + height);
+                            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+                            ctx.lineTo(x, y + radius);
+                            ctx.quadraticCurveTo(x, y, x + radius, y);
                             ctx.closePath();
                         }
                         break;
                     case 'polaroid':
-                        // Simular clip-path: inset(5% 5% 20% 5%)
+                        // clip-path: inset(5% 5% 20% 5%)
                         const insetTop = height * 0.05;
                         const insetRight = width * 0.05;
                         const insetBottom = height * 0.20;
                         const insetLeft = width * 0.05;
-                        ctx.rect(insetLeft, insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
+                        ctx.rect(x + insetLeft, y + insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
                         break;
                     case 'vintage':
-                        // Simular ellipse(45% 45% at 50% 50%)
-                        ctx.ellipse(width / 2, height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
+                        // clip-path: ellipse(45% 45% at 50% 50%)
+                        ctx.ellipse(x + width / 2, y + height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
                         break;
                     case 'diagonal':
-                        // Simular polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
-                        ctx.moveTo(0, 0);
-                        ctx.lineTo(width, height * 0.1);
-                        ctx.lineTo(width, height * 0.9);
-                        ctx.lineTo(0, height);
+                        // clip-path: polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + width, y + height * 0.1);
+                        ctx.lineTo(x + width, y + height * 0.9);
+                        ctx.lineTo(x, y + height);
                         ctx.closePath();
                         break;
                     case 'speech':
-                        // Simular polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
+                        // clip-path: polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
                         const speechPoints = [
-                            [width * 0.1, 0],
-                            [width * 0.9, 0],
-                            [width * 0.9, height * 0.8],
-                            [width * 0.6, height * 0.8],
-                            [width * 0.5, height],
-                            [width * 0.4, height * 0.8],
-                            [width * 0.1, height * 0.8]
+                            [x + width * 0.1, y],
+                            [x + width * 0.9, y],
+                            [x + width * 0.9, y + height * 0.8],
+                            [x + width * 0.6, y + height * 0.8],
+                            [x + width * 0.5, y + height],
+                            [x + width * 0.4, y + height * 0.8],
+                            [x + width * 0.1, y + height * 0.8]
                         ];
                         ctx.moveTo(speechPoints[0][0], speechPoints[0][1]);
                         speechPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
                         ctx.closePath();
                         break;
                     case 'burst':
-                        // Simular el burst de 16 puntos
+                        // clip-path: polygon(50% 0%, 60% 20%, 80% 10%, 70% 30%, 90% 50%, 70% 70%, 80% 90%, 60% 80%, 50% 100%, 40% 80%, 20% 90%, 30% 70%, 10% 50%, 30% 30%, 20% 10%, 40% 20%)
                         const burstPoints = [
-                            [width * 0.5, 0], [width * 0.6, height * 0.2],
-                            [width * 0.8, height * 0.1], [width * 0.7, height * 0.3],
-                            [width * 0.9, height * 0.5], [width * 0.7, height * 0.7],
-                            [width * 0.8, height * 0.9], [width * 0.6, height * 0.8],
-                            [width * 0.5, height], [width * 0.4, height * 0.8],
-                            [width * 0.2, height * 0.9], [width * 0.3, height * 0.7],
-                            [width * 0.1, height * 0.5], [width * 0.3, height * 0.3],
-                            [width * 0.2, height * 0.1], [width * 0.4, height * 0.2]
+                            [x + width * 0.5, y], [x + width * 0.6, y + height * 0.2],
+                            [x + width * 0.8, y + height * 0.1], [x + width * 0.7, y + height * 0.3],
+                            [x + width * 0.9, y + height * 0.5], [x + width * 0.7, y + height * 0.7],
+                            [x + width * 0.8, y + height * 0.9], [x + width * 0.6, y + height * 0.8],
+                            [x + width * 0.5, y + height], [x + width * 0.4, y + height * 0.8],
+                            [x + width * 0.2, y + height * 0.9], [x + width * 0.3, y + height * 0.7],
+                            [x + width * 0.1, y + height * 0.5], [x + width * 0.3, y + height * 0.3],
+                            [x + width * 0.2, y + height * 0.1], [x + width * 0.4, y + height * 0.2]
                         ];
                         ctx.moveTo(burstPoints[0][0], burstPoints[0][1]);
                         burstPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
@@ -1046,24 +1060,24 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     case 'blob1':
                     case 'blob2':
                     case 'blob3':
-                        // Crear formas blob orgánicas simplificadas
+                        // Crear formas blob orgánicas simplificadas usando las coordenadas absolutas
                         const blobRadius = Math.min(width, height) / 2;
-                        const centerX = width / 2;
-                        const centerY = height / 2;
+                        const centerX = x + width / 2;
+                        const centerY = y + height / 2;
                         const points = 8;
                         for (let i = 0; i < points; i++) {
                             const angle = (i / points) * 2 * Math.PI;
                             const variation = 0.3 + Math.sin(angle * 3) * 0.2;
-                            const x = centerX + Math.cos(angle) * blobRadius * variation;
-                            const y = centerY + Math.sin(angle) * blobRadius * variation;
-                            if (i === 0) ctx.moveTo(x, y);
-                            else ctx.lineTo(x, y);
+                            const pointX = centerX + Math.cos(angle) * blobRadius * variation;
+                            const pointY = centerY + Math.sin(angle) * blobRadius * variation;
+                            if (i === 0) ctx.moveTo(pointX, pointY);
+                            else ctx.lineTo(pointX, pointY);
                         }
                         ctx.closePath();
                         break;
                     default:
                         // Sin máscara - rectángulo completo
-                        ctx.rect(0, 0, width, height);
+                        ctx.rect(x, y, width, height);
                         break;
                 }
 
@@ -1299,18 +1313,18 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             // Aplicar máscara y dibujar imagen
                             customCtx.save();
 
-                            // Trasladar el origen del canvas a la posición del elemento
-                            customCtx.translate(destX, destY);
-
-                            // Si hay máscara, aplicarla al área del elemento (desde 0,0)
+                            // Si hay máscara, aplicarla con las coordenadas absolutas ANTES del translate
                             if (maskId && maskId !== 'none') {
-                                applyMaskToCanvas(customCtx, maskId, 0, 0, destWidth, destHeight);
+                                applyMaskToCanvas(customCtx, maskId, destX, destY, destWidth, destHeight);
                             } else {
                                 // Sin máscara, solo recortar al área del elemento
                                 customCtx.beginPath();
-                                customCtx.rect(0, 0, destWidth, destHeight);
+                                customCtx.rect(destX, destY, destWidth, destHeight);
                                 customCtx.clip();
                             }
+
+                            // AHORA trasladar el origen del canvas a la posición del elemento
+                            customCtx.translate(destX, destY);
 
                             // Aplicar filtros CSS completos si los hay
                             const filter = computedStyle.filter;
