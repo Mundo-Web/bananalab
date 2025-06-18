@@ -699,13 +699,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                 if (elementIndex !== -1) {
                     const currentElement = updatedPages[currentPage].cells[cellIndex].elements[elementIndex];
-                    
+
                     // Verificar si se están actualizando filtros, contenido o posición
                     const isUpdatingFilters = updates.filters && JSON.stringify(updates.filters) !== JSON.stringify(currentElement.filters);
                     const isUpdatingContent = updates.content && updates.content !== currentElement.content;
                     const isUpdatingPosition = updates.position && JSON.stringify(updates.position) !== JSON.stringify(currentElement.position);
                     const isUpdatingSize = updates.size && JSON.stringify(updates.size) !== JSON.stringify(currentElement.size);
-                    
+
                     if (isUpdatingFilters || isUpdatingContent || isUpdatingPosition || isUpdatingSize) {
                         shouldRegenerateThumbnails = true;
                         console.log('🔄 Cambio detectado que requiere regenerar thumbnails:', {
@@ -715,7 +715,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             size: isUpdatingSize
                         });
                     }
-                    
+
                     updatedPages[currentPage].cells[cellIndex].elements[
                         elementIndex
                     ] = {
@@ -725,7 +725,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 }
             }
             updatePages(updatedPages);
-            
+
             // Regenerar thumbnails si es necesario
             if (shouldRegenerateThumbnails) {
                 // Usar setTimeout para que se regenere después de que el DOM se actualice
@@ -913,633 +913,763 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         return () => window.removeEventListener('resize', handleResize);
     }, [presetData, workspaceSize]);
 
-  useEffect(() => {
-    const generateThumbnails = async () => {
-        if (pages.length === 0) return;
-        
-        console.log('🎯 Iniciando generación de thumbnails...');
+    useEffect(() => {
+        const generateThumbnails = async () => {
+            if (pages.length === 0) return;
 
-        const newThumbnails = {};
+            console.log('🎯 Iniciando generación de thumbnails...');
 
-        // Definir funciones para aplicar máscaras en canvas
-        const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.beginPath();
-            
-            switch (maskId) {
-                case 'circle':
-                    ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
-                    break;
-                case 'diamond':
-                    ctx.moveTo(width / 2, 0);
-                    ctx.lineTo(width, height / 2);
-                    ctx.lineTo(width / 2, height);
-                    ctx.lineTo(0, height / 2);
-                    ctx.closePath();
-                    break;
-                case 'triangle':
-                    ctx.moveTo(width / 2, 0);
-                    ctx.lineTo(width, height);
-                    ctx.lineTo(0, height);
-                    ctx.closePath();
-                    break;
-                case 'hexagon':
-                    const hexPoints = [
-                        [width * 0.25, height * 0.05],
-                        [width * 0.75, height * 0.05],
-                        [width * 1.0, height * 0.5],
-                        [width * 0.75, height * 0.95],
-                        [width * 0.25, height * 0.95],
-                        [width * 0.0, height * 0.5]
-                    ];
-                    ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
-                    hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                case 'star':
-                    const starPoints = [
-                        [width * 0.5, height * 0],
-                        [width * 0.61, height * 0.35],
-                        [width * 0.98, height * 0.35],
-                        [width * 0.68, height * 0.57],
-                        [width * 0.79, height * 0.91],
-                        [width * 0.5, height * 0.7],
-                        [width * 0.21, height * 0.91],
-                        [width * 0.32, height * 0.57],
-                        [width * 0.02, height * 0.35],
-                        [width * 0.39, height * 0.35]
-                    ];
-                    ctx.moveTo(starPoints[0][0], starPoints[0][1]);
-                    starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                case 'rounded':
-                    const radius = Math.min(width, height) * 0.1;
-                    if (ctx.roundRect) {
-                        ctx.roundRect(0, 0, width, height, radius);
-                    } else {
-                        // Fallback para navegadores que no soportan roundRect
-                        ctx.moveTo(radius, 0);
-                        ctx.lineTo(width - radius, 0);
-                        ctx.quadraticCurveTo(width, 0, width, radius);
-                        ctx.lineTo(width, height - radius);
-                        ctx.quadraticCurveTo(width, height, width - radius, height);
-                        ctx.lineTo(radius, height);
-                        ctx.quadraticCurveTo(0, height, 0, height - radius);
-                        ctx.lineTo(0, radius);
-                        ctx.quadraticCurveTo(0, 0, radius, 0);
+            const newThumbnails = {};
+
+            // Definir funciones para aplicar máscaras en canvas
+            const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
+                ctx.save();
+                ctx.translate(x, y);
+                ctx.beginPath();
+
+                switch (maskId) {
+                    case 'circle':
+                        ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
+                        break;
+                    case 'diamond':
+                        ctx.moveTo(width / 2, 0);
+                        ctx.lineTo(width, height / 2);
+                        ctx.lineTo(width / 2, height);
+                        ctx.lineTo(0, height / 2);
                         ctx.closePath();
-                    }
-                    break;
-                case 'polaroid':
-                    // Simular clip-path: inset(5% 5% 20% 5%)
-                    const insetTop = height * 0.05;
-                    const insetRight = width * 0.05;
-                    const insetBottom = height * 0.20;
-                    const insetLeft = width * 0.05;
-                    ctx.rect(insetLeft, insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
-                    break;
-                case 'vintage':
-                    // Simular ellipse(45% 45% at 50% 50%)
-                    ctx.ellipse(width / 2, height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
-                    break;
-                case 'diagonal':
-                    // Simular polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
-                    ctx.moveTo(0, 0);
-                    ctx.lineTo(width, height * 0.1);
-                    ctx.lineTo(width, height * 0.9);
-                    ctx.lineTo(0, height);
-                    ctx.closePath();
-                    break;
-                case 'speech':
-                    // Simular polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
-                    const speechPoints = [
-                        [width * 0.1, 0],
-                        [width * 0.9, 0],
-                        [width * 0.9, height * 0.8],
-                        [width * 0.6, height * 0.8],
-                        [width * 0.5, height],
-                        [width * 0.4, height * 0.8],
-                        [width * 0.1, height * 0.8]
-                    ];
-                    ctx.moveTo(speechPoints[0][0], speechPoints[0][1]);
-                    speechPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                case 'burst':
-                    // Simular el burst de 16 puntos
-                    const burstPoints = [
-                        [width * 0.5, 0], [width * 0.6, height * 0.2],
-                        [width * 0.8, height * 0.1], [width * 0.7, height * 0.3],
-                        [width * 0.9, height * 0.5], [width * 0.7, height * 0.7],
-                        [width * 0.8, height * 0.9], [width * 0.6, height * 0.8],
-                        [width * 0.5, height], [width * 0.4, height * 0.8],
-                        [width * 0.2, height * 0.9], [width * 0.3, height * 0.7],
-                        [width * 0.1, height * 0.5], [width * 0.3, height * 0.3],
-                        [width * 0.2, height * 0.1], [width * 0.4, height * 0.2]
-                    ];
-                    ctx.moveTo(burstPoints[0][0], burstPoints[0][1]);
-                    burstPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                case 'blob1':
-                case 'blob2':
-                case 'blob3':
-                    // Crear formas blob orgánicas simplificadas
-                    const blobRadius = Math.min(width, height) / 2;
-                    const centerX = width / 2;
-                    const centerY = height / 2;
-                    const points = 8;
-                    for (let i = 0; i < points; i++) {
-                        const angle = (i / points) * 2 * Math.PI;
-                        const variation = 0.3 + Math.sin(angle * 3) * 0.2;
-                        const x = centerX + Math.cos(angle) * blobRadius * variation;
-                        const y = centerY + Math.sin(angle) * blobRadius * variation;
-                        if (i === 0) ctx.moveTo(x, y);
-                        else ctx.lineTo(x, y);
-                    }
-                    ctx.closePath();
-                    break;
-                default:
-                    // Sin máscara - rectángulo completo
-                    ctx.rect(0, 0, width, height);
-                    break;
-            }
-            
-            ctx.clip();
-        };
-
-        // Procesar páginas secuencialmente
-        for (const page of pages) {
-            try {
-                const pageElement = document.getElementById(`page-${page.id}`);
-                if (!pageElement) {
-                    console.warn(`❌ No se encontró elemento para página ${page.id}`);
-                    continue;
+                        break;
+                    case 'triangle':
+                        ctx.moveTo(width / 2, 0);
+                        ctx.lineTo(width, height);
+                        ctx.lineTo(0, height);
+                        ctx.closePath();
+                        break;
+                    case 'hexagon':
+                        const hexPoints = [
+                            [width * 0.25, height * 0.05],
+                            [width * 0.75, height * 0.05],
+                            [width * 1.0, height * 0.5],
+                            [width * 0.75, height * 0.95],
+                            [width * 0.25, height * 0.95],
+                            [width * 0.0, height * 0.5]
+                        ];
+                        ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
+                        hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                        ctx.closePath();
+                        break;
+                    case 'star':
+                        const starPoints = [
+                            [width * 0.5, height * 0],
+                            [width * 0.61, height * 0.35],
+                            [width * 0.98, height * 0.35],
+                            [width * 0.68, height * 0.57],
+                            [width * 0.79, height * 0.91],
+                            [width * 0.5, height * 0.7],
+                            [width * 0.21, height * 0.91],
+                            [width * 0.32, height * 0.57],
+                            [width * 0.02, height * 0.35],
+                            [width * 0.39, height * 0.35]
+                        ];
+                        ctx.moveTo(starPoints[0][0], starPoints[0][1]);
+                        starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                        ctx.closePath();
+                        break;
+                    case 'rounded':
+                        const radius = Math.min(width, height) * 0.1;
+                        if (ctx.roundRect) {
+                            ctx.roundRect(0, 0, width, height, radius);
+                        } else {
+                            // Fallback para navegadores que no soportan roundRect
+                            ctx.moveTo(radius, 0);
+                            ctx.lineTo(width - radius, 0);
+                            ctx.quadraticCurveTo(width, 0, width, radius);
+                            ctx.lineTo(width, height - radius);
+                            ctx.quadraticCurveTo(width, height, width - radius, height);
+                            ctx.lineTo(radius, height);
+                            ctx.quadraticCurveTo(0, height, 0, height - radius);
+                            ctx.lineTo(0, radius);
+                            ctx.quadraticCurveTo(0, 0, radius, 0);
+                            ctx.closePath();
+                        }
+                        break;
+                    case 'polaroid':
+                        // Simular clip-path: inset(5% 5% 20% 5%)
+                        const insetTop = height * 0.05;
+                        const insetRight = width * 0.05;
+                        const insetBottom = height * 0.20;
+                        const insetLeft = width * 0.05;
+                        ctx.rect(insetLeft, insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
+                        break;
+                    case 'vintage':
+                        // Simular ellipse(45% 45% at 50% 50%)
+                        ctx.ellipse(width / 2, height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
+                        break;
+                    case 'diagonal':
+                        // Simular polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
+                        ctx.moveTo(0, 0);
+                        ctx.lineTo(width, height * 0.1);
+                        ctx.lineTo(width, height * 0.9);
+                        ctx.lineTo(0, height);
+                        ctx.closePath();
+                        break;
+                    case 'speech':
+                        // Simular polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
+                        const speechPoints = [
+                            [width * 0.1, 0],
+                            [width * 0.9, 0],
+                            [width * 0.9, height * 0.8],
+                            [width * 0.6, height * 0.8],
+                            [width * 0.5, height],
+                            [width * 0.4, height * 0.8],
+                            [width * 0.1, height * 0.8]
+                        ];
+                        ctx.moveTo(speechPoints[0][0], speechPoints[0][1]);
+                        speechPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                        ctx.closePath();
+                        break;
+                    case 'burst':
+                        // Simular el burst de 16 puntos
+                        const burstPoints = [
+                            [width * 0.5, 0], [width * 0.6, height * 0.2],
+                            [width * 0.8, height * 0.1], [width * 0.7, height * 0.3],
+                            [width * 0.9, height * 0.5], [width * 0.7, height * 0.7],
+                            [width * 0.8, height * 0.9], [width * 0.6, height * 0.8],
+                            [width * 0.5, height], [width * 0.4, height * 0.8],
+                            [width * 0.2, height * 0.9], [width * 0.3, height * 0.7],
+                            [width * 0.1, height * 0.5], [width * 0.3, height * 0.3],
+                            [width * 0.2, height * 0.1], [width * 0.4, height * 0.2]
+                        ];
+                        ctx.moveTo(burstPoints[0][0], burstPoints[0][1]);
+                        burstPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
+                        ctx.closePath();
+                        break;
+                    case 'blob1':
+                    case 'blob2':
+                    case 'blob3':
+                        // Crear formas blob orgánicas simplificadas
+                        const blobRadius = Math.min(width, height) / 2;
+                        const centerX = width / 2;
+                        const centerY = height / 2;
+                        const points = 8;
+                        for (let i = 0; i < points; i++) {
+                            const angle = (i / points) * 2 * Math.PI;
+                            const variation = 0.3 + Math.sin(angle * 3) * 0.2;
+                            const x = centerX + Math.cos(angle) * blobRadius * variation;
+                            const y = centerY + Math.sin(angle) * blobRadius * variation;
+                            if (i === 0) ctx.moveTo(x, y);
+                            else ctx.lineTo(x, y);
+                        }
+                        ctx.closePath();
+                        break;
+                    default:
+                        // Sin máscara - rectángulo completo
+                        ctx.rect(0, 0, width, height);
+                        break;
                 }
 
-                console.log(`📄 Procesando página ${page.id}...`);
+                ctx.clip();
+            };
 
-                // Obtener dimensiones reales del workspace
-                const rect = pageElement.getBoundingClientRect();
-                if (rect.width === 0 || rect.height === 0) {
-                    console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
-                    continue;
-                }
-
-                console.log(`📐 Dimensiones del workspace: ${rect.width}x${rect.height}`);
-
-                // Crear canvas personalizado que respete exactamente el layout
-                const customCanvas = document.createElement('canvas');
-                const customCtx = customCanvas.getContext('2d');
-                
-                // Usar un factor de escala mayor para mejor calidad
-                const scale = 4; // Factor más alto para máxima nitidez
-                customCanvas.width = rect.width * scale;
-                customCanvas.height = rect.height * scale;
-                
-                // Escalar el contexto para dibujar en alta resolución
-                customCtx.scale(scale, scale);
-                
-                // MEJORA 1: Habilitar suavizado de alta calidad
-                customCtx.imageSmoothingEnabled = true;
-                customCtx.imageSmoothingQuality = 'high';
-                customCtx.textRenderingOptimization = 'optimizeQuality';
-                // Configuración adicional para máxima nitidez
-                customCtx.webkitImageSmoothingEnabled = true;
-                customCtx.mozImageSmoothingEnabled = true;
-                customCtx.msImageSmoothingEnabled = true;
-                
-                // Fondo blanco
-                customCtx.fillStyle = '#ffffff';
-                customCtx.fillRect(0, 0, rect.width, rect.height);
-                
-                // 1. Renderizar imagen de fondo si existe
-                const bgImage = pageElement.querySelector('img[alt="background"]');
-                if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
-                    try {
-                        customCtx.drawImage(bgImage, 0, 0, rect.width, rect.height);
-                        console.log('✅ Fondo renderizado');
-                    } catch (error) {
-                        console.warn('❌ Error dibujando fondo:', error);
-                    }
-                }
-                
-                // 2. Obtener el grid container real
-                const gridContainer = pageElement.querySelector('[class*="grid"]');
-                if (!gridContainer) {
-                    console.warn('❌ No se encontró grid container');
-                    continue;
-                }
-
-                const gridRect = gridContainer.getBoundingClientRect();
-                const pageRect = pageElement.getBoundingClientRect();
-                
-                // Calcular offset del grid respecto al contenedor de la página
-                const gridOffsetX = gridRect.left - pageRect.left;
-                const gridOffsetY = gridRect.top - pageRect.top;
-                
-                console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
-                console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
-                
-                // Obtener elementos de celdas del DOM para calcular dimensiones
-                const cellElements = Array.from(gridContainer.children);
-                console.log(`📦 Celdas DOM encontradas: ${cellElements.length}`);
-                
-                // 3. Procesar elementos directamente desde los datos de la página en lugar del DOM
-                console.log(`📦 Procesando ${page.cells.length} celdas de datos`);
-                
-                for (let cellIndex = 0; cellIndex < page.cells.length; cellIndex++) {
-                    const cellData = page.cells[cellIndex];
-                    const cellElement = cellElements[cellIndex];
-                    
-                    if (!cellElement) {
-                        console.warn(`❌ No se encontró elemento DOM para celda ${cellIndex}`);
+            // Procesar páginas secuencialmente
+            for (const page of pages) {
+                try {
+                    const pageElement = document.getElementById(`page-${page.id}`);
+                    if (!pageElement) {
+                        console.warn(`❌ No se encontró elemento para página ${page.id}`);
                         continue;
                     }
-                    
-                    const cellRect = cellElement.getBoundingClientRect();
-                    const cellX = Math.round(cellRect.left - pageRect.left);
-                    const cellY = Math.round(cellRect.top - pageRect.top);
-                    const cellWidth = Math.round(cellRect.width);
-                    const cellHeight = Math.round(cellRect.height);
-                    
-                    console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
-                    
-                    // 3.1. Procesar elementos de imagen desde los datos
-                    const imageElements = cellData.elements.filter(el => el.type === 'image');
-                    console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes de datos`);
-                    
-                    for (const imageElement of imageElements) {
-                        // Buscar el elemento IMG correspondiente en el DOM por su contenido (src)
-                        const imgElement = cellElement.querySelector(`img[src="${imageElement.content}"]`);
-                        
-                        if (!imgElement || !imgElement.complete || imgElement.naturalWidth === 0) {
-                            console.log('⏳ Imagen no encontrada o no cargada, saltando...');
-                            continue;
-                        }
-                        
-                        // Usar la máscara directamente desde los datos del elemento
-                        const maskId = imageElement.mask || 'none';
-                        
-                        console.log(`🎭 Imagen encontrada con máscara: ${maskId} (desde datos)`);
-                        
-                        // Calcular posición y tamaño basado en los datos del elemento y las dimensiones de la celda
-                        const elementX = imageElement.position.x;
-                        const elementY = imageElement.position.y;
-                        
-                        // Si las coordenadas son <= 1, son porcentajes; si son > 1, son píxeles
-                        const containerX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
-                        const containerY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
-                        
-                        // Calcular el tamaño del contenedor de la imagen
-                        let containerWidth, containerHeight;
-                        if (imageElement.size) {
-                            // Si tiene size definido, usarlo
-                            containerWidth = imageElement.size.width <= 1 ? 
-                                imageElement.size.width * cellWidth : 
-                                imageElement.size.width;
-                            containerHeight = imageElement.size.height <= 1 ? 
-                                imageElement.size.height * cellHeight : 
-                                imageElement.size.height;
-                        } else {
-                            // Fallback: usar toda la celda
-                            containerWidth = cellWidth;
-                            containerHeight = cellHeight;
-                        }
-                        
-                        console.log(`📦 Contenedor calculado: x=${Math.round(containerX)}, y=${Math.round(containerY)}, w=${Math.round(containerWidth)}, h=${Math.round(containerHeight)}`);
-                        
-                        // Obtener dimensiones naturales de la imagen
-                        const naturalWidth = imgElement.naturalWidth;
-                        const naturalHeight = imgElement.naturalHeight;
-                        
-                        console.log(`📷 Imagen natural: ${naturalWidth}x${naturalHeight}`);
-                        
-                        // Obtener propiedades CSS de object-fit y object-position
-                        const computedStyle = window.getComputedStyle(imgElement);
-                        const objectFit = computedStyle.objectFit || 'cover';
-                        const objectPosition = computedStyle.objectPosition || 'center center';
-                        
-                        console.log(`🎨 CSS: object-fit=${objectFit}, object-position=${objectPosition}`);
-                        
-                        // Calcular cómo CSS renderizaría la imagen con object-fit: cover
-                        let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
-                        let destX = Math.round(containerX), destY = Math.round(containerY), destWidth = Math.round(containerWidth), destHeight = Math.round(containerHeight);
-                        
-                        if (objectFit === 'cover') {
-                            // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
-                            const scaleX = containerWidth / naturalWidth;
-                            const scaleY = containerHeight / naturalHeight;
-                            const scale = Math.max(scaleX, scaleY); // Mayor escala para cubrir completamente
-                            
-                            // Dimensiones de la imagen escalada
-                            const scaledWidth = naturalWidth * scale;
-                            const scaledHeight = naturalHeight * scale;
-                            
-                            // Parsear object-position (por defecto center center)
-                            const positions = objectPosition.split(' ');
-                            let posX = 'center', posY = 'center';
-                            
-                            if (positions.length >= 1) posX = positions[0];
-                            if (positions.length >= 2) posY = positions[1];
-                            
-                            // Convertir posiciones a porcentajes
-                            let offsetXPercent = 0.5; // center por defecto
-                            let offsetYPercent = 0.5; // center por defecto
-                            
-                            if (posX.includes('%')) {
-                                offsetXPercent = parseFloat(posX) / 100;
-                            } else if (posX === 'left') {
-                                offsetXPercent = 0;
-                            } else if (posX === 'right') {
-                                offsetXPercent = 1;
-                            }
-                            
-                            if (posY.includes('%')) {
-                                offsetYPercent = parseFloat(posY) / 100;
-                            } else if (posY === 'top') {
-                                offsetYPercent = 0;
-                            } else if (posY === 'bottom') {
-                                offsetYPercent = 1;
-                            }
-                            
-                            // Calcular qué parte de la imagen se mostrará (crop)
-                            if (scaledWidth > containerWidth) {
-                                // La imagen es más ancha que el contenedor, recortar horizontalmente
-                                const cropWidth = containerWidth / scale;
-                                const maxOffsetX = naturalWidth - cropWidth;
-                                sourceX = Math.round(maxOffsetX * offsetXPercent);
-                                sourceWidth = Math.round(cropWidth);
-                            } else {
-                                // La imagen encaja horizontalmente
-                                sourceX = 0;
-                                sourceWidth = naturalWidth;
-                            }
-                            
-                            if (scaledHeight > containerHeight) {
-                                // La imagen es más alta que el contenedor, recortar verticalmente
-                                const cropHeight = containerHeight / scale;
-                                const maxOffsetY = naturalHeight - cropHeight;
-                                sourceY = Math.round(maxOffsetY * offsetYPercent);
-                                sourceHeight = Math.round(cropHeight);
-                            } else {
-                                // La imagen encaja verticalmente
-                                sourceY = 0;
-                                sourceHeight = naturalHeight;
-                            }
-                            
-                            console.log(`✂️ Recorte calculado con ${objectPosition}: sourceX=${sourceX}, sourceY=${sourceY}, sourceW=${sourceWidth}, sourceH=${sourceHeight}`);
-                        }
-                        
-                        // Aplicar máscara y dibujar imagen
-                        customCtx.save();
-                        
-                        // Trasladar el origen del canvas a la posición del elemento
-                        customCtx.translate(destX, destY);
-                        
-                        // Si hay máscara, aplicarla al área del elemento (desde 0,0)
-                        if (maskId && maskId !== 'none') {
-                            applyMaskToCanvas(customCtx, maskId, 0, 0, destWidth, destHeight);
-                        } else {
-                            // Sin máscara, solo recortar al área del elemento
-                            customCtx.beginPath();
-                            customCtx.rect(0, 0, destWidth, destHeight);
-                            customCtx.clip();
-                        }
-                        
-                        // Aplicar filtros CSS completos si los hay
-                        const filter = computedStyle.filter;
-                        const transform = computedStyle.transform;
-                        const mixBlendMode = computedStyle.mixBlendMode;
-                        const opacity = parseFloat(computedStyle.opacity) || 1;
-                        
-                        // Aplicar opacity
-                        customCtx.globalAlpha = opacity;
-                        
-                        // Aplicar mix-blend-mode si está disponible
-                        if (mixBlendMode && mixBlendMode !== 'normal') {
-                            customCtx.globalCompositeOperation = mixBlendMode;
-                        }
-                        
-                        // Aplicar filtros CSS - usar la propiedad filter del contexto si está disponible
-                        if (filter && filter !== 'none') {
-                            // Para navegadores modernos que soportan CanvasRenderingContext2D.filter
-                            if ('filter' in customCtx) {
-                                customCtx.filter = filter;
-                                console.log(`🎨 Filtros CSS aplicados: ${filter}`);
-                            } else {
-                                // Fallback: aplicar brightness manualmente
-                                const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
-                                if (brightnessMatch) {
-                                    const brightness = parseFloat(brightnessMatch[1]);
-                                    customCtx.globalAlpha *= brightness;
-                                    console.log(`🎨 Brightness aplicado manualmente: ${brightness}`);
-                                }
-                            }
-                        }
-                        
-                        // Aplicar transformaciones básicas (scale y rotate)
-                        if (transform && transform !== 'none') {
-                            const scaleMatch = transform.match(/scale\(([^)]+)\)/);
-                            const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
-                            const scaleXMatch = transform.match(/scaleX\(([^)]+)\)/);
-                            const scaleYMatch = transform.match(/scaleY\(([^)]+)\)/);
-                            
-                            if (scaleMatch || rotateMatch || scaleXMatch || scaleYMatch) {
-                                // Aplicar transformaciones en el centro de la imagen (relativo al origen trasladado)
-                                const centerX = destWidth / 2;
-                                const centerY = destHeight / 2;
-                                
-                                customCtx.translate(centerX, centerY);
-                                
-                                if (scaleMatch) {
-                                    const scaleValue = parseFloat(scaleMatch[1]);
-                                    customCtx.scale(scaleValue, scaleValue);
-                                    console.log(`🔄 Scale aplicado: ${scaleValue}`);
-                                }
-                                
-                                if (scaleXMatch) {
-                                    const scaleXValue = parseFloat(scaleXMatch[1]);
-                                    customCtx.scale(scaleXValue, 1);
-                                    console.log(`🔄 ScaleX aplicado: ${scaleXValue}`);
-                                }
-                                
-                                if (scaleYMatch) {
-                                    const scaleYValue = parseFloat(scaleYMatch[1]);
-                                    customCtx.scale(1, scaleYValue);
-                                    console.log(`🔄 ScaleY aplicado: ${scaleYValue}`);
-                                }
-                                
-                                if (rotateMatch) {
-                                    const rotateValue = parseFloat(rotateMatch[1]) * Math.PI / 180;
-                                    customCtx.rotate(rotateValue);
-                                    console.log(`🔄 Rotate aplicado: ${rotateMatch[1]}°`);
-                                }
-                                
-                                customCtx.translate(-centerX, -centerY);
-                            }
-                        }
-                        
-                        // Dibujar la imagen aplicando el recorte de object-fit: cover
-                        // MEJORA 2: Usar valores enteros para evitar desenfoque
+
+                    console.log(`📄 Procesando página ${page.id}...`);
+
+                    // Obtener dimensiones reales del workspace
+                    const rect = pageElement.getBoundingClientRect();
+                    if (rect.width === 0 || rect.height === 0) {
+                        console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
+                        continue;
+                    }
+
+                    console.log(`📐 Dimensiones del workspace: ${rect.width}x${rect.height}`);
+
+                    // Crear canvas personalizado que respete exactamente el layout
+                    const customCanvas = document.createElement('canvas');
+                    const customCtx = customCanvas.getContext('2d');
+
+                    // Usar un factor de escala mayor para mejor calidad
+                    const scale = 4; // Factor más alto para máxima nitidez
+                    customCanvas.width = rect.width * scale;
+                    customCanvas.height = rect.height * scale;
+
+                    // Escalar el contexto para dibujar en alta resolución
+                    customCtx.scale(scale, scale);
+
+                    // MEJORA 1: Habilitar suavizado de alta calidad
+                    customCtx.imageSmoothingEnabled = true;
+                    customCtx.imageSmoothingQuality = 'high';
+                    customCtx.textRenderingOptimization = 'optimizeQuality';
+                    // Configuración adicional para máxima nitidez
+                    customCtx.webkitImageSmoothingEnabled = true;
+                    customCtx.mozImageSmoothingEnabled = true;
+                    customCtx.msImageSmoothingEnabled = true;
+
+                    // Fondo blanco
+                    customCtx.fillStyle = '#ffffff';
+                    customCtx.fillRect(0, 0, rect.width, rect.height);
+
+                    // 1. Renderizar imagen de fondo si existe
+                    const bgImage = pageElement.querySelector('img[alt="background"]');
+                    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
                         try {
-                            customCtx.drawImage(
-                                imgElement,
-                                sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
-                                0, 0, destWidth, destHeight                   // Área destino (desde origen trasladado)
-                            );
-                            console.log(`✅ Imagen dibujada con filtros, transformaciones y máscara ${maskId}`);
+                            customCtx.drawImage(bgImage, 0, 0, rect.width, rect.height);
+                            console.log('✅ Fondo renderizado');
                         } catch (error) {
-                            console.warn('❌ Error dibujando imagen:', error);
-                        }
-                        
-                        customCtx.restore();
-                        
-                        // Resetear filtros para la siguiente imagen
-                        if ('filter' in customCtx) {
-                            customCtx.filter = 'none';
+                            console.warn('❌ Error dibujando fondo:', error);
                         }
                     }
-                    
-                    // 3.2. Procesar elementos de texto desde los datos
-                    const textElements = cellData.elements.filter(el => el.type === 'text');
-                    console.log(`📝 Procesando ${textElements.length} elementos de texto desde datos en celda ${cellIndex}...`);
-                    
-                    for (const textElement of textElements) {
-                        try {
-                            // Calcular posición y tamaño basado en los datos del elemento
-                            const elementX = textElement.position.x;
-                            const elementY = textElement.position.y;
+
+                    // 2. Obtener el grid container real
+                    const gridContainer = pageElement.querySelector('[class*="grid"]');
+                    if (!gridContainer) {
+                        console.warn('❌ No se encontró grid container');
+                        continue;
+                    }
+
+                    const gridRect = gridContainer.getBoundingClientRect();
+                    const pageRect = pageElement.getBoundingClientRect();
+
+                    // Calcular offset del grid respecto al contenedor de la página
+                    const gridOffsetX = gridRect.left - pageRect.left;
+                    const gridOffsetY = gridRect.top - pageRect.top;
+
+                    console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
+                    console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
+
+                    // Obtener elementos de celdas del DOM para calcular dimensiones
+                    const cellElements = Array.from(gridContainer.children);
+                    console.log(`📦 Celdas DOM encontradas: ${cellElements.length}`);
+
+                    // 3. Procesar elementos directamente desde los datos de la página en lugar del DOM
+                    console.log(`📦 Procesando ${page.cells.length} celdas de datos`);
+
+                    for (let cellIndex = 0; cellIndex < page.cells.length; cellIndex++) {
+                        const cellData = page.cells[cellIndex];
+                        const cellElement = cellElements[cellIndex];
+                        // Si falta alguna celda o tiene dimensiones inválidas, abortar generación de thumbnail para esta página
+                        if (!cellElement) {
+                            console.warn(`❌ No se encontró elemento DOM para celda ${cellIndex}`);
+                            // ABORTAR thumbnail para esta página
+                            throw new Error('Celda no encontrada, abortando thumbnail');
+                        }
+                        const cellRect = cellElement.getBoundingClientRect();
+                        const cellX = Math.round(cellRect.left - pageRect.left);
+                        const cellY = Math.round(cellRect.top - pageRect.top);
+                        const cellWidth = Math.round(cellRect.width);
+                        const cellHeight = Math.round(cellRect.height);
+                        if (cellWidth === 0 || cellHeight === 0) {
+                            console.warn(`❌ Celda ${cellIndex} tiene dimensiones inválidas, abortando thumbnail`);
+                            throw new Error('Celda con dimensiones 0, abortando thumbnail');
+                        }
+                        console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
+
+                        // 3.1. Procesar elementos de imagen desde los datos
+                        const imageElements = cellData.elements.filter(el => el.type === 'image');
+                        console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes de datos`);
+
+                        for (const imageElement of imageElements) {
+                            // Buscar el elemento IMG correspondiente en el DOM por su contenido (src)
+                            const imgElement = cellElement.querySelector(`img[src="${imageElement.content}"]`);
+
+                            if (!imgElement || !imgElement.complete || imgElement.naturalWidth === 0) {
+                                console.log('⏳ Imagen no encontrada o no cargada, saltando...');
+                                continue;
+                            }
+
+                            // Usar la máscara directamente desde los datos del elemento
+                            const maskId = imageElement.mask || 'none';
+
+                            console.log(`🎭 Imagen encontrada con máscara: ${maskId} (desde datos)`);
+
+                            // Calcular posición y tamaño basado en los datos del elemento y las dimensiones de la celda
+                            const elementX = imageElement.position.x;
+                            const elementY = imageElement.position.y;
+
                             // Si las coordenadas son <= 1, son porcentajes; si son > 1, son píxeles
-                            const textX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
-                            const textY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
-                            // Usar estilos desde los datos del elemento
-                            const style = textElement.style || {};
-                            const fontSize = style.fontSize || '16px';
-                            const fontFamily = style.fontFamily || 'Arial';
-                            const fontWeight = style.fontWeight || 'normal';
-                            const fontStyle = style.fontStyle || 'normal';
-                            const color = style.color || '#000000';
-                            const textAlign = style.textAlign || 'left';
-                            // Opacidad puede venir como 1 o 100
-                            let opacity = style.opacity;
-                            if (opacity === undefined) opacity = 1;
-                            if (opacity > 1) opacity = opacity / 100;
-                            const textContent = textElement.content || '';
-                            if (textContent.trim()) {
-                                customCtx.save();
-                                customCtx.globalAlpha = opacity;
-                                // Usar fontSize directamente (con unidad)
-                                customCtx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
-                                customCtx.fillStyle = color;
-                                customCtx.textBaseline = 'top';
-                                // Alineación horizontal
-                                if (textAlign === 'center') {
-                                    customCtx.textAlign = 'center';
-                                } else if (textAlign === 'right') {
-                                    customCtx.textAlign = 'right';
-                                } else {
-                                    customCtx.textAlign = 'left';
-                                }
-                                // Dibujar el texto
-                                customCtx.fillText(textContent, textX, textY);
-                                customCtx.restore();
+                            const containerX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
+                            const containerY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
+
+                            // Calcular el tamaño del contenedor de la imagen
+                            let containerWidth, containerHeight;
+                            if (imageElement.size) {
+                                // Si tiene size definido, usarlo
+                                containerWidth = imageElement.size.width <= 1 ?
+                                    imageElement.size.width * cellWidth :
+                                    imageElement.size.width;
+                                containerHeight = imageElement.size.height <= 1 ?
+                                    imageElement.size.height * cellHeight :
+                                    imageElement.size.height;
+                            } else {
+                                // Fallback: usar toda la celda
+                                containerWidth = cellWidth;
+                                containerHeight = cellHeight;
                             }
-                        } catch (error) {
-                            console.warn(`❌ Error renderizando texto "${textElement.id}":`, error);
+
+                            console.log(`📦 Contenedor calculado: x=${Math.round(containerX)}, y=${Math.round(containerY)}, w=${Math.round(containerWidth)}, h=${Math.round(containerHeight)}`);
+
+                            // Obtener dimensiones naturales de la imagen
+                            const naturalWidth = imgElement.naturalWidth;
+                            const naturalHeight = imgElement.naturalHeight;
+
+                            console.log(`📷 Imagen natural: ${naturalWidth}x${naturalHeight}`);
+
+                            // Obtener propiedades CSS de object-fit y object-position
+                            const computedStyle = window.getComputedStyle(imgElement);
+                            const objectFit = computedStyle.objectFit || 'cover';
+                            const objectPosition = computedStyle.objectPosition || 'center center';
+
+                            console.log(`🎨 CSS: object-fit=${objectFit}, object-position=${objectPosition}`);
+
+                            // Calcular cómo CSS renderizaría la imagen con object-fit: cover
+                            let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
+                            let destX = Math.round(containerX), destY = Math.round(containerY), destWidth = Math.round(containerWidth), destHeight = Math.round(containerHeight);
+
+                            if (objectFit === 'cover') {
+                                // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
+                                const scaleX = containerWidth / naturalWidth;
+                                const scaleY = containerHeight / naturalHeight;
+                                const scale = Math.max(scaleX, scaleY); // Mayor escala para cubrir completamente
+
+                                // Dimensiones de la imagen escalada
+                                const scaledWidth = naturalWidth * scale;
+                                const scaledHeight = naturalHeight * scale;
+
+                                // Parsear object-position (por defecto center center)
+                                const positions = objectPosition.split(' ');
+                                let posX = 'center', posY = 'center';
+
+                                if (positions.length >= 1) posX = positions[0];
+                                if (positions.length >= 2) posY = positions[1];
+
+                                // Convertir posiciones a porcentajes
+                                let offsetXPercent = 0.5; // center por defecto
+                                let offsetYPercent = 0.5; // center por defecto
+
+                                if (posX.includes('%')) {
+                                    offsetXPercent = parseFloat(posX) / 100;
+                                } else if (posX === 'left') {
+                                    offsetXPercent = 0;
+                                } else if (posX === 'right') {
+                                    offsetXPercent = 1;
+                                }
+
+                                if (posY.includes('%')) {
+                                    offsetYPercent = parseFloat(posY) / 100;
+                                } else if (posY === 'top') {
+                                    offsetYPercent = 0;
+                                } else if (posY === 'bottom') {
+                                    offsetYPercent = 1;
+                                }
+
+                                // Calcular qué parte de la imagen se mostrará (crop)
+                                if (scaledWidth > containerWidth) {
+                                    // La imagen es más ancha que el contenedor, recortar horizontalmente
+                                    const cropWidth = containerWidth / scale;
+                                    const maxOffsetX = naturalWidth - cropWidth;
+                                    sourceX = Math.round(maxOffsetX * offsetXPercent);
+                                    sourceWidth = Math.round(cropWidth);
+                                } else {
+                                    // La imagen encaja horizontalmente
+                                    sourceX = 0;
+                                    sourceWidth = naturalWidth;
+                                }
+
+                                if (scaledHeight > containerHeight) {
+                                    // La imagen es más alta que el contenedor, recortar verticalmente
+                                    const cropHeight = containerHeight / scale;
+                                    const maxOffsetY = naturalHeight - cropHeight;
+                                    sourceY = Math.round(maxOffsetY * offsetYPercent);
+                                    sourceHeight = Math.round(cropHeight);
+                                } else {
+                                    // La imagen encaja verticalmente
+                                    sourceY = 0;
+                                    sourceHeight = naturalHeight;
+                                }
+
+                                console.log(`✂️ Recorte calculado con ${objectPosition}: sourceX=${sourceX}, sourceY=${sourceY}, sourceW=${sourceWidth}, sourceH=${sourceHeight}`);
+                            }
+
+                            // Aplicar máscara y dibujar imagen
+                            customCtx.save();
+
+                            // Trasladar el origen del canvas a la posición del elemento
+                            customCtx.translate(destX, destY);
+
+                            // Si hay máscara, aplicarla al área del elemento (desde 0,0)
+                            if (maskId && maskId !== 'none') {
+                                applyMaskToCanvas(customCtx, maskId, 0, 0, destWidth, destHeight);
+                            } else {
+                                // Sin máscara, solo recortar al área del elemento
+                                customCtx.beginPath();
+                                customCtx.rect(0, 0, destWidth, destHeight);
+                                customCtx.clip();
+                            }
+
+                            // Aplicar filtros CSS completos si los hay
+                            const filter = computedStyle.filter;
+                            const transform = computedStyle.transform;
+                            const mixBlendMode = computedStyle.mixBlendMode;
+                            const opacity = parseFloat(computedStyle.opacity) || 1;
+
+                            // Aplicar opacity
+                            customCtx.globalAlpha = opacity;
+
+                            // Aplicar mix-blend-mode si está disponible
+                            if (mixBlendMode && mixBlendMode !== 'normal') {
+                                customCtx.globalCompositeOperation = mixBlendMode;
+                            }
+
+                            // Aplicar filtros CSS - usar la propiedad filter del contexto si está disponible
+                            if (filter && filter !== 'none') {
+                                // Para navegadores modernos que soportan CanvasRenderingContext2D.filter
+                                if ('filter' in customCtx) {
+                                    customCtx.filter = filter;
+                                    console.log(`🎨 Filtros CSS aplicados: ${filter}`);
+                                } else {
+                                    // Fallback: aplicar brightness manualmente
+                                    const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
+                                    if (brightnessMatch) {
+                                        const brightness = parseFloat(brightnessMatch[1]);
+                                        customCtx.globalAlpha *= brightness;
+                                        console.log(`🎨 Brightness aplicado manualmente: ${brightness}`);
+                                    }
+                                }
+                            }
+
+                            // Aplicar transformaciones básicas (scale y rotate)
+                            if (transform && transform !== 'none') {
+                                const scaleMatch = transform.match(/scale\(([^)]+)\)/);
+                                const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
+                                const scaleXMatch = transform.match(/scaleX\(([^)]+)\)/);
+                                const scaleYMatch = transform.match(/scaleY\(([^)]+)\)/);
+
+                                if (scaleMatch || rotateMatch || scaleXMatch || scaleYMatch) {
+                                    // Aplicar transformaciones en el centro de la imagen (relativo al origen trasladado)
+                                    const centerX = destWidth / 2;
+                                    const centerY = destHeight / 2;
+
+                                    customCtx.translate(centerX, centerY);
+
+                                    if (scaleMatch) {
+                                        const scaleValue = parseFloat(scaleMatch[1]);
+                                        customCtx.scale(scaleValue, scaleValue);
+                                        console.log(`🔄 Scale aplicado: ${scaleValue}`);
+                                    }
+
+                                    if (scaleXMatch) {
+                                        const scaleXValue = parseFloat(scaleXMatch[1]);
+                                        customCtx.scale(scaleXValue, 1);
+                                        console.log(`🔄 ScaleX aplicado: ${scaleXValue}`);
+                                    }
+
+                                    if (scaleYMatch) {
+                                        const scaleYValue = parseFloat(scaleYMatch[1]);
+                                        customCtx.scale(1, scaleYValue);
+                                        console.log(`🔄 ScaleY aplicado: ${scaleYValue}`);
+                                    }
+
+                                    if (rotateMatch) {
+                                        const rotateValue = parseFloat(rotateMatch[1]) * Math.PI / 180;
+                                        customCtx.rotate(rotateValue);
+                                        console.log(`🔄 Rotate aplicado: ${rotateMatch[1]}°`);
+                                    }
+
+                                    customCtx.translate(-centerX, -centerY);
+                                }
+                            }
+
+                            // Dibujar la imagen aplicando el recorte de object-fit: cover
+                            // MEJORA 2: Usar valores enteros para evitar desenfoque
+                            try {
+                                customCtx.drawImage(
+                                    imgElement,
+                                    sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
+                                    0, 0, destWidth, destHeight                   // Área destino (desde origen trasladado)
+                                );
+                                console.log(`✅ Imagen dibujada con filtros, transformaciones y máscara ${maskId}`);
+                            } catch (error) {
+                                console.warn('❌ Error dibujando imagen:', error);
+                            }
+
+                            customCtx.restore();
+
+                            // Resetear filtros para la siguiente imagen
+                            if ('filter' in customCtx) {
+                                customCtx.filter = 'none';
+                            }
+                        }
+
+                        // 3.2. Procesar elementos de texto desde los datos
+                       const textElements = cellData.elements.filter(el => el.type === 'text');
+                        
+                        console.log(`📝 Procesando ${textElements.length} elementos de texto desde datos en celda ${cellIndex}...`);
+     
+
+                        for (const textElement of textElements) {
+                            try {
+                                console.log(`🔍 Buscando elemento de texto: ${textElement.id} en celda ${cellIndex}`);
+                                
+                                // Buscar el elemento de texto real en el DOM para obtener su posición calculada
+                                let textDOMElement = cellElement.querySelector(`[data-element-id="${textElement.id}"]`);
+                                
+                                // Si no se encuentra, intentar con otras variantes de selector
+                                if (!textDOMElement) {
+                                    textDOMElement = cellElement.querySelector(`[data-element-type="text"][data-element-id="${textElement.id}"]`);
+                                }
+                                
+                                // Si aún no se encuentra, buscar por contenido
+                                if (!textDOMElement && textElement.content) {
+                                    const allTextElements = cellElement.querySelectorAll('[data-element-type="text"]');
+                                    textDOMElement = Array.from(allTextElements).find(el => 
+                                        el.textContent.trim() === textElement.content.trim()
+                                    );
+                                }
+
+                                console.log(`📝 Elemento DOM encontrado:`, textDOMElement ? 'SÍ' : 'NO');
+
+                                let textX, textY, textWidth, textHeight;
+
+                                // SIEMPRE usar la posición original de los datos del elemento para consistency
+                                // No usar la posición del DOM porque puede ser diferente debido a CSS transforms
+                                const elementX = textElement.position.x;
+                                const elementY = textElement.position.y;
+                                
+                                // REPLICAR EXACTAMENTE LA LÓGICA DEL WORKSPACE:
+                                // left: element.position.x <= 1 ? `${element.position.x * 100}%` : `${element.position.x}px`
+                                // top: element.position.y <= 1 ? `${element.position.y * 100}%` : `${element.position.y}px`
+                                
+                                if (elementX <= 1) {
+                                    // Posición en porcentaje: cellX + (porcentaje * ancho)
+                                    textX = cellX + (elementX * cellWidth);
+                                } else {
+                                    // Posición en píxeles absolutos: cellX + píxeles
+                                    textX = cellX + elementX;
+                                }
+                                
+                                if (elementY <= 1) {
+                                    // Posición en porcentaje: cellY + (porcentaje * alto)
+                                    textY =  cellY + (elementY * cellHeight);
+                                } else {
+                                    // Posición en píxeles absolutos: cellY + píxeles
+                                    textY = cellY + elementY;
+                                }
+                                
+                                // Si encontramos el elemento DOM, usar sus dimensiones reales
+                                if (textDOMElement) {
+                                    const textRect = textDOMElement.getBoundingClientRect();
+                                    textWidth = Math.round(textRect.width);
+                                    textHeight = Math.round(textRect.height);
+                                    
+                                    console.log(`📝 Texto "${textElement.content}" - Usando posición de DATOS con dimensiones DOM:`, {
+                                        originalPosition: { x: elementX, y: elementY },
+                                        calculatedPosition: { textX, textY },
+                                        domDimensions: { width: textWidth, height: textHeight },
+                                        cellInfo: { cellX, cellY, cellWidth, cellHeight }
+                                    });
+                                } else {
+                                    // Estimar dimensiones del texto basándose en el estilo
+                                    console.warn(`❌ No se encontró elemento DOM para texto ${textElement.id}, estimando dimensiones`);
+                                    
+                                    const style = textElement.style || {};
+                                    const fontSize = parseFloat(style.fontSize || '16px');
+                                    const padding = parseFloat(style.padding || '8px');
+                                    
+                                    // Estimación más precisa del ancho del texto
+                                    textWidth = Math.max(100, textElement.content.length * fontSize * 0.6);
+                                    textHeight = fontSize * 1.2 + (padding * 2); // Incluir padding vertical
+                                    
+                                    console.log(`📝 Texto "${textElement.content}" - Usando posición de DATOS con dimensiones ESTIMADAS:`, {
+                                        originalPosition: { x: elementX, y: elementY },
+                                        calculatedPosition: { textX, textY },
+                                        estimatedDimensions: { width: textWidth, height: textHeight },
+                                        cellInfo: { cellX, cellY, cellWidth, cellHeight }
+                                    });
+                                }
+
+                                // Calcular padding y estilos
+                                const style = textElement.style || {};
+                                const padding = style.padding ? parseFloat(style.padding) : 0;
+                                const textContent = textElement.content || '';
+                                
+                                if (textContent.trim()) {
+                                    // Usar estilos desde los datos del elemento
+                                    const fontSize = style.fontSize || '16px';
+                                    const fontFamily = style.fontFamily || 'Arial';
+                                    const fontWeight = style.fontWeight || 'normal';
+                                    const fontStyle = style.fontStyle || 'normal';
+                                    const color = style.color || '#000000';
+                                    const textAlign = style.textAlign || 'left';
+                                    let opacity = style.opacity;
+                                    if (opacity === undefined) opacity = 1;
+                                    if (opacity > 1) opacity = opacity / 100;
+                                    const bgColor = style.backgroundColor || 'transparent';
+                                    const borderRadius = style.borderRadius ? parseFloat(style.borderRadius) : 0;
+
+                                    customCtx.save();
+                                    customCtx.globalAlpha = opacity;
+                                    customCtx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
+                                    
+                                    // Configurar alineación y baseline para texto
+                                    customCtx.textAlign = textAlign;
+                                    customCtx.textBaseline = 'top'; // Usar 'top' para que coincida con el CSS del workspace
+                                    
+                                    // Medir el texto real
+                                    const metrics = customCtx.measureText(textContent);
+                                    const measuredTextWidth = metrics.width;
+
+                                    // Dibujar fondo si existe
+                                    if (bgColor !== 'transparent' && bgColor !== 'none') {
+                                        customCtx.save();
+                                        customCtx.globalAlpha = opacity;
+                                        customCtx.fillStyle = bgColor;
+                                        
+                                        if (borderRadius > 0) {
+                                            customCtx.beginPath();
+                                            customCtx.moveTo(textX + borderRadius, textY);
+                                            customCtx.lineTo(textX + textWidth - borderRadius, textY);
+                                            customCtx.quadraticCurveTo(textX + textWidth, textY, textX + textWidth, textY + borderRadius);
+                                            customCtx.lineTo(textX + textWidth, textY + textHeight - borderRadius);
+                                            customCtx.quadraticCurveTo(textX + textWidth, textY + textHeight, textX + textWidth - borderRadius, textY + textHeight);
+                                            customCtx.lineTo(textX + borderRadius, textY + textHeight);
+                                            customCtx.quadraticCurveTo(textX, textY + textHeight, textX, textY + textHeight - borderRadius);
+                                            customCtx.lineTo(textX, textY + borderRadius);
+                                            customCtx.quadraticCurveTo(textX, textY, textX + borderRadius, textY);
+                                            customCtx.closePath();
+                                            customCtx.fill();
+                                        } else {
+                                            customCtx.fillRect(textX, textY, textWidth, textHeight);
+                                        }
+                                        customCtx.restore();
+                                    }
+                                    
+                                    // Calcular posición final del texto considerando padding y alineación
+                                    let finalTextX, finalTextY;
+                                    
+                                    // SIEMPRE usar posición calculada desde datos + padding
+                                    finalTextX = textX + padding;
+                                    finalTextY = textY + padding;
+                                    
+                                    
+
+                                    customCtx.fillStyle = color;
+                                    
+                                    console.log(`[THUMBNAIL] fillText FINAL:`, {
+                                        text: textContent,
+                                        finalX: finalTextX,
+                                        finalY: finalTextY,
+                                        originalPosition: textElement.position,
+                                        calculatedBox: { textX, textY, textWidth, textHeight },
+                                        cellInfo: { cellX, cellY, cellWidth, cellHeight },
+                                        color,
+                                        font: customCtx.font,
+                                        textAlign,
+                                        domFound: !!textDOMElement,
+                                        pageId: page.id
+                                    });
+                                    
+                                    customCtx.fillText(textContent, finalTextX, finalTextY);
+                                    customCtx.restore();
+                                }
+                            } catch (error) {
+                                console.warn(`❌ Error renderizando texto "${textElement.id}":`, error);
+                            }
                         }
                     }
+
+                    // 4. Crear thumbnail final con downscaling progresivo
+                    const thumbnailCanvas = document.createElement('canvas');
+                    const thumbnailCtx = thumbnailCanvas.getContext('2d');
+
+                    // Usar las dimensiones REALES del workspace para calcular la proporción exacta
+                    const workspaceAspectRatio = rect.width / rect.height;
+
+                    // MEJORA 5: Aumentar tamaño base para mejor calidad
+                    const thumbnailBaseSize = 900; // Incrementado de 600 a 900
+
+                    // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
+                    let thumbWidth, thumbHeight;
+
+                    if (workspaceAspectRatio >= 1) {
+                        // Workspace más ancho que alto
+                        thumbWidth = thumbnailBaseSize;
+                        thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
+                    } else {
+                        // Workspace más alto que ancho
+                        thumbHeight = thumbnailBaseSize;
+                        thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
+                    }
+
+                    console.log(`📏 Workspace proporción: ${workspaceAspectRatio.toFixed(3)} (${rect.width}x${rect.height})`);
+                    console.log(`📏 Thumbnail calculado: ${thumbWidth.toFixed(1)}x${thumbHeight.toFixed(1)}`);
+
+                    thumbWidth = Math.round(thumbWidth);
+                    thumbHeight = Math.round(thumbHeight);
+                    thumbnailCanvas.width = thumbWidth;
+                    thumbnailCanvas.height = thumbHeight;
+
+                    // MEJORA 6: Configuración de alta calidad para el thumbnail
+                    thumbnailCtx.imageSmoothingEnabled = true;
+                    thumbnailCtx.imageSmoothingQuality = 'high';
+                    thumbnailCtx.webkitImageSmoothingEnabled = true;
+                    thumbnailCtx.mozImageSmoothingEnabled = true;
+                    thumbnailCtx.msImageSmoothingEnabled = true;
+
+                    // MEJORA 7: Downscaling progresivo en dos pasos
+                    const tempCanvas = document.createElement('canvas');
+                    const tempCtx = tempCanvas.getContext('2d');
+
+                    // Tamaño intermedio (2x tamaño final)
+                    const intermediateWidth = thumbWidth * 2;
+                    const intermediateHeight = thumbHeight * 2;
+
+                    tempCanvas.width = intermediateWidth;
+                    tempCanvas.height = intermediateHeight;
+
+                    // Configurar suavizado en canvas intermedio
+                    tempCtx.imageSmoothingEnabled = true;
+                    tempCtx.imageSmoothingQuality = 'high';
+
+                    // Paso 1: Escalar a tamaño intermedio
+                    tempCtx.drawImage(
+                        customCanvas,
+                        0, 0, intermediateWidth, intermediateHeight
+                    );
+
+                    // Paso 2: Escalar de intermedio a tamaño final
+                    thumbnailCtx.drawImage(
+                        tempCanvas,
+                        0, 0, intermediateWidth, intermediateHeight,
+                        0, 0, thumbWidth, thumbHeight
+                    );
+
+                    // Convertir a base64 con alta calidad
+                    newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
+
+                    console.log(`✅ Thumbnail generado para página ${page.id}: ${thumbWidth}x${thumbHeight} (proporción: ${(thumbWidth / thumbHeight).toFixed(3)})`);
+
+                } catch (error) {
+                    console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
+                    newThumbnails[page.id] = null;
                 }
-                
-                // 4. Crear thumbnail final con downscaling progresivo
-                const thumbnailCanvas = document.createElement('canvas');
-                const thumbnailCtx = thumbnailCanvas.getContext('2d');
-                
-                // Usar las dimensiones REALES del workspace para calcular la proporción exacta
-                const workspaceAspectRatio = rect.width / rect.height;
-                
-                // MEJORA 5: Aumentar tamaño base para mejor calidad
-                const thumbnailBaseSize = 900; // Incrementado de 600 a 900
-                
-                // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
-                let thumbWidth, thumbHeight;
-                
-                if (workspaceAspectRatio >= 1) {
-                    // Workspace más ancho que alto
-                    thumbWidth = thumbnailBaseSize;
-                    thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
-                } else {
-                    // Workspace más alto que ancho
-                    thumbHeight = thumbnailBaseSize;
-                    thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
-                }
-                
-                console.log(`📏 Workspace proporción: ${workspaceAspectRatio.toFixed(3)} (${rect.width}x${rect.height})`);
-                console.log(`📏 Thumbnail calculado: ${thumbWidth.toFixed(1)}x${thumbHeight.toFixed(1)}`);
-                
-                thumbWidth = Math.round(thumbWidth);
-                thumbHeight = Math.round(thumbHeight);
-                thumbnailCanvas.width = thumbWidth;
-                thumbnailCanvas.height = thumbHeight;
-                
-                // MEJORA 6: Configuración de alta calidad para el thumbnail
-                thumbnailCtx.imageSmoothingEnabled = true;
-                thumbnailCtx.imageSmoothingQuality = 'high';
-                thumbnailCtx.webkitImageSmoothingEnabled = true;
-                thumbnailCtx.mozImageSmoothingEnabled = true;
-                thumbnailCtx.msImageSmoothingEnabled = true;
-                
-                // MEJORA 7: Downscaling progresivo en dos pasos
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // Tamaño intermedio (2x tamaño final)
-                const intermediateWidth = thumbWidth * 2;
-                const intermediateHeight = thumbHeight * 2;
-                
-                tempCanvas.width = intermediateWidth;
-                tempCanvas.height = intermediateHeight;
-                
-                // Configurar suavizado en canvas intermedio
-                tempCtx.imageSmoothingEnabled = true;
-                tempCtx.imageSmoothingQuality = 'high';
-                
-                // Paso 1: Escalar a tamaño intermedio
-                tempCtx.drawImage(
-                    customCanvas,
-                    0, 0, intermediateWidth, intermediateHeight
-                );
-                
-                // Paso 2: Escalar de intermedio a tamaño final
-                thumbnailCtx.drawImage(
-                    tempCanvas,
-                    0, 0, intermediateWidth, intermediateHeight,
-                    0, 0, thumbWidth, thumbHeight
-                );
-                
-                // Convertir a base64 con alta calidad
-                newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
-                
-                console.log(`✅ Thumbnail generado para página ${page.id}: ${thumbWidth}x${thumbHeight} (proporción: ${(thumbWidth/thumbHeight).toFixed(3)})`);
-                
-            } catch (error) {
-                console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
-                newThumbnails[page.id] = null;
             }
-        }
-        
-        console.log('🎉 Generación de thumbnails completada');
-        setPageThumbnails(prev => ({ ...prev, ...newThumbnails }));
-    };
 
-    const debouncedGenerate = setTimeout(() => {
-        generateThumbnails();
-    }, 800);
+            console.log('🎉 Generación de thumbnails completada');
+            setPageThumbnails(prev => ({ ...prev, ...newThumbnails }));
+        };
 
-    return () => clearTimeout(debouncedGenerate);
-}, [pages, currentPage, workspaceDimensions]);
+        const debouncedGenerate = setTimeout(() => {
+            generateThumbnails();
+        }, 800);
+
+        return () => clearTimeout(debouncedGenerate);
+    }, [pages, currentPage, workspaceDimensions]);
 
 
 
@@ -1724,7 +1854,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Agregar al carrito (siempre como nuevo item para álbumes personalizados)
             console.log('➕ Agregando producto al carrito...');
-            const newCart = [...currentCart, albumProduct];
+            let newCart = [...currentCart, albumProduct];
             console.log('🛒 Nuevo carrito:', newCart);
             console.log('🛒 Nueva longitud del carrito:', newCart.length);
 
@@ -2386,7 +2516,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                             {/* Action buttons */}
                             <div className="flex gap-3 items-center">
-                              {/*  <Button
+                                {/*  <Button
                                     variant={previewMode ? "secondary" : "outline"}
                                     size="sm"
                                     onClick={togglePreview}
@@ -3292,7 +3422,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             src={pageThumbnails[page.id]}
                                                             alt="Portada"
                                                             className="w-full h-full object-cover"
-                                                            style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
+                                                            style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
@@ -3336,7 +3466,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                 src={pageThumbnails[page.id]}
                                                                 alt={`Página ${page.pageNumber}`}
                                                                 className="w-full h-full object-cover"
-                                                                style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
+                                                                style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
@@ -3415,7 +3545,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             src={pageThumbnails[page.id]}
                                                             alt="Contraportada"
                                                             className="w-full h-full object-cover"
-                                                            style={{ imageRendering: 'crisp-edges', WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: '-webkit-crisp-edges' }}
+                                                            style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
