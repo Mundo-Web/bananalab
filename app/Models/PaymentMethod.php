@@ -73,7 +73,15 @@ class PaymentMethod extends Model
      */
     public function getConfig($key, $default = null)
     {
-        return data_get($this->configuration, $key, $default);
+        $config = $this->configuration;
+        // Forzar cast si es string JSON
+        if (is_string($config)) {
+            $decoded = json_decode($config, true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                $config = $decoded;
+            }
+        }
+        return data_get($config, $key, $default);
     }
 
     /**

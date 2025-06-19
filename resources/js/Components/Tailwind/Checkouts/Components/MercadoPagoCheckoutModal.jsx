@@ -10,6 +10,25 @@ const MercadoPagoCheckoutModal = ({
     onPaymentSuccess,
     mercadoPagoConfig 
 }) => {
+    console.log('🚀 MercadoPagoCheckoutModal función ejecutada con props:', {
+        isOpen,
+        amount,
+        hasBaseRequest: !!baseRequest,
+        hasConfig: !!mercadoPagoConfig
+    });
+
+    // Agregar protección contra cierres accidentales
+    const [preventClose, setPreventClose] = useState(false);
+    
+    const handleClose = () => {
+        if (preventClose) {
+            console.log('🛡️ Cierre del modal bloqueado por protección');
+            return;
+        }
+        console.log('🔴 Modal cerrándose - handleClose ejecutado');
+        onClose();
+    };
+
     const [formData, setFormData] = useState({
         cardNumber: '',
         cardHolder: '',
@@ -19,38 +38,143 @@ const MercadoPagoCheckoutModal = ({
         identificationType: 'DNI',
         identificationNumber: '',
         installments: 1
-    });
-
-    const [errors, setErrors] = useState({});
+    });    const [errors, setErrors] = useState({});
     const [loading, setLoading] = useState(false);
     const [cardType, setCardType] = useState(null);
     const [installmentOptions, setInstallmentOptions] = useState([]);
-
+    const [mpReady, setMpReady] = useState(false);
+    
     // Referencias para el SDK de MercadoPago
     const formRef = useRef(null);
     const cardNumberRef = useRef(null);
     const cardHolderRef = useRef(null);
     const expirationMonthRef = useRef(null);
     const expirationYearRef = useRef(null);
-    const securityCodeRef = useRef(null);    useEffect(() => {
+    const securityCodeRef = useRef(null);
+    const mercadoPagoRef = useRef(null);    // Cargar SDK de MercadoPago dinámicamente
+    useEffect(() => {
         if (isOpen && mercadoPagoConfig) {
-            initializeMercadoPagoForm();
+            console.log('🔄 useEffect activado - Modal abierto y config disponible');
+            // Activar protección contra cierre accidental al empezar carga
+            setPreventClose(true);
+            
+            // Verificar si el SDK ya está disponible (cualquier versión)
+            if (window.MercadoPago || window.Mercadopago) {
+                console.log('✅ SDK de MercadoPago ya disponible');
+                initializeMercadoPagoForm();
+            } else {
+                console.log('🔄 SDK no encontrado, cargando...');
+                loadMercadoPagoSDK();
+            }
+            
+            // Desactivar protección después de la inicialización
+            setTimeout(() => {
+                setPreventClose(false);
+                console.log('🛡️ Protección contra cierre desactivada');
+            }, 2000);
+        } else if (!isOpen) {
+            console.log('❌ useEffect - Modal cerrado o sin config');
         }
-    }, [isOpen, mercadoPagoConfig]);
+    }, [isOpen, mercadoPagoConfig]);const loadMercadoPagoSDK = () => {
+        console.log('🔄 Cargando SDK de MercadoPago...');
+        
+        if (document.getElementById('mercadopago-sdk')) {
+            console.log('✅ Script del SDK ya está en el DOM');
+            // Esperar un poco para que el SDK se inicialice
+            setTimeout(() => {
+                if (mercadoPagoConfig) {
+                    initializeMercadoPagoForm();
+                }
+            }, 100);
+            return;
+        }
 
-    const initializeMercadoPagoForm = async () => {
+        const script = document.createElement('script');
+        script.id = 'mercadopago-sdk';
+        // Intentar primero con v2, luego fallback a v1
+        script.src = 'https://sdk.mercadopago.com/js/v2';
+        script.async = true;
+        
+        script.onload = () => {
+            console.log('✅ SDK de MercadoPago v2 cargado');
+            setTimeout(() => {
+                if (mercadoPagoConfig) {
+                    initializeMercadoPagoForm();
+                }
+            }, 100);
+        };
+        
+        script.onerror = () => {
+            console.warn('⚠️ Error cargando SDK v2, intentando v1...');
+            // Remover el script fallido
+            script.remove();
+            
+            // Intentar con v1
+            const scriptV1 = document.createElement('script');
+            scriptV1.id = 'mercadopago-sdk';
+            scriptV1.src = 'https://secure.mlstatic.com/sdk/javascript/v1/mercadopago.js';
+            scriptV1.async = true;
+            
+            scriptV1.onload = () => {
+                console.log('✅ SDK de MercadoPago v1 cargado como fallback');
+                setTimeout(() => {
+                    if (mercadoPagoConfig) {
+                        initializeMercadoPagoForm();
+                    }
+                }, 100);
+            };
+            
+            scriptV1.onerror = () => {
+                console.error('❌ Error cargando ambas versiones del SDK');
+                toast.error('Error cargando el sistema de pagos');
+            };
+            
+            document.head.appendChild(scriptV1);
+        };
+
+        document.head.appendChild(script);
+    };    const initializeMercadoPagoForm = async () => {
         try {
-            if (!window.MercadoPago) {
-                console.error('MercadoPago SDK no está cargado');
+            // Detección robusta del SDK - verificar ambas versiones
+            let mp = null;
+            let sdkVersion = null;
+            
+            if (window.MercadoPago) {
+                // SDK v2 - window.MercadoPago (M mayúscula)
+                mp = window.MercadoPago;
+                sdkVersion = 'v2';
+                console.log('🔧 Detectado SDK MercadoPago v2');
+            } else if (window.Mercadopago) {
+                // SDK v1 - window.Mercadopago (m minúscula) 
+                mp = window.Mercadopago;
+                sdkVersion = 'v1';
+                console.log('🔧 Detectado SDK MercadoPago v1');
+            }
+            
+            if (!mp) {
+                console.error('❌ No se encontró ninguna versión del SDK de MercadoPago');
+                toast.error('Error: SDK de MercadoPago no disponible');
                 return;
             }
 
-            // Configurar MercadoPago con la public key
-            window.MercadoPago.setPublishableKey(mercadoPagoConfig.public_key);
+            console.log('🔧 Inicializando MercadoPago', sdkVersion, 'con public key:', mercadoPagoConfig.public_key?.substring(0, 20) + '...');
             
-            console.log('MercadoPago inicializado correctamente');
+            if (sdkVersion === 'v2') {
+                // SDK v2: crear una instancia
+                mercadoPagoRef.current = new mp(mercadoPagoConfig.public_key);
+                console.log('✅ MercadoPago v2 inicializado correctamente');
+            } else if (sdkVersion === 'v1') {
+                // SDK v1: usar setPublishableKey
+                mp.setPublishableKey(mercadoPagoConfig.public_key);
+                mercadoPagoRef.current = mp; // Guardar referencia para v1 también
+                console.log('✅ MercadoPago v1 inicializado correctamente');
+            }
+            
+            setMpReady(true);
+            
         } catch (error) {
-            console.error('Error inicializando formulario MP:', error);
+            console.error('❌ Error inicializando formulario MP:', error);
+            toast.error('Error inicializando el sistema de pagos');
         }
     };
 
@@ -112,9 +236,7 @@ const MercadoPagoCheckoutModal = ({
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    };
-
-    const handleSubmit = async (e) => {
+    };    const handleSubmit = async (e) => {
         e.preventDefault();
         
         if (!validateForm()) {
@@ -122,9 +244,39 @@ const MercadoPagoCheckoutModal = ({
             return;
         }
 
+        // Datos de prueba para MercadoPago
+        const testingCards = {
+            visa: {
+                cardNumber: '4509 9535 6623 3704',
+                cardHolder: 'APRO',
+                securityCode: '123',
+                expirationMonth: '11',
+                expirationYear: '25',
+            },
+            master: {
+                cardNumber: '5031 7557 3453 0604',
+                cardHolder: 'APRO',
+                securityCode: '123',
+                expirationMonth: '11',
+                expirationYear: '25',
+            },
+            rejected: {
+                cardNumber: '4000 0000 0000 0002',
+                cardHolder: 'RJCT',
+                securityCode: '123',
+                expirationMonth: '11',
+                expirationYear: '25',
+            },
+        };
+
         setLoading(true);
 
         try {
+            console.log('🧪 Integrando pago con MercadoPago...');
+            
+            // Si deseas usar tarjetas de prueba, descomenta la siguiente línea:
+            // const useTestCard = 'visa';
+            
             // Crear token de la tarjeta usando el SDK de MercadoPago
             const cardData = {
                 cardNumber: formData.cardNumber.replace(/\s/g, ''),
@@ -136,30 +288,62 @@ const MercadoPagoCheckoutModal = ({
                 identificationNumber: formData.identificationNumber,
             };
 
-            // Crear token usando MP SDK (esto debería ser implementado según la versión del SDK)
+            // Crear token usando MP SDK v2
             const token = await createCardToken(cardData);
+            console.log('🎯 Token creado y listo para enviar:', token);
 
-            // Procesar el pago con el backend
+            // Procesar el pago con el backend            // Preparar datos del pago - asegurarse que la estructura sea correcta
             const paymentData = {
                 ...baseRequest,
                 token: token.id,
-                payment_method_id: token.payment_method_id,
-                issuer_id: token.issuer_id,
+                payment_method_id: token.payment_method_id || cardType, // Usar cardType como fallback
+                issuer_id: token.issuer?.id || null,
                 installments: formData.installments,
                 identification_type: formData.identificationType,
-                identification_number: formData.identificationNumber
+                identification_number: formData.identificationNumber,
+                card_type: cardType,
+                // Asegurarse de incluir todos los campos que pueda necesitar el backend
+                card_last_four: formData.cardNumber.replace(/\s/g, '').slice(-4),
+                card_holder_name: formData.cardHolder
             };
-
-            const response = await fetch('/api/mercadopago/checkout-api', {
+            
+            // Registrar lo que estamos enviando para diagnóstico
+            console.log('📤 Enviando datos al backend:', {
+                token_id: paymentData.token,
+                payment_method_id: paymentData.payment_method_id,
+                baseRequest_sample: baseRequest ? Object.keys(baseRequest) : 'N/A',
+                amount: amount,
+                installments: paymentData.installments
+            });
+            
+            const response = await fetch('/api/payments/mercadopago/checkout-api', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
                 },
                 body: JSON.stringify(paymentData)
-            });
-
+            });            // Analizar la respuesta
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error en respuesta del servidor:', {
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText
+                });
+                
+                try {
+                    // Intentar parsear como JSON si es posible
+                    const errorJson = JSON.parse(errorText);
+                    throw new Error(errorJson.message || `Error ${response.status}: ${response.statusText}`);
+                } catch (e) {
+                    // Si no es JSON o hay otro error, usar texto original
+                    throw new Error(`Error ${response.status}: ${response.statusText}`);
+                }
+            }
+            
             const result = await response.json();
+            console.log('✅ Respuesta del servidor:', result);
 
             if (result.status) {
                 toast.success('¡Pago procesado exitosamente!');
@@ -175,231 +359,304 @@ const MercadoPagoCheckoutModal = ({
         } finally {
             setLoading(false);
         }
-    };    // Función auxiliar para crear token usando el SDK real de MercadoPago
+    };    // Función auxiliar para crear token usando el SDK real de MercadoPago (compatible con v1 y v2)
     const createCardToken = async (cardData) => {
         return new Promise((resolve, reject) => {
-            if (!window.MercadoPago) {
+            // Verificación robusta de disponibilidad del SDK
+            const mp = window.MercadoPago || window.Mercadopago;
+            if (!mp) {
                 reject(new Error('MercadoPago SDK no está disponible'));
                 return;
             }
 
-            window.MercadoPago.createToken({
-                cardNumber: cardData.cardNumber,
+            if (!mpReady || !mercadoPagoRef.current) {
+                reject(new Error('MercadoPago no está inicializado'));
+                return;
+            }
+
+            console.log('🔄 Creando token con datos:', {
+                cardNumber: cardData.cardNumber ? cardData.cardNumber.substring(0, 6) + '****' : 'No proporcionado',
+                cardholderName: cardData.cardholderName,
+                hasSecurityCode: !!cardData.securityCode
+            });
+
+            const tokenData = {
+                cardNumber: cardData.cardNumber.replace(/\s/g, ''),
                 cardholderName: cardData.cardholderName,
                 cardExpirationMonth: cardData.cardExpirationMonth,
                 cardExpirationYear: cardData.cardExpirationYear,
                 securityCode: cardData.securityCode,
                 identificationType: cardData.identificationType,
                 identificationNumber: cardData.identificationNumber,
-            }, (status, response) => {
-                if (status === 200 || status === 201) {
-                    resolve(response);
-                } else {
-                    console.error('Error creando token MP:', response);
-                    reject(new Error(response.cause?.[0]?.description || 'Error creando token de tarjeta'));
-                }
-            });
-        });
-    };
+            };
 
-    if (!isOpen) return null;
+            try {
+                if (window.MercadoPago && mercadoPagoRef.current.createCardToken) {
+                    // SDK v2 - usar la instancia
+                    console.log('🔄 Usando createCardToken v2...');
+                    mercadoPagoRef.current.createCardToken(tokenData)
+                        .then(response => {
+                            console.log('✅ Token v2 creado exitosamente:', response.id);
+                            resolve(response);
+                        })
+                        .catch(error => {
+                            console.error('❌ Error creando token v2:', error);
+                            reject(new Error(error.message || 'Error creando token de tarjeta v2'));
+                        });
+                } else if (window.Mercadopago && window.Mercadopago.createToken) {
+                    // SDK v1 - usar método global con callback
+                    console.log('🔄 Usando createToken v1...');
+                    window.Mercadopago.createToken(tokenData, function(status, response) {
+                        if (status === 200 || status === 201) {
+                            console.log('✅ Token v1 creado exitosamente:', response.id);
+                            resolve(response);
+                        } else {
+                            console.error('❌ Error creando token v1:', response);
+                            reject(new Error(response.cause?.[0]?.description || 'Error creando token de tarjeta v1'));
+                        }
+                    });
+                } else {
+                    reject(new Error('Método createToken no disponible en el SDK'));
+                }
+            } catch (error) {
+                console.error('❌ Error creando token (excepción):', error);
+                reject(new Error(error.message || 'Error inesperado creando token de tarjeta'));
+            }
+        });
+    };if (!isOpen) {
+        console.log('🔴 Modal NO se renderiza porque isOpen =', isOpen);
+        return null;
+    }
+
+    console.log('🟢 Modal SÍ se está renderizando!');
+
+    console.log('🔴 MercadoPago Modal Props:', { 
+        isOpen, 
+        amount, 
+        mercadoPagoConfig: mercadoPagoConfig?.public_key?.substring(0, 20) + '...',
+        baseRequest: baseRequest ? 'Sí' : 'No'
+    });
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full max-h-screen overflow-y-auto">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b">
+        <div 
+            className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center p-4"
+            style={{ zIndex: 99999 }}
+        >
+            <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+                {/* Header simplificado */}
+                <div className="flex items-center justify-between p-4 border-b bg-blue-600">
                     <div className="flex items-center gap-3">
-                        <CreditCard className="w-6 h-6 text-blue-600" />
-                        <h2 className="text-xl font-semibold">Pago con Tarjeta</h2>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                        <CreditCard className="w-6 h-6 text-white" />
+                        <h2 className="text-lg font-semibold text-white">💳 Pago con MercadoPago</h2>
+                    </div>                    <button
+                        onClick={handleClose}
+                        className="p-2 hover:bg-blue-700 rounded-full transition-colors"
                     >
-                        <X className="w-5 h-5" />
+                        <X className="w-5 h-5 text-white" />
                     </button>
                 </div>
 
                 {/* Content */}
-                <form ref={formRef} onSubmit={handleSubmit} className="p-6 space-y-4">
-                    {/* Monto */}
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                        <div className="text-center">
-                            <p className="text-sm text-blue-600">Total a pagar</p>
-                            <p className="text-2xl font-bold text-blue-800">S/ {amount?.toFixed(2)}</p>
-                        </div>
-                    </div>
-
-                    {/* Número de tarjeta */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Número de tarjeta
-                        </label>
-                        <div className="relative">
-                            <input
-                                ref={cardNumberRef}
-                                type="text"
-                                name="cardNumber"
-                                value={formatCardNumber(formData.cardNumber)}
-                                onChange={handleInputChange}
-                                placeholder="1234 5678 9012 3456"
-                                maxLength="19"
-                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.cardNumber ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                            {cardType && (
-                                <div className="absolute right-3 top-3">
-                                    <span className="text-xs text-gray-500 uppercase">{cardType}</span>
-                                </div>
-                            )}
-                        </div>
-                        {errors.cardNumber && <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>}
-                    </div>
-
-                    {/* Titular */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Nombre del titular
-                        </label>
-                        <input
-                            ref={cardHolderRef}
-                            type="text"
-                            name="cardHolder"
-                            value={formData.cardHolder}
-                            onChange={handleInputChange}
-                            placeholder="Como aparece en la tarjeta"
-                            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.cardHolder ? 'border-red-500' : 'border-gray-300'}`}
-                        />
-                        {errors.cardHolder && <p className="text-red-500 text-sm mt-1">{errors.cardHolder}</p>}
-                    </div>
-
-                    {/* Vencimiento y CVV */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Mes
-                            </label>
-                            <select
-                                ref={expirationMonthRef}
-                                name="expirationMonth"
-                                value={formData.expirationMonth}
-                                onChange={handleInputChange}
-                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.expiration ? 'border-red-500' : 'border-gray-300'}`}
-                            >
-                                <option value="">MM</option>
-                                {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                                    <option key={month} value={month.toString().padStart(2, '0')}>
-                                        {month.toString().padStart(2, '0')}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Año
-                            </label>
-                            <select
-                                ref={expirationYearRef}
-                                name="expirationYear"
-                                value={formData.expirationYear}
-                                onChange={handleInputChange}
-                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.expiration ? 'border-red-500' : 'border-gray-300'}`}
-                            >
-                                <option value="">AA</option>
-                                {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
-                                    <option key={year} value={year.toString().slice(-2)}>
-                                        {year}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                CVV
-                            </label>
-                            <input
-                                ref={securityCodeRef}
-                                type="text"
-                                name="securityCode"
-                                value={formData.securityCode}
-                                onChange={handleInputChange}
-                                placeholder="123"
-                                maxLength="4"
-                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.securityCode ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                        </div>
-                    </div>
-                    {errors.expiration && <p className="text-red-500 text-sm">{errors.expiration}</p>}
-                    {errors.securityCode && <p className="text-red-500 text-sm">{errors.securityCode}</p>}
-
-                    {/* Documento */}
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tipo
-                            </label>
-                            <select
-                                name="identificationType"
-                                value={formData.identificationType}
-                                onChange={handleInputChange}
-                                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            >
-                                <option value="DNI">DNI</option>
-                                <option value="CE">CE</option>
-                                <option value="PASSPORT">Pasaporte</option>
-                            </select>
-                        </div>
-                        <div className="col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Número de documento
-                            </label>
-                            <input
-                                type="text"
-                                name="identificationNumber"
-                                value={formData.identificationNumber}
-                                onChange={handleInputChange}
-                                placeholder="12345678"
-                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.identificationNumber ? 'border-red-500' : 'border-gray-300'}`}
-                            />
-                            {errors.identificationNumber && <p className="text-red-500 text-sm mt-1">{errors.identificationNumber}</p>}
-                        </div>
-                    </div>
-
-                    {/* Seguridad */}
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                        <div className="flex items-center gap-2">
-                            <Lock className="w-5 h-5 text-green-600" />
-                            <p className="text-sm text-green-700">
-                                Tus datos están protegidos con encriptación SSL
+                <div className="p-6">                    {/* Debug info */}
+                    <div className="text-center mb-4 p-3 bg-green-100 rounded border">
+                        <p className="text-sm font-bold text-green-800">✅ MODAL CARGADO CORRECTAMENTE</p>
+                        <p className="text-xs text-green-600 mt-1">
+                            Monto: S/ {amount} | Config: {mercadoPagoConfig ? '✓' : '✗'} | MP Ready: {mpReady ? '✓' : '✗'}
+                        </p>
+                        {!mpReady && (
+                            <p className="text-xs text-orange-600 mt-1">
+                                🔄 Inicializando sistema de pagos...
                             </p>
-                        </div>
+                        )}
                     </div>
+                    <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
+                        {/* Monto */}
+                        <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                            <div className="text-center">
+                                <p className="text-sm text-blue-600">Total a pagar</p>
+                                <p className="text-2xl font-bold text-blue-800">S/ {amount?.toFixed(2)}</p>
+                            </div>
+                        </div>
 
-                    {/* Buttons */}
-                    <div className="flex gap-3 pt-4">
-                        <button
+                        {/* Número de tarjeta */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Número de tarjeta
+                            </label>
+                            <div className="relative">
+                                <input
+                                    ref={cardNumberRef}
+                                    type="text"
+                                    name="cardNumber"
+                                    value={formatCardNumber(formData.cardNumber)}
+                                    onChange={handleInputChange}
+                                    placeholder="1234 5678 9012 3456"
+                                    maxLength="19"
+                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.cardNumber ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {cardType && (
+                                    <div className="absolute right-3 top-3">
+                                        <span className="text-xs text-gray-500 uppercase">{cardType}</span>
+                                    </div>
+                                )}
+                            </div>
+                            {errors.cardNumber && <p className="text-red-500 text-sm mt-1">{errors.cardNumber}</p>}
+                        </div>
+
+                        {/* Titular */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Nombre del titular
+                            </label>
+                            <input
+                                ref={cardHolderRef}
+                                type="text"
+                                name="cardHolder"
+                                value={formData.cardHolder}
+                                onChange={handleInputChange}
+                                placeholder="Como aparece en la tarjeta"
+                                className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.cardHolder ? 'border-red-500' : 'border-gray-300'}`}
+                            />
+                            {errors.cardHolder && <p className="text-red-500 text-sm mt-1">{errors.cardHolder}</p>}
+                        </div>
+
+                        {/* Vencimiento y CVV */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Mes
+                                </label>
+                                <select
+                                    ref={expirationMonthRef}
+                                    name="expirationMonth"
+                                    value={formData.expirationMonth}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.expiration ? 'border-red-500' : 'border-gray-300'}`}
+                                >
+                                    <option value="">MM</option>
+                                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
+                                        <option key={month} value={month.toString().padStart(2, '0')}>
+                                            {month.toString().padStart(2, '0')}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Año
+                                </label>
+                                <select
+                                    ref={expirationYearRef}
+                                    name="expirationYear"
+                                    value={formData.expirationYear}
+                                    onChange={handleInputChange}
+                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.expiration ? 'border-red-500' : 'border-gray-300'}`}
+                                >
+                                    <option value="">AA</option>
+                                    {Array.from({ length: 10 }, (_, i) => new Date().getFullYear() + i).map(year => (
+                                        <option key={year} value={year.toString().slice(-2)}>
+                                            {year}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    CVV
+                                </label>
+                                <input
+                                    ref={securityCodeRef}
+                                    type="text"
+                                    name="securityCode"
+                                    value={formData.securityCode}
+                                    onChange={handleInputChange}
+                                    placeholder="123"
+                                    maxLength="4"
+                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.securityCode ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                            </div>
+                        </div>
+                        {errors.expiration && <p className="text-red-500 text-sm">{errors.expiration}</p>}
+                        {errors.securityCode && <p className="text-red-500 text-sm">{errors.securityCode}</p>}
+
+                        {/* Documento */}
+                        <div className="grid grid-cols-3 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Tipo
+                                </label>
+                                <select
+                                    name="identificationType"
+                                    value={formData.identificationType}
+                                    onChange={handleInputChange}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="DNI">DNI</option>
+                                    <option value="CE">CE</option>
+                                    <option value="PASSPORT">Pasaporte</option>
+                                </select>
+                            </div>
+                            <div className="col-span-2">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Número de documento
+                                </label>
+                                <input
+                                    type="text"
+                                    name="identificationNumber"
+                                    value={formData.identificationNumber}
+                                    onChange={handleInputChange}
+                                    placeholder="12345678"
+                                    className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${errors.identificationNumber ? 'border-red-500' : 'border-gray-300'}`}
+                                />
+                                {errors.identificationNumber && <p className="text-red-500 text-sm mt-1">{errors.identificationNumber}</p>}
+                            </div>
+                        </div>
+
+                        {/* Seguridad */}
+                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                            <div className="flex items-center gap-2">
+                                <Lock className="w-5 h-5 text-green-600" />
+                                <p className="text-sm text-green-700">
+                                    Tus datos están protegidos con encriptación SSL
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Buttons */}
+                        <div className="flex gap-3 pt-4">                        <button
                             type="button"
-                            onClick={onClose}
+                            onClick={handleClose}
                             className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
                         >
                             Cancelar
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-blue-400 transition-colors flex items-center justify-center gap-2"
-                        >
-                            {loading ? (
-                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
-                            ) : (
-                                <>
-                                    <CreditCard className="w-5 h-5" />
-                                    Pagar S/ {amount?.toFixed(2)}
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
+                        </button><button
+                                type="submit"
+                                disabled={loading || !mpReady}
+                                className={`flex-1 px-4 py-3 rounded-lg transition-colors flex items-center justify-center gap-2 ${
+                                    !mpReady 
+                                        ? 'bg-gray-400 text-white cursor-not-allowed'
+                                        : loading 
+                                            ? 'bg-blue-400 text-white cursor-not-allowed'
+                                            : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                            >
+                                {loading ? (
+                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white" />
+                                ) : !mpReady ? (
+                                    <>
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" />
+                                        Inicializando...
+                                    </>
+                                ) : (
+                                    <>
+                                        <CreditCard className="w-5 h-5" />
+                                        Pagar S/ {amount?.toFixed(2)}
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     );

@@ -52,6 +52,7 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\ItemImportController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\Api\PaymentController as ApiPaymentController;
 use App\Http\Controllers\MercadoPagoController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\SubscriptionController;
@@ -178,19 +179,32 @@ Route::get('/presets/{preset}', [AdminItemPresetReactController::class, 'getById
 Route::post('/pago', [PaymentController::class, 'charge']);
 Route::get('/pago/{sale_id}', [PaymentController::class, 'getPaymentStatus']);
 
-// Nuevos métodos de pago
+// API de métodos de pago (nueva implementación unificada)
 Route::prefix('payments')->group(function () {
-    // Nueva ruta principal para procesar cualquier tipo de pago
-    Route::post('/process', [PaymentController::class, 'processPayment']);
+    // Obtener métodos de pago disponibles
+    Route::get('/methods', [ApiPaymentController::class, 'getPaymentMethods']);
     
-    // Rutas específicas (mantenidas por compatibilidad)
+    // Procesar cualquier tipo de pago (unificado)
+    Route::post('/process', [ApiPaymentController::class, 'processPayment']);
+    
+    // Configuración de MercadoPago
+    Route::get('/mercadopago/config', [ApiPaymentController::class, 'getMercadoPagoConfig']);
+    
+    // Crear preferencia de MercadoPago (Checkout Pro)
+    Route::post('/mercadopago/create-preference', [ApiPaymentController::class, 'createMercadoPagoPreference']);
+    
+    // Checkout directo con MercadoPago (tarjetas)
+    Route::post('/mercadopago/checkout-api', [ApiPaymentController::class, 'mercadoPagoCheckoutApi']);
+    
+    // Webhook de MercadoPago
+    Route::post('/mercadopago/webhook', [ApiPaymentController::class, 'mercadoPagoWebhook']);
+});
+
+// Métodos de pago legacy (mantenidos por compatibilidad)
+Route::prefix('payments-legacy')->group(function () {
+    Route::post('/process', [PaymentController::class, 'processPayment']);
     Route::post('/mercadopago', [PaymentController::class, 'processMercadoPago']);
     Route::post('/manual', [PaymentController::class, 'processManualPayment']);
-    
-    // Obtener métodos de pago disponibles
-    Route::get('/methods', [AdminPaymentMethodController::class, 'getActiveForFrontend']);
-    
-    // Validar comprobante de pago (para admin)
     Route::post('/validate-proof', [PaymentController::class, 'validatePaymentProof']);
 });
 

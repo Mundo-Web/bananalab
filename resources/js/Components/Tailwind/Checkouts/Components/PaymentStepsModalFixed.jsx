@@ -68,7 +68,7 @@ export default function PaymentStepsModalFixed({
         try {
             setMercadoPagoLoading(true);
             console.log('Iniciando proceso de pago MercadoPago...');            // Crear preferencia
-            const preferenceResponse = await fetch('http://localhost:8000/api/mercadopago/preference', {
+            const preferenceResponse = await fetch('/api/payments/mercadopago/create-preference', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',

@@ -148,10 +148,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const albumResponseData = await albumResponse.json();
             const album = albumResponseData.data || albumResponseData;
             setAlbumData(album);
-            
-            // Establecer el UUID del álbum en window para acceso desde BookPreview
-            window.currentAlbumUuid = album.uuid;
-            console.log('🔗 Album UUID establecido en window:', album.uuid);
 
             // Cargar datos del preset
             const presetResponse = await fetch(presetEndpoint, {
@@ -189,7 +185,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const itemResponseData = await itemResponse.json();
             const item = itemResponseData.data || itemResponseData;
             setItemData(item);
-
+         
 
 
             // Solo crear páginas si NO restauramos progreso
@@ -485,6 +481,20 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             currentPage,
             savedAt: Date.now(),
         }));
+        
+        // Marcar la miniatura de la página actual para regeneración
+        if (newPages[currentPage]) {
+            const pageId = newPages[currentPage].id;
+            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
+            
+            // Programar regeneración de miniatura después de un breve retraso
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
+            }
+            debouncedRegenerateThumbnails.current = setTimeout(() => {
+                regenerateThumbnail(pageId);
+            }, 500);
+        }
     };
 
     // Guardar currentPage en localStorage cuando cambie
@@ -587,6 +597,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPageId);
         setCurrentPage(newPageIndex);
+        
+        // Marcar la miniatura para regeneración
+        setThumbnailsGenerating(prev => ({ ...prev, [newPageId]: true }));
+        
+        // Usar el debounce existente para regenerar la miniatura
+        if (debouncedRegenerateThumbnails.current) {
+            clearTimeout(debouncedRegenerateThumbnails.current);
+        }
+        debouncedRegenerateThumbnails.current = setTimeout(() => {
+            regenerateThumbnail(newPageId);
+        }, 500);
     };
 
     // Eliminar la página actual (solo páginas de contenido)
@@ -605,6 +626,23 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         if (!confirm(`¿Estás seguro de eliminar la ${currentPageData.type === "content" ? `página ${currentPageData.pageNumber}` : "página"}?`)) {
             return;
         }
+        
+        // Guardar el ID de la página que se va a eliminar
+        const deletedPageId = currentPageData.id;
+        
+        // Eliminar la miniatura de la página eliminada
+        setPageThumbnails(prev => {
+            const newThumbnails = { ...prev };
+            delete newThumbnails[deletedPageId];
+            return newThumbnails;
+        });
+        
+        // Eliminar el estado de generación de la página eliminada
+        setThumbnailsGenerating(prev => {
+            const newGenerating = { ...prev };
+            delete newGenerating[deletedPageId];
+            return newGenerating;
+        });
 
         const updatedPages = pages.filter((_, index) => index !== currentPage);
         updatePages(updatedPages);
@@ -654,6 +692,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
         setCurrentPage(newPageIndex);
+        
+        // Marcar la miniatura para regeneración
+        setThumbnailsGenerating(prev => ({ ...prev, [newPage.id]: true }));
+        
+        // Usar el debounce existente para regenerar la miniatura
+        if (debouncedRegenerateThumbnails.current) {
+            clearTimeout(debouncedRegenerateThumbnails.current);
+        }
+        debouncedRegenerateThumbnails.current = setTimeout(() => {
+            regenerateThumbnail(newPage.id);
+        }, 500);
     };
 
     // Añadir un elemento a una celda
@@ -668,6 +717,18 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             updatePages(updatedPages);
             setSelectedElement(element.id);
             setSelectedCell(cellId);
+            
+            // Marcar la miniatura para regeneración
+            const pageId = updatedPages[currentPage].id;
+            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
+            
+            // Usar el debounce existente para regenerar la miniatura
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
+            }
+            debouncedRegenerateThumbnails.current = setTimeout(() => {
+                regenerateThumbnail(pageId);
+            }, 500);
         }
     };
 
@@ -683,8 +744,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             (cell) => cell.id === cellId
         );
 
-        let shouldRegenerateThumbnails = false;
-
         if (cellIndex !== -1) {
             if (isDuplicate) {
                 // Añadir como nuevo elemento
@@ -694,7 +753,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     ),
                     ...updates,
                 });
-                shouldRegenerateThumbnails = true;
             } else {
                 // Actualizar elemento existente
                 const elementIndex = updatedPages[currentPage].cells[
@@ -702,41 +760,29 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 ].elements.findIndex((el) => el.id === elementId);
 
                 if (elementIndex !== -1) {
-                    const currentElement = updatedPages[currentPage].cells[cellIndex].elements[elementIndex];
-
-                    // Verificar si se están actualizando filtros, contenido o posición
-                    const isUpdatingFilters = updates.filters && JSON.stringify(updates.filters) !== JSON.stringify(currentElement.filters);
-                    const isUpdatingContent = updates.content && updates.content !== currentElement.content;
-                    const isUpdatingPosition = updates.position && JSON.stringify(updates.position) !== JSON.stringify(currentElement.position);
-                    const isUpdatingSize = updates.size && JSON.stringify(updates.size) !== JSON.stringify(currentElement.size);
-
-                    if (isUpdatingFilters || isUpdatingContent || isUpdatingPosition || isUpdatingSize) {
-                        shouldRegenerateThumbnails = true;
-                        console.log('🔄 Cambio detectado que requiere regenerar thumbnails:', {
-                            filters: isUpdatingFilters,
-                            content: isUpdatingContent,
-                            position: isUpdatingPosition,
-                            size: isUpdatingSize
-                        });
-                    }
-
                     updatedPages[currentPage].cells[cellIndex].elements[
                         elementIndex
                     ] = {
-                        ...currentElement,
+                        ...updatedPages[currentPage].cells[cellIndex].elements[
+                        elementIndex
+                        ],
                         ...updates,
                     };
                 }
             }
             updatePages(updatedPages);
-
-            // Regenerar thumbnails si es necesario
-            if (shouldRegenerateThumbnails) {
-                // Usar setTimeout para que se regenere después de que el DOM se actualice
-                setTimeout(() => {
-                    generateThumbnails();
-                }, 100);
+            
+            // Marcar la miniatura para regeneración
+            const pageId = updatedPages[currentPage].id;
+            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
+            
+            // Usar el debounce existente para regenerar la miniatura
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
             }
+            debouncedRegenerateThumbnails.current = setTimeout(() => {
+                regenerateThumbnail(pageId);
+            }, 500);
         }
     };
 
@@ -756,6 +802,18 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             if (selectedElement === elementId) {
                 setSelectedElement(null);
             }
+            
+            // Marcar la miniatura para regeneración
+            const pageId = updatedPages[currentPage].id;
+            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
+            
+            // Usar el debounce existente para regenerar la miniatura
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
+            }
+            debouncedRegenerateThumbnails.current = setTimeout(() => {
+                regenerateThumbnail(pageId);
+            }, 500);
         }
     };
 
@@ -828,6 +886,38 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             },
         });
     };
+    
+    // Mostrar previsualización de miniatura con zoom mejorado
+    const handleShowThumbnailPreview = (thumbnailSrc, event) => {
+        if (!thumbnailSrc) return;
+        
+        // Calcular posición para que la previsualización aparezca cerca del cursor
+        // pero sin salirse de la pantalla
+        const x = Math.min(event.clientX + 20, window.innerWidth - 320);
+        const y = Math.min(event.clientY - 100, window.innerHeight - 240);
+        
+        setThumbnailPosition({ x, y });
+        setPreviewThumbnail(thumbnailSrc);
+        
+        // Añadir clase para animación suave
+        setTimeout(() => {
+            const previewElement = document.getElementById('thumbnail-preview');
+            if (previewElement) {
+                previewElement.classList.add('thumbnail-preview-visible');
+            }
+        }, 10);
+    };
+    
+    // Ocultar previsualización de miniatura con animación
+    const handleHideThumbnailPreview = () => {
+        const previewElement = document.getElementById('thumbnail-preview');
+        if (previewElement) {
+            previewElement.classList.remove('thumbnail-preview-visible');
+            setTimeout(() => setPreviewThumbnail(null), 200); // Esperar a que termine la animación
+        } else {
+            setPreviewThumbnail(null);
+        }
+    };
 
     const [workspaceSize, setWorkspaceSize] = useState("preset");
 
@@ -899,6 +989,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     // Estado para las dimensiones calculadas
     const [workspaceDimensions, setWorkspaceDimensions] = useState({ width: 800, height: 600 });
+    
+    // Estado para la previsualización de miniaturas
+    const [previewThumbnail, setPreviewThumbnail] = useState(null);
+    const [thumbnailPosition, setThumbnailPosition] = useState({ x: 0, y: 0 });
 
     // Actualizar dimensiones cuando cambie el preset o el tamaño del workspace
     useEffect(() => {
@@ -907,798 +1001,566 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     }, [presetData, workspaceSize]);
 
     // Actualizar dimensiones cuando cambie el tamaño de la ventana
+    // Referencia para el debounce de regeneración de miniaturas
+    const debouncedRegenerateThumbnails = useRef(null);
+    
     useEffect(() => {
         const handleResize = () => {
+            // Actualizar dimensiones del workspace
             const dimensions = getWorkspaceDimensions();
             setWorkspaceDimensions(dimensions);
+            
+            // Regenerar miniaturas cuando cambia el tamaño de la ventana
+            // Usamos un debounce para no regenerar constantemente
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
+            }
+            debouncedRegenerateThumbnails.current = setTimeout(() => {
+                // Marcar todas las páginas para regeneración
+                const newGeneratingState = {};
+                pages.forEach(page => {
+                    newGeneratingState[page.id] = true;
+                });
+                setThumbnailsGenerating(prev => ({ ...prev, ...newGeneratingState }));
+                
+                // Programar regeneración después de un breve retraso
+                setTimeout(() => {
+                    regenerateAllThumbnails();
+                }, 300);
+            }, 500);
         };
 
         window.addEventListener('resize', handleResize);
-        return () => window.removeEventListener('resize', handleResize);
-    }, [presetData, workspaceSize]);
-
-    useEffect(() => {
-        const generateThumbnails = async () => {
-            if (pages.length === 0) return;
-
-            console.log('🎯 Iniciando generación de thumbnails...');
-
-            const newThumbnails = {};
-
-            // Importar máscaras desde el archivo de constantes
-            const { imageMasks } = await import('./constants/masks.js');
-
-            // Función mejorada para aplicar máscaras usando las definiciones CSS
-            const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
-                // No hacer translate aquí, trabajar directamente en las coordenadas finales
-                ctx.beginPath();
-
-                switch (maskId) {
-                    case 'circle':
-                        // clip-path: circle(50% at 50% 50%)
-                        ctx.arc(x + width / 2, y + height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
-                        break;
-                    case 'diamond':
-                        // clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)
-                        ctx.moveTo(x + width / 2, y);
-                        ctx.lineTo(x + width, y + height / 2);
-                        ctx.lineTo(x + width / 2, y + height);
-                        ctx.lineTo(x, y + height / 2);
-                        ctx.closePath();
-                        break;
-                    case 'triangle':
-                        // clip-path: polygon(50% 0%, 100% 100%, 0% 100%)
-                        ctx.moveTo(x + width / 2, y);
-                        ctx.lineTo(x + width, y + height);
-                        ctx.lineTo(x, y + height);
-                        ctx.closePath();
-                        break;
-                    case 'hexagon':
-                        // clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)
-                        const hexPoints = [
-                            [x + width * 0.25, y + height * 0.05],
-                            [x + width * 0.75, y + height * 0.05],
-                            [x + width * 1.0, y + height * 0.5],
-                            [x + width * 0.75, y + height * 0.95],
-                            [x + width * 0.25, y + height * 0.95],
-                            [x + width * 0.0, y + height * 0.5]
-                        ];
-                        ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
-                        hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    case 'star':
-                        // clip-path de star-2: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)
-                        const starPoints = [
-                            [x + width * 0.5, y + height * 0],
-                            [x + width * 0.61, y + height * 0.35],
-                            [x + width * 0.98, y + height * 0.35],
-                            [x + width * 0.68, y + height * 0.57],
-                            [x + width * 0.79, y + height * 0.91],
-                            [x + width * 0.5, y + height * 0.7],
-                            [x + width * 0.21, y + height * 0.91],
-                            [x + width * 0.32, y + height * 0.57],
-                            [x + width * 0.02, y + height * 0.35],
-                            [x + width * 0.39, y + height * 0.35]
-                        ];
-                        ctx.moveTo(starPoints[0][0], starPoints[0][1]);
-                        starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    case 'rounded':
-                    case 'rounded-sm':
-                    case 'rounded-lg':
-                    case 'rounded-rect':
-                        // Las máscaras rounded usan border-radius en CSS, no clip-path
-                        // Para canvas, aproximamos con un rectángulo redondeado
-                        const radius = maskId === 'rounded-sm' ? 6 : 
-                                     maskId === 'rounded' ? 12 : 
-                                     maskId === 'rounded-lg' ? 24 : 16;
-                        if (ctx.roundRect) {
-                            ctx.roundRect(x, y, width, height, radius);
-                        } else {
-                            // Fallback para navegadores que no soportan roundRect
-                            ctx.moveTo(x + radius, y);
-                            ctx.lineTo(x + width - radius, y);
-                            ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-                            ctx.lineTo(x + width, y + height - radius);
-                            ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-                            ctx.lineTo(x + radius, y + height);
-                            ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-                            ctx.lineTo(x, y + radius);
-                            ctx.quadraticCurveTo(x, y, x + radius, y);
-                            ctx.closePath();
-                        }
-                        break;
-                    case 'polaroid':
-                        // clip-path: inset(5% 5% 20% 5%)
-                        const insetTop = height * 0.05;
-                        const insetRight = width * 0.05;
-                        const insetBottom = height * 0.20;
-                        const insetLeft = width * 0.05;
-                        ctx.rect(x + insetLeft, y + insetTop, width - insetLeft - insetRight, height - insetTop - insetBottom);
-                        break;
-                    case 'vintage':
-                        // clip-path: ellipse(45% 45% at 50% 50%)
-                        ctx.ellipse(x + width / 2, y + height / 2, width * 0.45, height * 0.45, 0, 0, 2 * Math.PI);
-                        break;
-                    case 'diagonal':
-                        // clip-path: polygon(0 0, 100% 10%, 100% 90%, 0% 100%)
-                        ctx.moveTo(x, y);
-                        ctx.lineTo(x + width, y + height * 0.1);
-                        ctx.lineTo(x + width, y + height * 0.9);
-                        ctx.lineTo(x, y + height);
-                        ctx.closePath();
-                        break;
-                    case 'speech':
-                        // clip-path: polygon(10% 0%, 90% 0%, 90% 80%, 60% 80%, 50% 100%, 40% 80%, 10% 80%)
-                        const speechPoints = [
-                            [x + width * 0.1, y],
-                            [x + width * 0.9, y],
-                            [x + width * 0.9, y + height * 0.8],
-                            [x + width * 0.6, y + height * 0.8],
-                            [x + width * 0.5, y + height],
-                            [x + width * 0.4, y + height * 0.8],
-                            [x + width * 0.1, y + height * 0.8]
-                        ];
-                        ctx.moveTo(speechPoints[0][0], speechPoints[0][1]);
-                        speechPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    case 'burst':
-                        // clip-path: polygon(50% 0%, 60% 20%, 80% 10%, 70% 30%, 90% 50%, 70% 70%, 80% 90%, 60% 80%, 50% 100%, 40% 80%, 20% 90%, 30% 70%, 10% 50%, 30% 30%, 20% 10%, 40% 20%)
-                        const burstPoints = [
-                            [x + width * 0.5, y], [x + width * 0.6, y + height * 0.2],
-                            [x + width * 0.8, y + height * 0.1], [x + width * 0.7, y + height * 0.3],
-                            [x + width * 0.9, y + height * 0.5], [x + width * 0.7, y + height * 0.7],
-                            [x + width * 0.8, y + height * 0.9], [x + width * 0.6, y + height * 0.8],
-                            [x + width * 0.5, y + height], [x + width * 0.4, y + height * 0.8],
-                            [x + width * 0.2, y + height * 0.9], [x + width * 0.3, y + height * 0.7],
-                            [x + width * 0.1, y + height * 0.5], [x + width * 0.3, y + height * 0.3],
-                            [x + width * 0.2, y + height * 0.1], [x + width * 0.4, y + height * 0.2]
-                        ];
-                        ctx.moveTo(burstPoints[0][0], burstPoints[0][1]);
-                        burstPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                        ctx.closePath();
-                        break;
-                    case 'blob1':
-                    case 'blob2':
-                    case 'blob3':
-                        // Crear formas blob orgánicas simplificadas usando las coordenadas absolutas
-                        const blobRadius = Math.min(width, height) / 2;
-                        const centerX = x + width / 2;
-                        const centerY = y + height / 2;
-                        const points = 8;
-                        for (let i = 0; i < points; i++) {
-                            const angle = (i / points) * 2 * Math.PI;
-                            const variation = 0.3 + Math.sin(angle * 3) * 0.2;
-                            const pointX = centerX + Math.cos(angle) * blobRadius * variation;
-                            const pointY = centerY + Math.sin(angle) * blobRadius * variation;
-                            if (i === 0) ctx.moveTo(pointX, pointY);
-                            else ctx.lineTo(pointX, pointY);
-                        }
-                        ctx.closePath();
-                        break;
-                    default:
-                        // Sin máscara - rectángulo completo
-                        ctx.rect(x, y, width, height);
-                        break;
-                }
-
-                ctx.clip();
-            };
-
-            // Procesar páginas secuencialmente
-            for (const page of pages) {
-                try {
-                    const pageElement = document.getElementById(`page-${page.id}`);
-                    if (!pageElement) {
-                        console.warn(`❌ No se encontró elemento para página ${page.id}`);
-                        continue;
-                    }
-
-                    console.log(`📄 Procesando página ${page.id}...`);
-
-                    // Obtener dimensiones reales del workspace
-                    const rect = pageElement.getBoundingClientRect();
-                    if (rect.width === 0 || rect.height === 0) {
-                        console.warn(`❌ Elemento tiene dimensiones 0 para página ${page.id}`);
-                        continue;
-                    }
-
-                    console.log(`📐 Dimensiones del workspace: ${rect.width}x${rect.height}`);
-
-                    // Crear canvas personalizado que respete exactamente el layout
-                    const customCanvas = document.createElement('canvas');
-                    const customCtx = customCanvas.getContext('2d');
-
-                    // Usar un factor de escala mayor para mejor calidad
-                    const scale = 4; // Factor más alto para máxima nitidez
-                    customCanvas.width = rect.width * scale;
-                    customCanvas.height = rect.height * scale;
-
-                    // Escalar el contexto para dibujar en alta resolución
-                    customCtx.scale(scale, scale);
-
-                    // MEJORA 1: Habilitar suavizado de alta calidad
-                    customCtx.imageSmoothingEnabled = true;
-                    customCtx.imageSmoothingQuality = 'high';
-                    customCtx.textRenderingOptimization = 'optimizeQuality';
-                    // Configuración adicional para máxima nitidez
-                    customCtx.webkitImageSmoothingEnabled = true;
-                    customCtx.mozImageSmoothingEnabled = true;
-                    customCtx.msImageSmoothingEnabled = true;
-
-                    // Fondo blanco
-                    customCtx.fillStyle = '#ffffff';
-                    customCtx.fillRect(0, 0, rect.width, rect.height);
-
-                    // 1. Renderizar imagen de fondo si existe
-                    const bgImage = pageElement.querySelector('img[alt="background"]');
-                    if (bgImage && bgImage.complete && bgImage.naturalWidth > 0) {
-                        try {
-                            customCtx.drawImage(bgImage, 0, 0, rect.width, rect.height);
-                            console.log('✅ Fondo renderizado');
-                        } catch (error) {
-                            console.warn('❌ Error dibujando fondo:', error);
-                        }
-                    }
-
-                    // 2. Obtener el grid container real
-                    const gridContainer = pageElement.querySelector('[class*="grid"]');
-                    if (!gridContainer) {
-                        console.warn('❌ No se encontró grid container');
-                        continue;
-                    }
-
-                    const gridRect = gridContainer.getBoundingClientRect();
-                    const pageRect = pageElement.getBoundingClientRect();
-
-                    // Calcular offset del grid respecto al contenedor de la página
-                    const gridOffsetX = gridRect.left - pageRect.left;
-                    const gridOffsetY = gridRect.top - pageRect.top;
-
-                    console.log(`📐 Grid offset: ${gridOffsetX}, ${gridOffsetY}`);
-                    console.log(`📐 Grid dimensiones: ${gridRect.width}x${gridRect.height}`);
-
-                    // Obtener elementos de celdas del DOM para calcular dimensiones
-                    const cellElements = Array.from(gridContainer.children);
-                    console.log(`📦 Celdas DOM encontradas: ${cellElements.length}`);
-
-                    // 3. Procesar elementos directamente desde los datos de la página en lugar del DOM
-                    console.log(`📦 Procesando ${page.cells.length} celdas de datos`);
-
-                    for (let cellIndex = 0; cellIndex < page.cells.length; cellIndex++) {
-                        const cellData = page.cells[cellIndex];
-                        const cellElement = cellElements[cellIndex];
-                        // Si falta alguna celda o tiene dimensiones inválidas, abortar generación de thumbnail para esta página
-                        if (!cellElement) {
-                            console.warn(`❌ No se encontró elemento DOM para celda ${cellIndex}`);
-                            // ABORTAR thumbnail para esta página
-                            throw new Error('Celda no encontrada, abortando thumbnail');
-                        }
-                        const cellRect = cellElement.getBoundingClientRect();
-                        const cellX = Math.round(cellRect.left - pageRect.left);
-                        const cellY = Math.round(cellRect.top - pageRect.top);
-                        const cellWidth = Math.round(cellRect.width);
-                        const cellHeight = Math.round(cellRect.height);
-                        if (cellWidth === 0 || cellHeight === 0) {
-                            console.warn(`❌ Celda ${cellIndex} tiene dimensiones inválidas, abortando thumbnail`);
-                            throw new Error('Celda con dimensiones 0, abortando thumbnail');
-                        }
-                        console.log(`📦 Celda ${cellIndex}: x=${cellX}, y=${cellY}, w=${cellWidth}, h=${cellHeight}`);
-
-                        // 3.1. Procesar elementos de imagen desde los datos
-                        const imageElements = cellData.elements.filter(el => el.type === 'image');
-                        console.log(`🖼️ En celda ${cellIndex}: ${imageElements.length} imágenes de datos`);
-
-                        for (const imageElement of imageElements) {
-                            // Buscar el elemento IMG correspondiente en el DOM por su contenido (src)
-                            const imgElement = cellElement.querySelector(`img[src="${imageElement.content}"]`);
-
-                            if (!imgElement || !imgElement.complete || imgElement.naturalWidth === 0) {
-                                console.log('⏳ Imagen no encontrada o no cargada, saltando...');
-                                continue;
-                            }
-
-                            // Usar la máscara directamente desde los datos del elemento
-                            const maskId = imageElement.mask || 'none';
-
-                            console.log(`🎭 Imagen encontrada con máscara: ${maskId} (desde datos)`);
-
-                            // Calcular posición y tamaño basado en los datos del elemento y las dimensiones de la celda
-                            const elementX = imageElement.position.x;
-                            const elementY = imageElement.position.y;
-
-                            // Si las coordenadas son <= 1, son porcentajes; si son > 1, son píxeles
-                            const containerX = cellX + (elementX <= 1 ? elementX * cellWidth : elementX);
-                            const containerY = cellY + (elementY <= 1 ? elementY * cellHeight : elementY);
-
-                            // Calcular el tamaño del contenedor de la imagen
-                            let containerWidth, containerHeight;
-                            if (imageElement.size) {
-                                // Si tiene size definido, usarlo
-                                containerWidth = imageElement.size.width <= 1 ?
-                                    imageElement.size.width * cellWidth :
-                                    imageElement.size.width;
-                                containerHeight = imageElement.size.height <= 1 ?
-                                    imageElement.size.height * cellHeight :
-                                    imageElement.size.height;
-                            } else {
-                                // Fallback: usar toda la celda
-                                containerWidth = cellWidth;
-                                containerHeight = cellHeight;
-                            }
-
-                            console.log(`📦 Contenedor calculado: x=${Math.round(containerX)}, y=${Math.round(containerY)}, w=${Math.round(containerWidth)}, h=${Math.round(containerHeight)}`);
-
-                            // Obtener dimensiones naturales de la imagen
-                            const naturalWidth = imgElement.naturalWidth;
-                            const naturalHeight = imgElement.naturalHeight;
-
-                            console.log(`📷 Imagen natural: ${naturalWidth}x${naturalHeight}`);
-
-                            // Obtener propiedades CSS de object-fit y object-position
-                            const computedStyle = window.getComputedStyle(imgElement);
-                            const objectFit = computedStyle.objectFit || 'cover';
-                            const objectPosition = computedStyle.objectPosition || 'center center';
-
-                            console.log(`🎨 CSS: object-fit=${objectFit}, object-position=${objectPosition}`);
-
-                            // Calcular cómo CSS renderizaría la imagen con object-fit: cover
-                            let sourceX = 0, sourceY = 0, sourceWidth = naturalWidth, sourceHeight = naturalHeight;
-                            let destX = Math.round(containerX), destY = Math.round(containerY), destWidth = Math.round(containerWidth), destHeight = Math.round(containerHeight);
-
-                            if (objectFit === 'cover') {
-                                // Calcular la escala necesaria para que la imagen cubra completamente el contenedor
-                                const scaleX = containerWidth / naturalWidth;
-                                const scaleY = containerHeight / naturalHeight;
-                                const scale = Math.max(scaleX, scaleY); // Mayor escala para cubrir completamente
-
-                                // Dimensiones de la imagen escalada
-                                const scaledWidth = naturalWidth * scale;
-                                const scaledHeight = naturalHeight * scale;
-
-                                // Parsear object-position (por defecto center center)
-                                const positions = objectPosition.split(' ');
-                                let posX = 'center', posY = 'center';
-
-                                if (positions.length >= 1) posX = positions[0];
-                                if (positions.length >= 2) posY = positions[1];
-
-                                // Convertir posiciones a porcentajes
-                                let offsetXPercent = 0.5; // center por defecto
-                                let offsetYPercent = 0.5; // center por defecto
-
-                                if (posX.includes('%')) {
-                                    offsetXPercent = parseFloat(posX) / 100;
-                                } else if (posX === 'left') {
-                                    offsetXPercent = 0;
-                                } else if (posX === 'right') {
-                                    offsetXPercent = 1;
-                                }
-
-                                if (posY.includes('%')) {
-                                    offsetYPercent = parseFloat(posY) / 100;
-                                } else if (posY === 'top') {
-                                    offsetYPercent = 0;
-                                } else if (posY === 'bottom') {
-                                    offsetYPercent = 1;
-                                }
-
-                                // Calcular qué parte de la imagen se mostrará (crop)
-                                if (scaledWidth > containerWidth) {
-                                    // La imagen es más ancha que el contenedor, recortar horizontalmente
-                                    const cropWidth = containerWidth / scale;
-                                    const maxOffsetX = naturalWidth - cropWidth;
-                                    sourceX = Math.round(maxOffsetX * offsetXPercent);
-                                    sourceWidth = Math.round(cropWidth);
-                                } else {
-                                    // La imagen encaja horizontalmente
-                                    sourceX = 0;
-                                    sourceWidth = naturalWidth;
-                                }
-
-                                if (scaledHeight > containerHeight) {
-                                    // La imagen es más alta que el contenedor, recortar verticalmente
-                                    const cropHeight = containerHeight / scale;
-                                    const maxOffsetY = naturalHeight - cropHeight;
-                                    sourceY = Math.round(maxOffsetY * offsetYPercent);
-                                    sourceHeight = Math.round(cropHeight);
-                                } else {
-                                    // La imagen encaja verticalmente
-                                    sourceY = 0;
-                                    sourceHeight = naturalHeight;
-                                }
-
-                                console.log(`✂️ Recorte calculado con ${objectPosition}: sourceX=${sourceX}, sourceY=${sourceY}, sourceW=${sourceWidth}, sourceH=${sourceHeight}`);
-                            }
-
-                            // Aplicar máscara y dibujar imagen
-                            customCtx.save();
-
-                            // Si hay máscara, aplicarla con las coordenadas absolutas ANTES del translate
-                            if (maskId && maskId !== 'none') {
-                                applyMaskToCanvas(customCtx, maskId, destX, destY, destWidth, destHeight);
-                            } else {
-                                // Sin máscara, solo recortar al área del elemento
-                                customCtx.beginPath();
-                                customCtx.rect(destX, destY, destWidth, destHeight);
-                                customCtx.clip();
-                            }
-
-                            // AHORA trasladar el origen del canvas a la posición del elemento
-                            customCtx.translate(destX, destY);
-
-                            // Aplicar filtros CSS completos si los hay
-                            const filter = computedStyle.filter;
-                            const transform = computedStyle.transform;
-                            const mixBlendMode = computedStyle.mixBlendMode;
-                            const opacity = parseFloat(computedStyle.opacity) || 1;
-
-                            // Aplicar opacity
-                            customCtx.globalAlpha = opacity;
-
-                            // Aplicar mix-blend-mode si está disponible
-                            if (mixBlendMode && mixBlendMode !== 'normal') {
-                                customCtx.globalCompositeOperation = mixBlendMode;
-                            }
-
-                            // Aplicar filtros CSS - usar la propiedad filter del contexto si está disponible
-                            if (filter && filter !== 'none') {
-                                // Para navegadores modernos que soportan CanvasRenderingContext2D.filter
-                                if ('filter' in customCtx) {
-                                    customCtx.filter = filter;
-                                    console.log(`🎨 Filtros CSS aplicados: ${filter}`);
-                                } else {
-                                    // Fallback: aplicar brightness manualmente
-                                    const brightnessMatch = filter.match(/brightness\(([^)]+)\)/);
-                                    if (brightnessMatch) {
-                                        const brightness = parseFloat(brightnessMatch[1]);
-                                        customCtx.globalAlpha *= brightness;
-                                        console.log(`🎨 Brightness aplicado manualmente: ${brightness}`);
-                                    }
-                                }
-                            }
-
-                            // Aplicar transformaciones básicas (scale y rotate)
-                            if (transform && transform !== 'none') {
-                                const scaleMatch = transform.match(/scale\(([^)]+)\)/);
-                                const rotateMatch = transform.match(/rotate\(([^)]+)deg\)/);
-                                const scaleXMatch = transform.match(/scaleX\(([^)]+)\)/);
-                                const scaleYMatch = transform.match(/scaleY\(([^)]+)\)/);
-
-                                if (scaleMatch || rotateMatch || scaleXMatch || scaleYMatch) {
-                                    // Aplicar transformaciones en el centro de la imagen (relativo al origen trasladado)
-                                    const centerX = destWidth / 2;
-                                    const centerY = destHeight / 2;
-
-                                    customCtx.translate(centerX, centerY);
-
-                                    if (scaleMatch) {
-                                        const scaleValue = parseFloat(scaleMatch[1]);
-                                        customCtx.scale(scaleValue, scaleValue);
-                                        console.log(`🔄 Scale aplicado: ${scaleValue}`);
-                                    }
-
-                                    if (scaleXMatch) {
-                                        const scaleXValue = parseFloat(scaleXMatch[1]);
-                                        customCtx.scale(scaleXValue, 1);
-                                        console.log(`🔄 ScaleX aplicado: ${scaleXValue}`);
-                                    }
-
-                                    if (scaleYMatch) {
-                                        const scaleYValue = parseFloat(scaleYMatch[1]);
-                                        customCtx.scale(1, scaleYValue);
-                                        console.log(`🔄 ScaleY aplicado: ${scaleYValue}`);
-                                    }
-
-                                    if (rotateMatch) {
-                                        const rotateValue = parseFloat(rotateMatch[1]) * Math.PI / 180;
-                                        customCtx.rotate(rotateValue);
-                                        console.log(`🔄 Rotate aplicado: ${rotateMatch[1]}°`);
-                                    }
-
-                                    customCtx.translate(-centerX, -centerY);
-                                }
-                            }
-
-                            // Dibujar la imagen aplicando el recorte de object-fit: cover
-                            // MEJORA 2: Usar valores enteros para evitar desenfoque
-                            try {
-                                customCtx.drawImage(
-                                    imgElement,
-                                    sourceX, sourceY, sourceWidth, sourceHeight,  // Área fuente (recortada)
-                                    0, 0, destWidth, destHeight                   // Área destino (desde origen trasladado)
-                                );
-                                console.log(`✅ Imagen dibujada con filtros, transformaciones y máscara ${maskId}`);
-                            } catch (error) {
-                                console.warn('❌ Error dibujando imagen:', error);
-                            }
-
-                            customCtx.restore();
-
-                            // Resetear filtros para la siguiente imagen
-                            if ('filter' in customCtx) {
-                                customCtx.filter = 'none';
-                            }
-                        }
-
-                        // 3.2. Procesar elementos de texto desde los datos
-                       const textElements = cellData.elements.filter(el => el.type === 'text');
-                        
-                        console.log(`📝 Procesando ${textElements.length} elementos de texto desde datos en celda ${cellIndex}...`);
-     
-
-                        for (const textElement of textElements) {
-                            try {
-                                console.log(`🔍 Buscando elemento de texto: ${textElement.id} en celda ${cellIndex}`);
-                                
-                                // Buscar el elemento de texto real en el DOM para obtener su posición calculada
-                                let textDOMElement = cellElement.querySelector(`[data-element-id="${textElement.id}"]`);
-                                
-                                // Si no se encuentra, intentar con otras variantes de selector
-                                if (!textDOMElement) {
-                                    textDOMElement = cellElement.querySelector(`[data-element-type="text"][data-element-id="${textElement.id}"]`);
-                                }
-                                
-                                // Si aún no se encuentra, buscar por contenido
-                                if (!textDOMElement && textElement.content) {
-                                    const allTextElements = cellElement.querySelectorAll('[data-element-type="text"]');
-                                    textDOMElement = Array.from(allTextElements).find(el => 
-                                        el.textContent.trim() === textElement.content.trim()
-                                    );
-                                }
-
-                                console.log(`📝 Elemento DOM encontrado:`, textDOMElement ? 'SÍ' : 'NO');
-
-                                let textX, textY, textWidth, textHeight;
-
-                                // SIEMPRE usar la posición original de los datos del elemento para consistency
-                                // No usar la posición del DOM porque puede ser diferente debido a CSS transforms
-                                const elementX = textElement.position.x;
-                                const elementY = textElement.position.y;
-                                
-                                // REPLICAR EXACTAMENTE LA LÓGICA DEL WORKSPACE:
-                                // left: element.position.x <= 1 ? `${element.position.x * 100}%` : `${element.position.x}px`
-                                // top: element.position.y <= 1 ? `${element.position.y * 100}%` : `${element.position.y}px`
-                                
-                                if (elementX <= 1) {
-                                    // Posición en porcentaje: cellX + (porcentaje * ancho)
-                                    textX = cellX + (elementX * cellWidth);
-                                } else {
-                                    // Posición en píxeles absolutos: cellX + píxeles
-                                    textX = cellX + elementX;
-                                }
-                                
-                                if (elementY <= 1) {
-                                    // Posición en porcentaje: cellY + (porcentaje * alto)
-                                    textY =  cellY + (elementY * cellHeight);
-                                } else {
-                                    // Posición en píxeles absolutos: cellY + píxeles
-                                    textY = cellY + elementY;
-                                }
-                                
-                                // Si encontramos el elemento DOM, usar sus dimensiones reales
-                                if (textDOMElement) {
-                                    const textRect = textDOMElement.getBoundingClientRect();
-                                    textWidth = Math.round(textRect.width);
-                                    textHeight = Math.round(textRect.height);
-                                    
-                                    console.log(`📝 Texto "${textElement.content}" - Usando posición de DATOS con dimensiones DOM:`, {
-                                        originalPosition: { x: elementX, y: elementY },
-                                        calculatedPosition: { textX, textY },
-                                        domDimensions: { width: textWidth, height: textHeight },
-                                        cellInfo: { cellX, cellY, cellWidth, cellHeight }
-                                    });
-                                } else {
-                                    // Estimar dimensiones del texto basándose en el estilo
-                                    console.warn(`❌ No se encontró elemento DOM para texto ${textElement.id}, estimando dimensiones`);
-                                    
-                                    const style = textElement.style || {};
-                                    const fontSize = parseFloat(style.fontSize || '16px');
-                                    const padding = parseFloat(style.padding || '8px');
-                                    
-                                    // Estimación más precisa del ancho del texto
-                                    textWidth = Math.max(100, textElement.content.length * fontSize * 0.6);
-                                    textHeight = fontSize * 1.2 + (padding * 2); // Incluir padding vertical
-                                    
-                                    console.log(`📝 Texto "${textElement.content}" - Usando posición de DATOS con dimensiones ESTIMADAS:`, {
-                                        originalPosition: { x: elementX, y: elementY },
-                                        calculatedPosition: { textX, textY },
-                                        estimatedDimensions: { width: textWidth, height: textHeight },
-                                        cellInfo: { cellX, cellY, cellWidth, cellHeight }
-                                    });
-                                }
-
-                                // Calcular padding y estilos
-                                const style = textElement.style || {};
-                                const padding = style.padding ? parseFloat(style.padding) : 0;
-                                const textContent = textElement.content || '';
-                                
-                                if (textContent.trim()) {
-                                    // Usar estilos desde los datos del elemento
-                                    const fontSize = style.fontSize || '16px';
-                                    const fontFamily = style.fontFamily || 'Arial';
-                                    const fontWeight = style.fontWeight || 'normal';
-                                    const fontStyle = style.fontStyle || 'normal';
-                                    const color = style.color || '#000000';
-                                    const textAlign = style.textAlign || 'left';
-                                    let opacity = style.opacity;
-                                    if (opacity === undefined) opacity = 1;
-                                    if (opacity > 1) opacity = opacity / 100;
-                                    const bgColor = style.backgroundColor || 'transparent';
-                                    const borderRadius = style.borderRadius ? parseFloat(style.borderRadius) : 0;
-
-                                    customCtx.save();
-                                    customCtx.globalAlpha = opacity;
-                                    customCtx.font = `${fontStyle} ${fontWeight} ${fontSize} ${fontFamily}`;
-                                    
-                                    // Configurar alineación y baseline para texto
-                                    customCtx.textAlign = textAlign;
-                                    customCtx.textBaseline = 'top'; // Usar 'top' para que coincida con el CSS del workspace
-                                    
-                                    // Medir el texto real
-                                    const metrics = customCtx.measureText(textContent);
-                                    const measuredTextWidth = metrics.width;
-
-                                    // Dibujar fondo si existe
-                                    if (bgColor !== 'transparent' && bgColor !== 'none') {
-                                        customCtx.save();
-                                        customCtx.globalAlpha = opacity;
-                                        customCtx.fillStyle = bgColor;
-                                        
-                                        if (borderRadius > 0) {
-                                            customCtx.beginPath();
-                                            customCtx.moveTo(textX + borderRadius, textY);
-                                            customCtx.lineTo(textX + textWidth - borderRadius, textY);
-                                            customCtx.quadraticCurveTo(textX + textWidth, textY, textX + textWidth, textY + borderRadius);
-                                            customCtx.lineTo(textX + textWidth, textY + textHeight - borderRadius);
-                                            customCtx.quadraticCurveTo(textX + textWidth, textY + textHeight, textX + textWidth - borderRadius, textY + textHeight);
-                                            customCtx.lineTo(textX + borderRadius, textY + textHeight);
-                                            customCtx.quadraticCurveTo(textX, textY + textHeight, textX, textY + textHeight - borderRadius);
-                                            customCtx.lineTo(textX, textY + borderRadius);
-                                            customCtx.quadraticCurveTo(textX, textY, textX + borderRadius, textY);
-                                            customCtx.closePath();
-                                            customCtx.fill();
-                                        } else {
-                                            customCtx.fillRect(textX, textY, textWidth, textHeight);
-                                        }
-                                        customCtx.restore();
-                                    }
-                                    
-                                    // Calcular posición final del texto considerando padding y alineación
-                                    let finalTextX, finalTextY;
-                                    
-                                    // SIEMPRE usar posición calculada desde datos + padding
-                                    finalTextX = textX + padding;
-                                    finalTextY = textY + padding;
-                                    
-                                    
-
-                                    customCtx.fillStyle = color;
-                                    
-                                    console.log(`[THUMBNAIL] fillText FINAL:`, {
-                                        text: textContent,
-                                        finalX: finalTextX,
-                                        finalY: finalTextY,
-                                        originalPosition: textElement.position,
-                                        calculatedBox: { textX, textY, textWidth, textHeight },
-                                        cellInfo: { cellX, cellY, cellWidth, cellHeight },
-                                        color,
-                                        font: customCtx.font,
-                                        textAlign,
-                                        domFound: !!textDOMElement,
-                                        pageId: page.id
-                                    });
-                                    
-                                    customCtx.fillText(textContent, finalTextX, finalTextY);
-                                    customCtx.restore();
-                                }
-                            } catch (error) {
-                                console.warn(`❌ Error renderizando texto "${textElement.id}":`, error);
-                            }
-                        }
-                    }
-
-                    // 4. Crear thumbnail final con downscaling progresivo
-                    const thumbnailCanvas = document.createElement('canvas');
-                    const thumbnailCtx = thumbnailCanvas.getContext('2d');
-
-                    // Usar las dimensiones REALES del workspace para calcular la proporción exacta
-                    const workspaceAspectRatio = rect.width / rect.height;
-
-                    // MEJORA 5: Aumentar tamaño base para mejor calidad
-                    const thumbnailBaseSize = 900; // Incrementado de 600 a 900
-
-                    // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
-                    let thumbWidth, thumbHeight;
-
-                    if (workspaceAspectRatio >= 1) {
-                        // Workspace más ancho que alto
-                        thumbWidth = thumbnailBaseSize;
-                        thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
-                    } else {
-                        // Workspace más alto que ancho
-                        thumbHeight = thumbnailBaseSize;
-                        thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
-                    }
-
-                    console.log(`📏 Workspace proporción: ${workspaceAspectRatio.toFixed(3)} (${rect.width}x${rect.height})`);
-                    console.log(`📏 Thumbnail calculado: ${thumbWidth.toFixed(1)}x${thumbHeight.toFixed(1)}`);
-
-                    thumbWidth = Math.round(thumbWidth);
-                    thumbHeight = Math.round(thumbHeight);
-                    thumbnailCanvas.width = thumbWidth;
-                    thumbnailCanvas.height = thumbHeight;
-
-                    // MEJORA 6: Configuración de alta calidad para el thumbnail
-                    thumbnailCtx.imageSmoothingEnabled = true;
-                    thumbnailCtx.imageSmoothingQuality = 'high';
-                    thumbnailCtx.webkitImageSmoothingEnabled = true;
-                    thumbnailCtx.mozImageSmoothingEnabled = true;
-                    thumbnailCtx.msImageSmoothingEnabled = true;
-
-                    // MEJORA 7: Downscaling progresivo en dos pasos
-                    const tempCanvas = document.createElement('canvas');
-                    const tempCtx = tempCanvas.getContext('2d');
-
-                    // Tamaño intermedio (2x tamaño final)
-                    const intermediateWidth = thumbWidth * 2;
-                    const intermediateHeight = thumbHeight * 2;
-
-                    tempCanvas.width = intermediateWidth;
-                    tempCanvas.height = intermediateHeight;
-
-                    // Configurar suavizado en canvas intermedio
-                    tempCtx.imageSmoothingEnabled = true;
-                    tempCtx.imageSmoothingQuality = 'high';
-
-                    // Paso 1: Escalar a tamaño intermedio
-                    tempCtx.drawImage(
-                        customCanvas,
-                        0, 0, intermediateWidth, intermediateHeight
-                    );
-
-                    // Paso 2: Escalar de intermedio a tamaño final
-                    thumbnailCtx.drawImage(
-                        tempCanvas,
-                        0, 0, intermediateWidth, intermediateHeight,
-                        0, 0, thumbWidth, thumbHeight
-                    );
-
-                    // Convertir a base64 con alta calidad
-                    newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
-
-                    console.log(`✅ Thumbnail generado para página ${page.id}: ${thumbWidth}x${thumbHeight} (proporción: ${(thumbWidth / thumbHeight).toFixed(3)})`);
-
-                } catch (error) {
-                    console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
-                    newThumbnails[page.id] = null;
-                }
+        return () => {
+            window.removeEventListener('resize', handleResize);
+            if (debouncedRegenerateThumbnails.current) {
+                clearTimeout(debouncedRegenerateThumbnails.current);
             }
+        };
+    }, [presetData, workspaceSize, pages]);
 
-            console.log('🎉 Generación de thumbnails completada');
-            setPageThumbnails(prev => ({ ...prev, ...newThumbnails }));
+    // Estado para controlar la generación de miniaturas
+    const [thumbnailsGenerating, setThumbnailsGenerating] = useState({});
+    
+    useEffect(() => {
+        // ===== SISTEMA PROFESIONAL DE MINIATURAS ESTILO CANVA =====
+        // Esta función genera miniaturas que son copias exactas del workspace
+        const generateProfessionalThumbnails = async () => {
+            console.log('🎨 === INICIANDO GENERACIÓN PROFESIONAL DE MINIATURAS ===');
+            console.log(`📄 Generando miniaturas para ${pages.length} páginas`);
+            
+            const newThumbnails = {};
+            const newGeneratingState = {};
+            
+            // Marcar todas las páginas como "generando"
+            pages.forEach(page => {
+                newGeneratingState[page.id] = true;
+            });
+            setThumbnailsGenerating({...thumbnailsGenerating, ...newGeneratingState});
+            
+            // Procesar cada página
+            for (let i = 0; i < pages.length; i++) {
+                const page = pages[i];
+                const pageId = page.id;
+                
+                console.log(`🎯 Procesando página ${i + 1}/${pages.length}: ${pageId}`);
+                
+                try {
+                    let thumbnailDataUrl = null;
+                    
+                    // MÉTODO 1: Si es la página actual, capturar el workspace visible
+                    if (i === currentPage) {
+                        console.log(`⚡ Capturando página actual visible: ${pageId}`);
+                        const visibleWorkspace = document.getElementById(`page-${pageId}`);
+                        
+                        if (visibleWorkspace) {
+                            // Esperar a que las imágenes estén cargadas
+                            const images = visibleWorkspace.querySelectorAll('img');
+                            await Promise.all(Array.from(images).map(img => {
+                                return new Promise(resolve => {
+                                    if (img.complete && img.naturalWidth > 0) {
+                                        resolve();
+                                    } else {
+                                        img.onload = resolve;
+                                        img.onerror = resolve;
+                                        setTimeout(resolve, 2000); // timeout
+                                    }
+                                });
+                            }));
+                            
+                            // Capturar con html2canvas optimizado
+                            const canvas = await html2canvas(visibleWorkspace, {
+                                scale: 1,
+                                backgroundColor: '#ffffff',
+                                useCORS: true,
+                                allowTaint: false,
+                                logging: false,
+                                imageTimeout: 5000,
+                                foreignObjectRendering: true,
+                                ignoreElements: (element) => {
+                                    return element.classList.contains('ignore-thumbnail') ||
+                                           element.classList.contains('selection-indicator') ||
+                                           element.classList.contains('resize-handle') ||
+                                           element.tagName === 'BUTTON';
+                                }
+                            });
+                            
+                            thumbnailDataUrl = canvas.toDataURL('image/png', 0.9);
+                            console.log(`✅ Miniatura de página actual capturada: ${pageId}`);
+                        }
+                    }
+                    
+                    // MÉTODO 2: Si no es la página actual, crear una representación temporal
+                    if (!thumbnailDataUrl) {
+                        console.log(`🔄 Creando representación temporal para: ${pageId}`);
+                        thumbnailDataUrl = await createTemporaryThumbnail(page);
+                    }
+                    
+                    // Guardar miniatura generada
+                    if (thumbnailDataUrl) {
+                        newThumbnails[pageId] = thumbnailDataUrl;
+                        
+                        // Actualizar inmediatamente en la UI
+                        setPageThumbnails(prev => ({ 
+                            ...prev, 
+                            [pageId]: thumbnailDataUrl 
+                        }));
+                        
+                        console.log(`✅ Miniatura completada para: ${pageId}`);
+                    } else {
+                        console.warn(`⚠️ No se pudo generar miniatura para: ${pageId}`);
+                    }
+                    
+                } catch (error) {
+                    console.error(`❌ Error generando miniatura para ${pageId}:`, error);
+                } finally {
+                    // Marcar como completado
+                    setThumbnailsGenerating(prev => ({ 
+                        ...prev, 
+                        [pageId]: false 
+                    }));
+                }
+                
+                // Pequeña pausa para no bloquear la UI
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            console.log('🎉 === GENERACIÓN DE MINIATURAS COMPLETADA ===');
+            console.log(`📊 Miniaturas generadas: ${Object.keys(newThumbnails).length}/${pages.length}`);
+        };
+        
+        // Función para crear miniatura temporal renderizando la página sin mostrarla
+        const createTemporaryThumbnail = async (pageData) => {
+            try {
+                // Crear contenedor temporal fuera de la vista
+                const tempContainer = document.createElement('div');
+                tempContainer.style.position = 'absolute';
+                tempContainer.style.left = '-9999px';
+                tempContainer.style.top = '-9999px';
+                tempContainer.style.width = `${workspaceDimensions.width}px`;
+                tempContainer.style.height = `${workspaceDimensions.height}px`;
+                tempContainer.style.backgroundColor = '#ffffff';
+                tempContainer.style.overflow = 'hidden';
+                tempContainer.id = `temp-page-${pageData.id}`;
+                
+                // Obtener layout de la página
+                const pageLayout = layouts.find(l => l.id === pageData.layout) || layouts[0];
+                
+                // Crear estructura HTML igual al workspace
+                tempContainer.innerHTML = `
+                    <div class="grid ${pageLayout.template} gap-6" style="width: 100%; height: 100%;">
+                        ${pageData.cells.map((cell, cellIndex) => `
+                            <div style="position: relative; background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
+                                ${cell.elements.map(element => {
+                                    if (element.type === 'image' && element.content) {
+                                        // Encontrar la máscara
+                                        const mask = imageMasks.find(m => m.id === element.mask);
+                                        const maskClass = mask ? mask.class : '';
+                                        
+                                        // Crear filtros CSS
+                                        const filters = element.filters ? [
+                                            `brightness(${(element.filters.brightness || 100) / 100})`,
+                                            `contrast(${(element.filters.contrast || 100) / 100})`,
+                                            `saturate(${(element.filters.saturation || 100) / 100})`,
+                                            `sepia(${(element.filters.tint || 0) / 100})`,
+                                            `hue-rotate(${(element.filters.hue || 0) * 3.6}deg)`,
+                                            `blur(${element.filters.blur || 0}px)`
+                                        ].join(' ') : '';
+                                        
+                                        const transforms = element.filters ? [
+                                            `scale(${element.filters.scale || 1})`,
+                                            `rotate(${element.filters.rotate || 0}deg)`,
+                                            element.filters.flipHorizontal ? 'scaleX(-1)' : '',
+                                            element.filters.flipVertical ? 'scaleY(-1)' : ''
+                                        ].filter(Boolean).join(' ') : '';
+                                        
+                                        return `
+                                            <div class="${maskClass}" style="
+                                                position: absolute;
+                                                left: ${element.position.x}px;
+                                                top: ${element.position.y}px;
+                                                width: 100%;
+                                                height: 100%;
+                                                z-index: ${element.zIndex || 1};
+                                            ">
+                                                <img src="${element.content}" style="
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    object-fit: cover;
+                                                    filter: ${filters};
+                                                    transform: ${transforms};
+                                                    mix-blend-mode: ${element.filters?.blendMode || 'normal'};
+                                                    opacity: ${(element.filters?.opacity || 100) / 100};
+                                                " />
+                                            </div>
+                                        `;
+                                    } else if (element.type === 'text' && element.content) {
+                                        const style = element.style || {};
+                                        return `
+                                            <div style="
+                                                position: absolute;
+                                                left: ${element.position.x}px;
+                                                top: ${element.position.y}px;
+                                                font-family: ${style.fontFamily || 'Arial'};
+                                                font-size: ${style.fontSize || '16px'};
+                                                font-weight: ${style.fontWeight || 'normal'};
+                                                font-style: ${style.fontStyle || 'normal'};
+                                                text-decoration: ${style.textDecoration || 'none'};
+                                                color: ${style.color || '#000000'};
+                                                text-align: ${style.textAlign || 'left'};
+                                                background-color: ${style.backgroundColor || 'transparent'};
+                                                padding: ${style.padding || '8px'};
+                                                border-radius: ${style.borderRadius || '0px'};
+                                                border: ${style.border || 'none'};
+                                                opacity: ${style.opacity || 1};
+                                                z-index: ${element.zIndex || 1};
+                                            ">${element.content}</div>
+                                        `;
+                                    }
+                                    return '';
+                                }).join('')}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+                
+                // Agregar al DOM temporal
+                document.body.appendChild(tempContainer);
+                
+                // Esperar a que las imágenes se carguen
+                const images = tempContainer.querySelectorAll('img');
+                await Promise.all(Array.from(images).map(img => {
+                    return new Promise(resolve => {
+                        if (img.complete && img.naturalWidth > 0) {
+                            resolve();
+                        } else {
+                            img.onload = resolve;
+                            img.onerror = resolve;
+                            setTimeout(resolve, 3000); // timeout
+                        }
+                    });
+                }));
+                
+                // Capturar con html2canvas
+                const canvas = await html2canvas(tempContainer, {
+                    scale: 1,
+                    backgroundColor: '#ffffff',
+                    useCORS: true,
+                    allowTaint: false,
+                    logging: false,
+                    imageTimeout: 5000,
+                    foreignObjectRendering: true
+                });
+                
+                // Limpiar el contenedor temporal
+                document.body.removeChild(tempContainer);
+                
+                return canvas.toDataURL('image/png', 0.9);
+                
+            } catch (error) {
+                console.error('Error creando miniatura temporal:', error);
+                return null;
+            }
         };
 
+        // Debounce para no generar miniaturas constantemente
         const debouncedGenerate = setTimeout(() => {
-            generateThumbnails();
-        }, 800);
+            generateProfessionalThumbnails();
+        }, 500);
 
         return () => clearTimeout(debouncedGenerate);
     }, [pages, currentPage, workspaceDimensions]);
+    
+    // Función para regenerar una miniatura específica
+    const regenerateThumbnail = async (pageId) => {
+        const pageElement = document.getElementById(`page-${pageId}`);
+        if (!pageElement) return;
+        
+        // Evitar regenerar si ya está en proceso
+        if (thumbnailsGenerating[pageId]) return;
+        
+        setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
+        
+        try {
+            // Esperar a que todas las imágenes estén cargadas
+            const images = pageElement.querySelectorAll('img');
+            if (images.length > 0) {
+                await Promise.all(
+                    Array.from(images).map(img => {
+                        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+                        return new Promise(resolve => {
+                            img.onload = resolve;
+                            img.onerror = resolve; // Continuar incluso si hay error
+                            
+                            // Forzar recarga si la imagen no está cargada correctamente
+                            if (!img.complete || img.naturalWidth === 0) {
+                                const currentSrc = img.src;
+                                if (currentSrc) {
+                                    // Intentar recargar la imagen
+                                    const timestamp = new Date().getTime();
+                                    if (currentSrc.indexOf('?') === -1) {
+                                        img.src = `${currentSrc}?t=${timestamp}`;
+                                    } else {
+                                        img.src = `${currentSrc}&t=${timestamp}`;
+                                    }
+                                }
+                            }
+                        });
+                    })
+                );
+                
+                // Dar un pequeño tiempo adicional para asegurar que el navegador ha renderizado todo
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+            
+            // Calcular dimensiones óptimas para la miniatura
+            const rect = pageElement.getBoundingClientRect();
+            const width = Math.round(rect.width);
+            const height = Math.round(rect.height);
+            
+            // Calcular escala óptima para miniaturas
+            // Usar una escala menor para miniaturas mejora el rendimiento
+            // pero mantiene suficiente calidad para la visualización
+            const scale = Math.min(window.devicePixelRatio || 1, 1.5);
+            
+            const canvas = await html2canvas(pageElement, {
+                scale: 1.5, // Usar una escala fija para mejor rendimiento y calidad
+                width,
+                height,
+                logging: true, // Activar logs para depuración
+                useCORS: true,
+                allowTaint: true,
+                backgroundColor: '#ffffff', // Fondo blanco para evitar transparencias no deseadas
+                imageTimeout: 15000, // Tiempo de espera más largo para cargar imágenes
+                foreignObjectRendering: false, // Desactivar para mayor compatibilidad
+                removeContainer: false,
+                proxy: null, // No usar proxy para imágenes
+                ignoreElements: (element) => {
+                    // Ignorar elementos que podrían causar problemas
+                    return element.classList.contains('ignore-thumbnail') || 
+                           element.tagName === 'SCRIPT' || 
+                           element.tagName === 'STYLE';
+                },
+                onclone: (clonedDoc) => {
+                    // Asegurar que los estilos se apliquen correctamente en el clon
+                    const clonedElement = clonedDoc.getElementById(`page-${pageId}`);
+                    if (clonedElement) {
+                        // Aplicar estilos CSS externos de manera más eficiente
+                        try {
+                            // Crear un único elemento de estilo para todos los CSS
+                            const newStyle = clonedDoc.createElement('style');
+                            let cssText = '';
+                            
+                            // Recopilar reglas CSS relevantes
+                            Array.from(document.styleSheets).forEach(sheet => {
+                                try {
+                                    if (sheet.cssRules) {
+                                        Array.from(sheet.cssRules).forEach(rule => {
+                                            // Incluir todas las reglas CSS para asegurar fidelidad visual
+                                            cssText += rule.cssText + '\n';
+                                        });
+                                    }
+                                } catch (e) {
+                                    // Ignorar errores de acceso a hojas de estilo
+                                }
+                            });
+                            
+                            // Añadir reglas específicas para asegurar que las miniaturas se muestren correctamente
+                            cssText += `
+                                .image-element img { max-width: 100%; height: auto; }
+                                .object-cover { object-fit: cover !important; }
+                                .mask-circle { clip-path: circle(50%) !important; }
+                                .mask-rounded { clip-path: inset(0% 0% 0% 0% round 8px) !important; }
+                            `;
+                            
+                            newStyle.appendChild(document.createTextNode(cssText));
+                            clonedDoc.head.appendChild(newStyle);
+                        } catch (e) {
+                            console.warn('Error al aplicar estilos CSS', e);
+                        }
+                        
+                        // Procesar imágenes y asegurar que los filtros y máscaras se apliquen
+                        const imageElements = clonedElement.querySelectorAll('.image-element');
+                        imageElements.forEach(imgEl => {
+                            // Aplicar estilos de máscara
+                            const maskElements = imgEl.querySelectorAll('[class*="mask-"]');
+                            maskElements.forEach(el => {
+                                const maskClass = Array.from(el.classList).find(c => c.startsWith('mask-'));
+                                if (maskClass) {
+                                    el.style.clipPath = window.getComputedStyle(el).clipPath;
+                                }
+                            });
+                            
+                            // Aplicar filtros y transformaciones
+                            const filteredElements = imgEl.querySelectorAll('[style*="filter"]');
+                            filteredElements.forEach(el => {
+                                el.style.filter = window.getComputedStyle(el).filter;
+                                el.style.transform = window.getComputedStyle(el).transform;
+                                el.style.mixBlendMode = window.getComputedStyle(el).mixBlendMode;
+                                el.style.opacity = window.getComputedStyle(el).opacity;
+                            });
+                        });
+                        
+                        // Manejar imágenes con enfoque más robusto
+                        const images = clonedElement.querySelectorAll('img');
+                        images.forEach(img => {
+                            // Forzar visibilidad y carga completa
+                            img.style.visibility = 'visible';
+                            img.style.opacity = '1';
+                            img.style.display = 'block';
+                            
+                            // Aplicar estilos específicos según las clases
+                            if (img.classList.contains('object-cover')) {
+                                img.style.objectFit = 'cover';
+                            } else if (img.classList.contains('object-contain')) {
+                                img.style.objectFit = 'contain';
+                            } else {
+                                // Por defecto, usar object-fit: cover para mantener la proporción de aspecto
+                                img.style.objectFit = 'cover';
+                            }
+                            
+                            // Asegurar que las dimensiones sean correctas
+                            if (img.style.width === '100%' || img.classList.contains('w-full')) {
+                                img.style.width = '100%';
+                            }
+                            if (img.style.height === '100%' || img.classList.contains('h-full')) {
+                                img.style.height = '100%';
+                            }
+                            
+                            // Si la imagen no tiene dimensiones, establecer valores por defecto
+                            if (!img.width || !img.height || img.width === 0 || img.height === 0) {
+                                img.style.width = '100%';
+                                img.style.height = '100%';
+                            }
+                            
+                            // Forzar recarga de la imagen si es necesario
+                            if (!img.complete || img.naturalWidth === 0) {
+                                const originalSrc = img.getAttribute('src');
+                                if (originalSrc) {
+                                    // Añadir timestamp para forzar recarga
+                                    const timestamp = new Date().getTime();
+                                    if (originalSrc.indexOf('?') === -1) {
+                                        img.setAttribute('src', `${originalSrc}?t=${timestamp}`);
+                                    } else {
+                                        img.setAttribute('src', `${originalSrc}&t=${timestamp}`);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                },
+                ignoreElements: (element) => element.classList.contains("ignore-thumbnail"),
+            });
+            
+            // Intentar usar formato JPEG para mejor rendimiento y compatibilidad
+            let thumbnail;
+            try {
+                // Intentar primero con PNG para máxima calidad
+                thumbnail = canvas.toDataURL('image/png', 1.0);
+                
+                // Verificar que la miniatura no esté vacía
+                if (thumbnail === 'data:,' || 
+                    thumbnail === 'data:image/png;base64,' ||
+                    thumbnail.length < 100) {
+                    // Si está vacía, intentar con JPEG
+                    console.warn('PNG thumbnail vacío, intentando con JPEG');
+                    thumbnail = canvas.toDataURL('image/jpeg', 1.0);
+                }
+                
+                // Verificar nuevamente
+                if (thumbnail === 'data:,' || 
+                    thumbnail === 'data:image/jpeg;base64,' ||
+                    thumbnail.length < 100) {
+                    console.error('No se pudo generar miniatura válida');
+                }
+            } catch (e) {
+                console.warn('Error al generar miniatura, intentando alternativas:', e);
+                // Intentar diferentes formatos y calidades
+                try {
+                    thumbnail = canvas.toDataURL('image/jpeg', 0.8);
+                } catch (e2) {
+                    console.error('Error final al generar miniatura:', e2);
+                    // Último intento con formato básico
+                    thumbnail = canvas.toDataURL();
+                }
+            }
+            
+            setPageThumbnails(prev => ({ ...prev, [pageId]: thumbnail }));
+        } catch (error) {
+            console.error(`Error regenerating thumbnail for page ${pageId}:`, error);
+            
+            // Intentar una segunda vez con configuración más simple
+            try {
+                console.warn(`Reintentando regeneración de miniatura para página ${pageId} con configuración simplificada`);
+                const simpleCanvas = await html2canvas(pageElement, {
+                    scale: 1,
+                    width,
+                    height,
+                    logging: true,
+                    useCORS: true,
+                    allowTaint: true,
+                    backgroundColor: '#ffffff',
+                    imageTimeout: 0,
+                    foreignObjectRendering: false,
+                    removeContainer: false
+                });
+                
+                // Usar formato PNG para mayor compatibilidad
+                const simpleThumbnail = simpleCanvas.toDataURL('image/png', 1.0);
+                setPageThumbnails(prev => ({ ...prev, [pageId]: simpleThumbnail }));
+            } catch (retryError) {
+                console.error(`Error en segundo intento para página ${pageId}:`, retryError);
+            }
+        } finally {
+            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: false }));
+        }
+    };
+    
+    // Función para regenerar todas las miniaturas
+    const regenerateAllThumbnails = async () => {
+        // Regenerar miniaturas de forma secuencial para evitar bloquear la UI
+        for (let i = 0; i < pages.length; i++) {
+            const page = pages[i];
+            const pageId = page.id;
+            
+            // Esperar un momento entre cada generación para permitir que la UI responda
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            // Regenerar la miniatura
+            await regenerateThumbnail(pageId);
+        }
+    };
 
 
 
     // --- Función para agregar álbum al carrito ---
     const addAlbumToCart = () => {
         console.log('🛒 === INICIO addAlbumToCart ===');
-
+        
         try {
-            console.log('📊 Estado actual:', {
-                albumData: albumData,
-                presetData: presetData,
+            console.log('📊 Estado actual:', { 
+                albumData: albumData, 
+                presetData: presetData, 
                 cartLength: cart?.length,
                 hasAlbumData: !!albumData,
                 hasPresetData: !!presetData,
@@ -1712,7 +1574,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('Global type:', typeof Global);
             console.log('Local object:', Local);
             console.log('Global object:', Global);
-
+            
             if (typeof Local === 'undefined') {
                 console.error('❌ Local no está definido');
                 toast.error("Error del sistema", {
@@ -1722,7 +1584,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 });
                 return false;
             }
-
+            
             if (typeof Global === 'undefined') {
                 console.error('❌ Global no está definido');
                 toast.error("Error del sistema", {
@@ -1735,7 +1597,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Verificar APP_CORRELATIVE
             console.log('Global.APP_CORRELATIVE:', Global.APP_CORRELATIVE);
-
+            
             if (!Global.APP_CORRELATIVE) {
                 console.error('❌ Global.APP_CORRELATIVE no está definido');
                 toast.error("Error del sistema", {
@@ -1757,7 +1619,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 });
                 return false;
             }
-
+            
             if (!presetData) {
                 console.error('❌ presetData no está disponible');
                 console.log('presetData actual:', presetData);
@@ -1782,11 +1644,11 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     }
                 }
                 console.log('📊 Tamaño actual del localStorage:', (totalSize / 1024 / 1024).toFixed(2), 'MB');
-
+                
                 // Si el localStorage está muy lleno (más de 8MB), limpiar datos innecesarios
                 if (totalSize > 8 * 1024 * 1024) {
                     console.log('⚠️ localStorage lleno, limpiando datos innecesarios...');
-
+                    
                     // Limpiar thumbnails viejos y datos temporales
                     for (let key in localStorage) {
                         if (key.includes('thumbnail') || key.includes('temp') || key.includes('cache')) {
@@ -1813,7 +1675,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Crear el producto del álbum para el carrito
             console.log('📦 Creando producto del álbum...');
-
+            
             // Optimizar los datos del álbum para reducir el tamaño del carrito
             const optimizedAlbumData = {
                 album_id: albumData.id,
@@ -1865,22 +1727,22 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             console.log('🛒 Obteniendo carrito actual...');
             const cartKey = `${Global.APP_CORRELATIVE}_cart`;
             console.log('🔑 Clave del carrito:', cartKey);
-
+            
             const currentCart = Local.get(cartKey) || [];
             console.log('🛒 Carrito actual desde localStorage:', currentCart);
             console.log('🛒 Longitud del carrito actual:', currentCart.length);
 
             // Agregar al carrito (siempre como nuevo item para álbumes personalizados)
             console.log('➕ Agregando producto al carrito...');
-            let newCart = [...currentCart, albumProduct];
+            const newCart = [...currentCart, albumProduct];
             console.log('🛒 Nuevo carrito:', newCart);
             console.log('🛒 Nueva longitud del carrito:', newCart.length);
 
             // Actualizar tanto el estado local como localStorage
             console.log('💾 Guardando en estado y localStorage...');
-
+            
             let storageError = null;
-
+            
             try {
                 setCart(newCart);
                 Local.set(cartKey, newCart);
@@ -1889,34 +1751,34 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 storageError = error;
                 if (error.name === 'QuotaExceededError') {
                     console.error('❌ Error de cuota de localStorage excedida');
-
+                    
                     // Intentar liberar espacio eliminando elementos del carrito antiguos
                     console.log('🧹 Intentando liberar espacio del carrito...');
-
+                    
                     try {
                         // Mantener solo los últimos 3 elementos del carrito
                         const reducedCart = currentCart.slice(-2); // Solo los últimos 2
                         const finalCart = [...reducedCart, albumProduct]; // Más el nuevo
-
+                        
                         console.log('📦 Carrito reducido:', finalCart);
-
+                        
                         setCart(finalCart);
                         Local.set(cartKey, finalCart);
-
+                        
                         console.log('✅ Carrito guardado con espacio reducido');
-
+                        
                         // Actualizar la referencia del carrito para las verificaciones
                         newCart = finalCart;
-
+                        
                         toast.success("Álbum agregado al carrito", {
                             description: "Se liberó espacio eliminando productos antiguos.",
                             duration: 4000,
                             position: "bottom-center",
                         });
-
+                        
                     } catch (secondError) {
                         console.error('❌ No se pudo liberar espacio suficiente:', secondError);
-
+                        
                         // Como último recurso, guardar solo la información esencial
                         try {
                             const minimalProduct = {
@@ -1932,20 +1794,20 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     title: albumData.title
                                 }
                             };
-
+                            
                             const minimalCart = [minimalProduct];
                             setCart(minimalCart);
                             Local.set(cartKey, minimalCart);
-
+                            
                             console.log('✅ Guardado con datos mínimos');
                             newCart = minimalCart;
-
+                            
                             toast.success("Álbum agregado al carrito", {
                                 description: "Guardado con información esencial.",
                                 duration: 3000,
                                 position: "bottom-center",
                             });
-
+                            
                         } catch (finalError) {
                             console.error('❌ Error final al guardar:', finalError);
                             throw new Error('No se pudo guardar en el carrito por falta de espacio');
@@ -1966,7 +1828,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const albumInCart = verifyCart?.find(item => item.id === albumId);
             console.log('📦 Álbum encontrado en carrito:', albumInCart ? 'SÍ' : 'NO');
             console.log('📦 Datos del álbum en carrito:', albumInCart);
-
+            
             if (!albumInCart) {
                 console.error('❌ ERROR: El álbum no se encontró en el carrito después de guardarlo');
                 toast.error("Error al verificar carrito", {
@@ -1991,19 +1853,19 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
             // Disparar evento personalizado para notificar otros componentes
             console.log('📡 Disparando evento cartUpdated...');
-            window.dispatchEvent(new CustomEvent('cartUpdated', {
+            window.dispatchEvent(new CustomEvent('cartUpdated', { 
                 detail: { cart: newCart, action: 'add', product: albumProduct }
             }));
 
             console.log('🛒 === FIN addAlbumToCart EXITOSO ===');
             return true;
-
+            
         } catch (error) {
             console.error('❌ === ERROR EN addAlbumToCart ===');
             console.error('Error completo:', error);
             console.error('Stack trace:', error.stack);
             console.error('Mensaje del error:', error.message);
-
+            
             toast.error("Error al agregar al carrito", {
                 description: `Error específico: ${error.message}`,
                 duration: 5000,
@@ -2052,7 +1914,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 } else {
                                     optimizedElement.content = element.content;
                                 }
-
+                                
                                 // Solo incluir filtros no vacíos
                                 if (element.filters) {
                                     const activeFilters = Object.entries(element.filters)
@@ -2061,12 +1923,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             acc[key] = value;
                                             return acc;
                                         }, {});
-
+                                    
                                     if (Object.keys(activeFilters).length > 0) {
                                         optimizedElement.filters = activeFilters;
                                     }
                                 }
-
+                                
                                 if (element.mask && element.mask !== 'none') {
                                     optimizedElement.mask = element.mask;
                                 }
@@ -2092,7 +1954,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             acc[key] = value;
                                             return acc;
                                         }, {});
-
+                                    
                                     if (Object.keys(nonDefaultStyles).length > 0) {
                                         optimizedElement.style = nonDefaultStyles;
                                     }
@@ -2135,13 +1997,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             const dataString = JSON.stringify({ design_data: designData });
             const dataSizeKB = Math.round(dataString.length / 1024);
             const dataSizeMB = Math.round(dataSizeKB / 1024 * 100) / 100;
-
+            
             console.log(`Tamaño del payload: ${dataSizeKB} KB (${dataSizeMB} MB)`);
-
+            
             // Mostrar información detallada sobre el contenido
             let base64Images = 0;
             let totalBase64Size = 0;
-
+            
             pages.forEach(page => {
                 page.cells?.forEach(cell => {
                     cell.elements?.forEach(element => {
@@ -2152,10 +2014,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     });
                 });
             });
-
+            
             const base64SizeMB = Math.round(totalBase64Size / (1024 * 1024) * 100) / 100;
             console.log(`Imágenes base64 encontradas: ${base64Images}, Tamaño total: ${base64SizeMB} MB`);
-
+            
             // Advertir si el payload es muy grande
             if (dataSizeKB > 1024) { // Más de 1MB
                 const proceed = confirm(
@@ -2202,152 +2064,171 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             }
 
             const result = await response.json();
-
+            
             console.log('✅ Diseño finalizado exitosamente en el servidor');
             console.log('📄 Respuesta del servidor:', result);
-
+            
             return true;
 
         } catch (error) {
             console.error('Error al finalizar diseño:', error);
             let userMessage = error.message;
-
+            
             // Mejorar mensajes de error específicos
             if (error.message.includes('Failed to fetch')) {
                 userMessage = 'Error de conexión. Verifique su conexión a internet e intente nuevamente.';
             } else if (error.message.includes('NetworkError') || error.message.includes('net::')) {
                 userMessage = 'Error de red. Intente nuevamente más tarde.';
             }
-
+            
             alert('Error al finalizar el diseño: ' + userMessage);
             return false;
         }
     };
 
-    // --- Generar PDF del álbum usando thumbnails ya generados ---
+    // --- Generar PDF del álbum (fiel al render del editor) ---
+    // Renderiza cada página usando el mismo componente React en un contenedor oculto
     window.generateAlbumPDF = async () => {
-        try {
-            // Importar dependencias dinámicamente
-            const jsPDF = (await import('jspdf')).default;
-
-            console.log('🎯 Iniciando generación de PDF del álbum usando thumbnails...');
-
-            // Verificar que tenemos thumbnails disponibles
-            console.log('🖼️ Thumbnails disponibles:', Object.keys(pageThumbnails));
-            
-            if (Object.keys(pageThumbnails).length === 0) {
-                console.warn('⚠️ No hay thumbnails disponibles, regenerando...');
-                // Disparar regeneración de thumbnails y esperar un poco
-                await new Promise(resolve => setTimeout(resolve, 2000));
-            }
-
-            // Determinar las dimensiones del PDF basadas en el workspace
-            const pdfWidth = workspaceDimensions.originalWidthPx || workspaceDimensions.originalWidth || 800;
-            const pdfHeight = workspaceDimensions.originalHeightPx || workspaceDimensions.originalHeight || 600;
-            
-            console.log(`📄 Dimensiones del PDF: ${pdfWidth}x${pdfHeight}px`);
-
-            // Crear PDF con las dimensiones correctas
-            const pdf = new jsPDF({
-                orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
-                unit: 'px',
-                format: [pdfWidth, pdfHeight]
-            });
-
-            let addedPages = 0;
-
-            // Procesar cada página en orden
-            for (let i = 0; i < pages.length; i++) {
-                const page = pages[i];
-                console.log(`📄 Procesando página ${i + 1} de ${pages.length}: ${page.id} (${page.type})`);
-
-                // Verificar si existe thumbnail para esta página
-                const thumbnailDataUrl = pageThumbnails[page.id];
-                
-                if (!thumbnailDataUrl) {
-                    console.warn(`⚠️ No se encontró thumbnail para página ${page.id}, intentando generar...`);
-                    
-                    // Intentar usar el elemento visible en el DOM como fallback
-                    const pageElement = document.getElementById(`page-${page.id}`);
-                    if (!pageElement) {
-                        console.warn(`❌ Página ${page.id} no encontrada en DOM, saltando...`);
-                        continue;
-                    }
-
-                    try {
-                        // Generar thumbnail on-the-fly usando html2canvas
-                        const html2canvas = (await import('html2canvas')).default;
-                        const canvas = await html2canvas(pageElement, {
-                            width: pdfWidth,
-                            height: pdfHeight,
-                            scale: 2,
-                            backgroundColor: '#ffffff',
-                            useCORS: true,
-                            allowTaint: true,
-                            logging: false
-                        });
-                        
-                        const fallbackDataUrl = canvas.toDataURL('image/jpeg', 0.95);
-                        
-                        if (addedPages > 0) {
-                            pdf.addPage([pdfWidth, pdfHeight]);
-                        }
-                        
-                        pdf.addImage(fallbackDataUrl, 'JPEG', 0, 0, pdfWidth, pdfHeight);
-                        addedPages++;
-                        
-                        console.log(`✅ Página ${page.id} generada como fallback`);
-                        
-                    } catch (error) {
-                        console.error(`❌ Error generando fallback para página ${page.id}:`, error);
-                        continue;
-                    }
-                } else {
-                    // Usar el thumbnail existente
-                    try {
-                        // Agregar nueva página si no es la primera
-                        if (addedPages > 0) {
-                            pdf.addPage([pdfWidth, pdfHeight]);
-                        }
-
-                        // Agregar la imagen del thumbnail al PDF
-                        pdf.addImage(
-                            thumbnailDataUrl,
-                            'JPEG',
-                            0,
-                            0,
-                            pdfWidth,
-                            pdfHeight
-                        );
-                        
-                        addedPages++;
-                        console.log(`✅ Página ${page.id} agregada al PDF usando thumbnail`);
-                        
-                    } catch (error) {
-                        console.error(`❌ Error agregando página ${page.id} al PDF:`, error);
-                        continue;
-                    }
-                }
-            }
-
-            if (addedPages === 0) {
-                throw new Error('No se pudo agregar ninguna página al PDF');
-            }
-
-            // Crear el nombre del archivo
-            const albumTitle = albumData?.title || 'Album';
-            const fileName = `${albumTitle.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}.pdf`;
-
-            // Obtener el PDF como blob
-            const pdfBlob = pdf.output('blob');
-            console.log(`🎉 PDF generado exitosamente: ${fileName} con ${addedPages} páginas`);
-
-            return pdfBlob;
-            
-        } catch (error) {
-            console.error('❌ Error generando PDF:', error);
-            throw error;
+        // 1. Crear un contenedor oculto React en el DOM
+        let hiddenContainer = document.getElementById('pdf-hidden-pages');
+        if (!hiddenContainer) {
+            hiddenContainer = document.createElement('div');
+            hiddenContainer.id = 'pdf-hidden-pages';
+            hiddenContainer.style.position = 'fixed';
+            hiddenContainer.style.left = '-99999px';
+            hiddenContainer.style.top = '0';
+            hiddenContainer.style.width = '800px';
+            hiddenContainer.style.zIndex = '-1';
+            document.body.appendChild(hiddenContainer);
         }
+        hiddenContainer.innerHTML = '';
+
+        // 2. Renderizar cada página usando React (idéntico al editor)
+        // Creamos un mini-app React temporal para renderizar las páginas
+        const renderPage = (page, idx) => {
+            const layout = layouts.find(l => l.id === page.layout) || layouts[0];
+            return (
+                <div
+                    key={page.id}
+                    id={`pdf-page-${page.id}`}
+                    style={{
+                        width: 800,
+                        height: 600,
+                        background: '#fff',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        boxSizing: 'border-box',
+                        display: 'block',
+                        margin: 0,
+                        padding: 0,
+                    }}
+                >
+                    <div
+                        className={`grid ${layout.template}`}
+                        style={{
+                            width: '100%',
+                            height: '100%',
+                            gap: layout.style?.gap || '16px',
+                            padding: layout.style?.padding || '16px',
+                            boxSizing: 'border-box',
+                        }}
+                    >
+                        {page.cells.map((cell, cellIdx) => (
+                            <div
+                                key={cell.id}
+                                style={{
+                                    position: 'relative',
+                                    width: '100%',
+                                    height: '100%',
+                                    background: '#f9fafb',
+                                    borderRadius: 8,
+                                    overflow: 'hidden',
+                                }}
+                            >
+                                {cell.elements.map((element) =>
+                                    element.type === 'image' ? (
+                                        <div
+                                            key={element.id}
+                                            className={imageMasks.find(m => m.id === element.mask)?.class || ''}
+                                            style={{
+                                                position: 'absolute',
+                                                left: element.position.x,
+                                                top: element.position.y,
+                                                width: '100%',
+                                                height: '100%',
+                                                zIndex: element.zIndex || 1,
+                                            }}
+                                        >
+                                            <img
+                                                src={element.content}
+                                                alt=""
+                                                style={{
+                                                    width: '100%',
+                                                    height: '100%',
+                                                    objectFit: 'cover',
+                                                    filter: `brightness(${(element.filters?.brightness || 100) / 100}) contrast(${(element.filters?.contrast || 100) / 100}) saturate(${(element.filters?.saturation || 100) / 100}) sepia(${(element.filters?.tint || 0) / 100}) hue-rotate(${(element.filters?.hue || 0) * 3.6}deg) blur(${element.filters?.blur || 0}px)`,
+                                                    transform: `scale(${element.filters?.scale || 1}) rotate(${element.filters?.rotate || 0}deg)${element.filters?.flipHorizontal ? ' scaleX(-1)' : ''}${element.filters?.flipVertical ? ' scaleY(-1)' : ''}`,
+                                                    mixBlendMode: element.filters?.blendMode || 'normal',
+                                                    opacity: (element.filters?.opacity || 100) / 100,
+                                                }}
+                                            />
+                                        </div>
+                                    ) : (
+                                        <div
+                                            key={element.id}
+                                            style={{
+                                                position: 'absolute',
+                                                left: element.position.x,
+                                                top: element.position.y,
+                                                fontFamily: element.style?.fontFamily,
+                                                fontSize: element.style?.fontSize,
+                                                fontWeight: element.style?.fontWeight,
+                                                fontStyle: element.style?.fontStyle,
+                                                textDecoration: element.style?.textDecoration,
+                                                color: element.style?.color,
+                                                textAlign: element.style?.textAlign,
+                                                background: element.style?.backgroundColor || 'transparent',
+                                                padding: element.style?.padding || '8px',
+                                                borderRadius: element.style?.borderRadius || '0px',
+                                                border: element.style?.border || 'none',
+                                                opacity: element.style?.opacity || 1,
+                                            }}
+                                        >
+                                            {element.content}
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        // Renderizar usando ReactDOM
+        const ReactDOM = await import('react-dom');
+        await new Promise((resolve) => {
+            ReactDOM.render(
+                <div>
+                    {pages.map((page, idx) => renderPage(page, idx))}
+                </div>,
+                hiddenContainer,
+                resolve
+            );
+        });
+
+        // 3. Capturar cada página y agregar al PDF
+        const pdf = new jsPDF({ orientation: 'landscape', unit: 'px', format: [800, 600] });
+        for (let i = 0; i < pages.length; i++) {
+            const pageDiv = document.getElementById(`pdf-page-${pages[i].id}`);
+            const canvas = await html2canvas(pageDiv, { backgroundColor: '#fff', scale: 2 });
+            const imgData = canvas.toDataURL('image/jpeg', 1.0);
+            if (i > 0) pdf.addPage([800, 600], 'landscape');
+            pdf.addImage(imgData, 'JPEG', 0, 0, 800, 600);
+        }
+        pdf.save('album.pdf');
+        // 4. Limpiar el DOM
+        hiddenContainer.innerHTML = '';
     };
 
     return (
@@ -2399,7 +2280,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             return layouts.find((l) => l.id === page.layout) || layouts[0];
                         }}
                         presetData={presetData}
-                        layouts={layouts}
                         pageThumbnails={pageThumbnails}
                         addAlbumToCart={addAlbumToCart}
                     />
@@ -2436,19 +2316,19 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 {isCurrentPageEditable() ? (
                                     <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Pencil className="h-3 w-3" />
-
+                                      
                                     </span>
                                 ) : (
                                     <span className="bg-white/10 text-white/80 px-2 py-2 rounded-md text-xs font-medium flex items-center gap-1">
                                         <Lock className="h-3 w-3" />
-
+                                      
                                     </span>
                                 )}
                             </div>
 
                             {/* Action buttons */}
                             <div className="flex gap-3 items-center">
-                                {/*  <Button
+                                <Button
                                     variant={previewMode ? "secondary" : "outline"}
                                     size="sm"
                                     onClick={togglePreview}
@@ -2456,16 +2336,16 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     className="border-white/20 text-white hover:bg-white/10 hover:text-white"
                                 >
                                     {previewMode ? "Editar" : "Vista previa"}
-                                </Button> */}
+                                </Button>
                                 <Button
                                     variant="secondary"
                                     size="sm"
                                     onClick={() => setIsBookPreviewOpen(true)}
                                     icon={<Book className="h-4 w-4" />}
                                 >
-                                    Comprar Ahora
+                                    Vista de Álbum
                                 </Button>
-                                {/*  <Button
+                              {/*  <Button
                                     variant="primary"
                                     size="sm"
                                     onClick={addAlbumToCart}
@@ -2475,148 +2355,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     Agregar al Carrito
                                 </Button> */}
                                 {/* Botón para limpiar progreso guardado (opcional, visible solo en desarrollo) */}
-                                {/*process.env.NODE_ENV !== 'production' && (
-                                    <>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={clearSavedProgress}
-                                            icon={<Trash2 className="h-4 w-4" />}
-                                            className="text-white hover:bg-red-500"
-                                        >
-                                            Limpiar progreso
-                                        </Button>
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            onClick={async () => {
-                                                console.log('🔍 === DIAGNÓSTICO DE MÁSCARAS ===');
-                                                const pageElement = document.getElementById(`page-${pages[currentPage].id}`);
-
-                                                if (!pageElement) {
-                                                    console.error('❌ No se encontró el elemento de la página');
-                                                    alert('No se encontró el elemento de la página');
-                                                    return;
-                                                }
-
-                                                // Buscar elementos con máscaras
-                                                const maskedElements = pageElement.querySelectorAll('[class*="mask-"]');
-                                                console.log(`  Elementos con máscara encontrados: ${maskedElements.length}`);
-
-                                                maskedElements.forEach((element, index) => {
-                                                    const maskClass = Array.from(element.classList).find(cls => cls.startsWith('mask-'));
-                                                    console.log(`🎭 Elemento ${index}: ${maskClass}`);
-
-                                                    const img = element.querySelector('img');
-                                                    if (img) {
-                                                        console.log(`📷 Imagen encontrada: ${img.src}`);
-                                                        console.log(`  Dimensiones imagen: ${img.naturalWidth}x${img.naturalHeight}`);
-                                                    }
-                                                });
-
-                                                // Crear canvas de prueba con máscaras aplicadas manualmente
-                                                const testCanvas = document.createElement('canvas');
-                                                const testCtx = testCanvas.getContext('2d');
-                                                testCanvas.width = 400;
-                                                testCanvas.height = 300;
-
-                                                // Fondo blanco
-                                                testCtx.fillStyle = '#ffffff';
-                                                testCtx.fillRect(0, 0, 400, 300);
-
-                                                // Función para aplicar máscaras
-                                                const applyMask = (ctx, maskId, width, height) => {
-                                                    ctx.beginPath();
-
-                                                    switch (maskId) {
-                                                        case 'diamond':
-                                                            ctx.moveTo(width / 2, 0);
-                                                            ctx.lineTo(width, height / 2);
-                                                            ctx.lineTo(width / 2, height);
-                                                            ctx.lineTo(0, height / 2);
-                                                            ctx.closePath();
-                                                            break;
-                                                        case 'circle':
-                                                            ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
-                                                            break;
-                                                        case 'triangle':
-                                                            ctx.moveTo(width / 2, 0);
-                                                            ctx.lineTo(width, height);
-                                                            ctx.lineTo(0, height);
-                                                            ctx.closePath();
-                                                            break;
-                                                        default:
-                                                            ctx.rect(0, 0, width, height);
-                                                            break;
-                                                    }
-
-                                                    ctx.clip();
-                                                };
-
-                                                // Procesar cada elemento con máscara
-                                                let yOffset = 0;
-                                                for (const element of maskedElements) {
-                                                    const maskClass = Array.from(element.classList).find(cls => cls.startsWith('mask-'));
-                                                    const maskId = maskClass ? maskClass.replace('mask-', '') : 'none';
-
-                                                    const img = element.querySelector('img');
-                                                    if (img && img.complete) {
-                                                        testCtx.save();
-                                                        testCtx.translate(10, yOffset + 10);
-
-                                                        const testWidth = 150;
-                                                        const testHeight = 100;
-
-                                                        // Aplicar máscara
-                                                        applyMask(testCtx, maskId, testWidth, testHeight);
-
-                                                        // Dibujar imagen
-                                                        testCtx.drawImage(img, 0, 0, testWidth, testHeight);
-                                                        testCtx.restore();
-
-                                                        // Añadir etiqueta
-                                                        testCtx.fillStyle = '#000000';
-                                                        testCtx.font = '12px Arial';
-                                                        testCtx.fillText(`Máscara: ${maskId}`, 170, yOffset + 30);
-
-                                                        yOffset += 120;
-                                                    }
-                                                }
-
-                                                const testDataUrl = testCanvas.toDataURL('image/jpeg', 0.9);
-                                                console.log('✅ Canvas de prueba generado');
-
-                                                // Mostrar en una nueva ventana
-                                                const newWindow = window.open('', '_blank', 'width=600,height=500');
-                                                if (newWindow) {
-                                                    newWindow.document.write(`
-                                                        <html>
-                                                            <head><title>Test Máscaras - Página ${pages[currentPage].id}</title></head>
-                                                            <body style="margin:0; padding:20px; background:#f0f0f0;">
-                                                                <h2>Test de Máscaras - Página ${pages[currentPage].id}</h2>
-                                                                <p>Elementos con máscara encontrados: ${maskedElements.length}</p>
-                                                                <div style="border:2px solid #333; display:inline-block; background:#fff;">
-                                                                    <img src="${testDataUrl}" style="max-width:100%; display:block;" />
-                                                                </div>
-                                                                <h3>Análisis:</h3>
-                                                                <ul>
-                                                                    ${Array.from(maskedElements).map((el, i) => {
-                                                        const maskClass = Array.from(el.classList).find(cls => cls.startsWith('mask-'));
-                                                        return `<li>Elemento ${i + 1}: ${maskClass || 'sin máscara'}</li>`;
-                                                    }).join('')}
-                                                                </ul>
-                                                            </body>
-                                                        </html>
-                                                    `);
-                                                }
-                                            }}
-                                            icon={<Eye className="h-4 w-4" />}
-                                            className="text-white hover:bg-blue-500"
-                                        >
-                                            Test Máscaras
-                                        </Button>
-                                    </>
-                                )*/}
+                                {process.env.NODE_ENV !== 'production' && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={clearSavedProgress}
+                                        icon={<Trash2 className="h-4 w-4" />}
+                                        className="text-white hover:bg-red-500"
+                                    >
+                                        Limpiar progreso
+                                    </Button>
+                                )}
                             </div>
                         </div>
                     </header>
@@ -2839,8 +2588,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     </div>
                                 )}
                             </div>
-
-
                         </aside>
 
                         {/* Main canvas area */}
@@ -3084,7 +2831,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             {/* Canvas workspace - centered */}
                             <div className="flex-1 flex items-center justify-center p-6 overflow-hidden bg-gray-100">
                                 {previewMode ? (
-                                    <div className="bg-white  shadow-lg">
+                                    <div className="bg-white rounded-lg shadow-lg">
                                         <div
                                             className="overflow-hidden"
                                             style={{
@@ -3093,14 +2840,14 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                             }}
                                         >
                                             <div
-                                                id={`page-${pages[currentPage].id}-preview`}
+                                                id={`page-${pages[currentPage].id}`}
                                                 className={`grid ${getCurrentLayout().template} gap-6`}
                                                 style={{ width: '100%', height: '100%' }}
                                             >
                                                 {pages[currentPage].cells.map((cell) => (
                                                     <div
                                                         key={cell.id}
-                                                        className="relative bg-gray-50  overflow-hidden"
+                                                        className="relative bg-gray-50 rounded-lg overflow-hidden"
                                                     >
                                                         {cell.elements.map((element) =>
                                                             element.type === "image" ? (
@@ -3129,7 +2876,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                             sepia(${(element.filters?.tint || 0) / 100})
                                                                             hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
                                                                             blur(${element.filters?.blur || 0}px)
-                                                                        `.replace(/\s+/g, ' ').trim(),
+                                                                        `,
                                                                             transform: `scale(${element.filters?.scale || 1
                                                                                 }) rotate(${element.filters?.rotate || 0
                                                                                 }deg) ${element.filters?.flipHorizontal
@@ -3138,13 +2885,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                                 } ${element.filters?.flipVertical
                                                                                     ? "scaleY(-1)"
                                                                                     : ""
-                                                                                }`.replace(/\s+/g, ' ').trim(),
+                                                                                }`,
                                                                             mixBlendMode: element.filters?.blendMode || "normal",
                                                                             opacity: (element.filters?.opacity || 100) / 100,
-                                                                            // Forzar repaint para asegurar que los filtros se apliquen
-                                                                            willChange: 'filter, transform, opacity',
-                                                                            backfaceVisibility: 'hidden',
-                                                                            WebkitBackfaceVisibility: 'hidden',
                                                                         }}
                                                                     />
                                                                 </div>
@@ -3152,32 +2895,24 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                 <div
                                                                     key={element.id}
                                                                     className="absolute"
-                                                                    data-element-type="text"
-                                                                    data-element-id={element.id}
                                                                     style={{
-                                                                        left: element.position.x <= 1 ? `${element.position.x * 100}%` : `${element.position.x}px`,
-                                                                        top: element.position.y <= 1 ? `${element.position.y * 100}%` : `${element.position.y}px`,
-                                                                        fontFamily: element.style?.fontFamily || "Arial, sans-serif",
-                                                                        fontSize: element.style?.fontSize || "16px",
-                                                                        fontWeight: element.style?.fontWeight || "normal",
-                                                                        fontStyle: element.style?.fontStyle || "normal",
-                                                                        textDecoration: element.style?.textDecoration || "none",
-                                                                        color: element.style?.color || "#000000",
-                                                                        textAlign: element.style?.textAlign || "left",
+                                                                        left: `${element.position.x}px`,
+                                                                        top: `${element.position.y}px`,
+                                                                        fontFamily: element.style?.fontFamily,
+                                                                        fontSize: element.style?.fontSize,
+                                                                        fontWeight: element.style?.fontWeight,
+                                                                        fontStyle: element.style?.fontStyle,
+                                                                        textDecoration: element.style?.textDecoration,
+                                                                        color: element.style?.color,
+                                                                        textAlign: element.style?.textAlign,
                                                                         backgroundColor: element.style?.backgroundColor || "transparent",
                                                                         padding: element.style?.padding || "8px",
                                                                         borderRadius: element.style?.borderRadius || "0px",
                                                                         border: element.style?.border || "none",
-                                                                        opacity: element.style?.opacity !== undefined ? element.style.opacity : 1,
-                                                                        zIndex: element.zIndex || 10,
-                                                                        pointerEvents: 'none',
-                                                                        userSelect: 'none',
-                                                                        // Asegurar que el texto sea siempre visible
-                                                                        minHeight: '20px',
-                                                                        display: 'block'
+                                                                        opacity: element.style?.opacity || 1,
                                                                     }}
                                                                 >
-                                                                    {element.content || "Texto"}
+                                                                    {element.content}
                                                                 </div>
                                                             )
                                                         )}
@@ -3189,22 +2924,12 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 ) : (
                                     <div
                                         id={`page-${pages[currentPage].id}`}
-                                        className="bg-white  shadow-xl"
+                                        className="bg-white rounded-lg shadow-xl"
                                         style={{
                                             width: workspaceDimensions.width,
                                             height: workspaceDimensions.height,
-                                            position: 'relative',
-                                            // Propiedades para mejorar la captura con html2canvas
-                                            isolation: 'isolate',
-                                            contain: 'layout style paint',
-                                            WebkitTransform: 'translateZ(0)', // Forzar aceleración por hardware
-                                            transform: 'translateZ(0)',
-                                            // Asegurar que el contenido no se corte
-                                            overflow: 'visible',
-                                            // Fondo explícito para captura
-                                            backgroundColor: '#ffffff'
+                                            position: 'relative'
                                         }}
-                                        data-capture-element="page"
                                     >
                                         {/* Background layer */}
                                         {(() => {
@@ -3289,7 +3014,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                     </span>
                                 </div>
 
-                                {/*      <div className="flex gap-1.5 mt-3">
+                          {/*      <div className="flex gap-1.5 mt-3">
                                     <Button
                                         variant="ghost"
                                         size="icon"
@@ -3348,19 +3073,29 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className="relative bg-purple-50 overflow-hidden border min-h-[120px] max-h-[160px] flex items-center justify-center">
+                                                <div 
+                                                    className="relative bg-purple-50 overflow-hidden border aspect-[4/3]"
+                                                    onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
+                                                    onMouseLeave={handleHideThumbnailPreview}
+                                                >
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
                                                             alt="Portada"
-                                                            className="w-full h-full object-cover"
-                                                            style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
+                                                            className="w-full h-full object-contain"
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            <div className="text-purple-300">
-                                                                <Book className="h-8 w-8" />
-                                                            </div>
+                                                            {thumbnailsGenerating[page.id] ? (
+                                                                <div className="flex flex-col items-center justify-center">
+                                                                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-400"></div>
+                                                                    <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-purple-300">
+                                                                    <Book className="h-8 w-8" />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
 
@@ -3377,9 +3112,34 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                                     {/* Content pages */}
                                     <div>
-                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></div>
-                                            Páginas de contenido
+                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center justify-between">
+                                            <div className="flex items-center">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></div>
+                                                Páginas de contenido
+                                            </div>
+                                            {/* Botón para regenerar miniaturas */}
+                                            <button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    console.log('🔄 Regenerando miniaturas manualmente...');
+                                                    regenerateAllThumbnails();
+                                                }}
+                                                disabled={Object.values(thumbnailsGenerating).some(isGenerating => isGenerating)}
+                                                className="text-xs px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                                                title="Regenerar todas las miniaturas"
+                                            >
+                                                {Object.values(thumbnailsGenerating).some(isGenerating => isGenerating) ? (
+                                                    <>
+                                                        <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin mr-1"></div>
+                                                        Generando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <ImageIcon className="w-3 h-3 mr-1" />
+                                                        Actualizar
+                                                    </>
+                                                )}
+                                            </button>
                                         </div>
                                         <div className="space-y-2">
                                             {pages.filter(page => page.type === "content").map((page, index) => (
@@ -3392,28 +3152,38 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 mb-1`}
                                                     onClick={() => setCurrentPage(pages.indexOf(page))}
                                                 >
-                                                    <div className="relative overflow-hidden border min-h-[120px] max-h-[160px] flex items-center justify-center bg-gray-50">
+                                                    <div 
+                                                        className="relative overflow-hidden border aspect-[4/3]"
+                                                        onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
+                                                        onMouseLeave={handleHideThumbnailPreview}
+                                                    >
                                                         {pageThumbnails[page.id] ? (
                                                             <img
                                                                 src={pageThumbnails[page.id]}
                                                                 alt={`Página ${page.pageNumber}`}
-                                                                className="w-full h-full object-cover"
-                                                                style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
+                                                                className="w-full h-full object-contain"
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
-                                                                <div
-                                                                    className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full `}
-                                                                >
-                                                                    {Array.from({
-                                                                        length: getCurrentLayout().cells,
-                                                                    }).map((_, i) => (
-                                                                        <div
-                                                                            key={i}
-                                                                            className="bg-gray-200 rounded-sm"
-                                                                        ></div>
-                                                                    ))}
-                                                                </div>
+                                                                {thumbnailsGenerating[page.id] ? (
+                                                                    <div className="flex flex-col items-center justify-center">
+                                                                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-400"></div>
+                                                                        <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div
+                                                                        className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full `}
+                                                                    >
+                                                                        {Array.from({
+                                                                            length: getCurrentLayout().cells,
+                                                                        }).map((_, i) => (
+                                                                            <div
+                                                                                key={i}
+                                                                                className="bg-gray-200 rounded-sm"
+                                                                            ></div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
                                                             </div>
                                                         )}
 
@@ -3448,7 +3218,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                                 </div>
                                                             </div>
                                                         </div>*/}
-
+                                                      
                                                     </div>
                                                 </div>
                                             ))}
@@ -3471,19 +3241,29 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div className="relative overflow-hidden border mb-1 min-h-[120px] max-h-[160px] flex items-center justify-center bg-green-50">
+                                                <div 
+                                                    className="relative overflow-hidden border mb-1 aspect-[4/3]"
+                                                    onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
+                                                    onMouseLeave={handleHideThumbnailPreview}
+                                                >
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
                                                             alt="Contraportada"
-                                                            className="w-full h-full object-cover"
-                                                            style={{ WebkitImageRendering: 'crisp-edges', msImageRendering: 'crisp-edges', imageRendering: 'crisp-edges' }}
+                                                            className="w-full h-full object-contain"
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            <div className="text-green-300">
-                                                                <Book className="h-8 w-8" />
-                                                            </div>
+                                                            {thumbnailsGenerating[page.id] ? (
+                                                                <div className="flex flex-col items-center justify-center">
+                                                                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-400"></div>
+                                                                    <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="text-green-300">
+                                                                    <Book className="h-8 w-8" />
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
 
@@ -3503,9 +3283,45 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                     </div>
                 </div>
             )}
-
+            
             {/* Toaster para notificaciones */}
             <Toaster />
+            
+            {/* Previsualización de miniatura con animación mejorada */}
+            {previewThumbnail && (
+                <div 
+                    id="thumbnail-preview"
+                    className="fixed z-50 shadow-xl rounded-lg overflow-hidden border-2 border-white bg-white opacity-0 scale-95 transform"
+                    style={{
+                        left: `${thumbnailPosition.x}px`,
+                        top: `${thumbnailPosition.y}px`,
+                        width: '300px',
+                        height: '225px',
+                        pointerEvents: 'none', // Para que no interfiera con los eventos del mouse
+                        transition: 'all 0.2s ease-in-out',
+                    }}
+                >
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse" style={{opacity: 0.5}}>
+                        <span className="text-xs text-gray-500">Cargando vista previa...</span>
+                    </div>
+                    <img 
+                        src={previewThumbnail} 
+                        alt="Vista previa" 
+                        className="w-full h-full object-contain relative z-10"
+                        onLoad={(e) => e.target.parentNode.querySelector('.animate-pulse').style.display = 'none'}
+                    />
+                </div>
+            )}
+            
+            {/* Indicador de estado de generación de miniaturas */}
+            <div className="fixed bottom-4 right-4 z-50">
+                {Object.values(thumbnailsGenerating).some(generating => generating) && (
+                    <div className="bg-white shadow-lg rounded-lg p-3 flex items-center space-x-3 border border-gray-200">
+                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
+                        <span className="text-xs text-gray-600">Generando miniaturas...</span>
+                    </div>
+                )}
+            </div>
         </DndProvider>
     );
 }
@@ -3517,6 +3333,13 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         scrollbar-width: thin;
         scrollbar-color: #c7d2fe #f5f3ff;
     }
+    
+    /* Estilos para la animación de miniaturas */
+    .thumbnail-preview-visible {
+        opacity: 1 !important;
+        transform: scale(1) !important;
+    }
+    
     .custom-scroll::-webkit-scrollbar {
         height: 6px;
     }
@@ -3527,5 +3350,10 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     .custom-scroll::-webkit-scrollbar-thumb {
         background-color: #c7d2fe;
         border-radius: 3px;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.95); }
+        to { opacity: 1; transform: scale(1); }
     }
 `}</style>

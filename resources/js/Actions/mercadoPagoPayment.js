@@ -6,7 +6,7 @@ export const processMercadoPagoPayment = (request) => {
         console.log("Datos para MercadoPago:", request)
   
         // Crear preferencia en el servidor
-        const { status, result } = await Fetch("./api/mercadopago/preference", {
+        const { status, result } = await Fetch("./api/payments/mercadopago/create-preference", {
           method: "POST",
           body: JSON.stringify(request),
         })

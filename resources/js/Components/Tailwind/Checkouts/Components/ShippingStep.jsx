@@ -15,9 +15,6 @@ import MercadoPagoCheckoutModal from "./MercadoPagoCheckoutModal";
 import { InfoIcon, CreditCard, Smartphone, Building2, Upload, Check, User, Copy, QrCode, Clock, ChevronRight } from "lucide-react";
 import { Notify } from "sode-extend-react";
 
-// Importar SDK de MercadoPago
-import { initMercadoPago, CardPayment } from '@mercadopago/sdk-js';
-
 export default function ShippingStep({
     cart,
     setSale,
@@ -66,6 +63,16 @@ export default function ShippingStep({
     const [cardPayment, setCardPayment] = useState(null);
     const [mpInitialized, setMpInitialized] = useState(false);
     const [showMpModal, setShowMpModal] = useState(false);
+
+    // DEBUG: Rastrear cambios en el estado del modal
+    useEffect(() => {
+        console.log('🔔 showMpModal cambió a:', showMpModal);
+        if (showMpModal) {
+            console.log('✅ Modal de MP debería estar ABIERTO');
+        } else {
+            console.log('❌ Modal de MP debería estar CERRADO');
+        }
+    }, [showMpModal]);
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -127,40 +134,137 @@ export default function ShippingStep({
     // Procesar pago con MercadoPago Checkout API
     const processMercadoPagoCheckoutApi = async (baseRequest) => {
         try {
-            if (!mpInitialized) {
-                throw new Error('MercadoPago SDK no está inicializado');
+            if (!mpInitialized || !mercadoPagoConfig) {
+                throw new Error('MercadoPago no está disponible. Verifica tu conexión.');
             }
 
-            // Abrir modal de MercadoPago
-            setShowMpModal(true);
+            console.log('💳 Iniciando proceso de pago con MercadoPago...');
 
-            // Retornar promesa que se resuelve cuando el modal completa el pago
-            return new Promise((resolve, reject) => {
-                window.mercadoPagoPaymentResolver = { resolve, reject, baseRequest };
+            // Primero creamos el pedido en nuestro backend
+            const response = await paymentAPI.processPayment(baseRequest);
+            
+            if (!response || !response.status) {
+                throw new Error(response?.message || 'Error al crear el pedido');
+            }
+
+            console.log('✅ Pedido creado:', response.code);
+
+            // Crear datos de preferencia para MercadoPago
+            const preferenceData = {
+                items: [
+                    {
+                        title: `Pedido BananaLab #${response.code}`,
+                        description: `Compra en BananaLab - ${cart.length} item(s)`,
+                        unit_price: parseFloat(baseRequest.amount),
+                        quantity: 1,
+                        currency_id: 'PEN'
+                    }
+                ],
+                external_reference: response.code,
+                back_urls: {
+                    success: `${window.location.origin}/checkout/success?order=${response.code}`,
+                    failure: `${window.location.origin}/checkout/failure?order=${response.code}`,
+                    pending: `${window.location.origin}/checkout/pending?order=${response.code}`
+                },
+                auto_return: 'approved',
+                notification_url: `${window.location.origin}/api/payments/mercadopago/webhook`,
+                statement_descriptor: 'BANANALAB',
+                payment_methods: {
+                    installments: 12,
+                    default_installments: 1
+                },
+                payer: {
+                    name: baseRequest.name,
+                    surname: baseRequest.lastname,
+                    email: baseRequest.email,
+                    phone: {
+                        area_code: '51',
+                        number: baseRequest.phone || ''
+                    }
+                }
+            };
+
+            console.log('📋 Creando preferencia de pago...');
+
+            // Usar nuestro backend para crear la preferencia
+            const preferenceResponse = await fetch('/api/payments/mercadopago/create-preference', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+                },
+                body: JSON.stringify({
+                    preference_data: preferenceData,
+                    order_code: response.code
+                })
             });
 
+            const preferenceResult = await preferenceResponse.json();
+
+            if (preferenceResult.status && preferenceResult.init_point) {
+                console.log('✅ Preferencia creada, redirigiendo...');
+                
+                // Redirigir al checkout de MercadoPago
+                window.location.href = preferenceResult.init_point;
+                
+                // Retornar la respuesta para que el componente maneje el éxito
+                return response;
+            } else {
+                throw new Error(preferenceResult.message || 'No se pudo crear la preferencia de pago');
+            }
+
         } catch (error) {
-            console.error('Error en MercadoPago Checkout API:', error);
-            throw error;
+            console.error('❌ Error en MercadoPago:', error);
+            
+            // Si hay un error, mostrar un mensaje más amigable
+            let errorMessage = 'Error procesando el pago con MercadoPago';
+            
+            if (error.message.includes('public_key') || error.message.includes('configurado')) {
+                errorMessage = 'MercadoPago no está configurado correctamente';
+            } else if (error.message.includes('network') || error.message.includes('fetch')) {
+                errorMessage = 'Error de conexión. Verifica tu internet e intenta nuevamente';
+            } else if (error.message.includes('preferencia')) {
+                errorMessage = 'Error creando la preferencia de pago';
+            }
+            
+            throw new Error(errorMessage);
         }
     };
 
     // Manejar éxito de pago desde el modal de MercadoPago
     const handleMercadoPagoSuccess = (result) => {
+        setShowMpModal(false);
+        
+        if (result && result.status) {
+            setSale(result.sale);
+            setCode(result.code);
+            setCart([]);
+            
+            Notify.add({
+                icon: "/assets/img/icon.svg",
+                title: "¡Pago exitoso!",
+                body: "Tu pago con tarjeta ha sido procesado correctamente",
+                type: "success",
+            });
+            
+            onContinue();
+        }
+        
         if (window.mercadoPagoPaymentResolver) {
             window.mercadoPagoPaymentResolver.resolve(result);
             window.mercadoPagoPaymentResolver = null;
         }
-        setShowMpModal(false);
     };
 
     // Manejar cierre del modal de MercadoPago
     const handleMercadoPagoClose = () => {
+        console.log('🔴 handleMercadoPagoClose ejecutado');
+        setShowMpModal(false);
+        
         if (window.mercadoPagoPaymentResolver) {
             window.mercadoPagoPaymentResolver.reject(new Error('Pago cancelado por el usuario'));
             window.mercadoPagoPaymentResolver = null;
         }
-        setShowMpModal(false);
     };
 
     // Manejar pago exitoso desde el modal
@@ -202,15 +306,15 @@ export default function ShippingStep({
 
             // Usar la nueva API unificada para procesar pagos
             if (selectedMethod.type === 'gateway') {
-                // Para gateways (Culqi, MercadoPago)
+                // Para gateways (Culqi, otros)
                 if (selectedMethod.slug === 'culqi') {
                     if (!window.Culqi) {
                         throw new Error("Culqi aún no se ha cargado.");
                     }
                     response = await processCulqiPayment(baseRequest);
                 } else if (selectedMethod.slug === 'mercadopago') {
-                    // Usar Checkout API de MercadoPago
-                    response = await processMercadoPagoCheckoutApi(baseRequest);
+                    // MercadoPago se maneja directamente en handlePayment
+                    throw new Error('MercadoPago debe manejarse directamente');
                 } else {
                     // Otros gateways usando la API unificada
                     response = await paymentAPI.processPayment(baseRequest);
@@ -222,7 +326,6 @@ export default function ShippingStep({
 
             if (response && response.status) {
                 setSale(response.sale);
-                setDelivery(response.delivery);
                 setCode(response.code);
                 setCart([]);
                 
@@ -310,25 +413,49 @@ export default function ShippingStep({
 
     // Inicializar MercadoPago SDK
     useEffect(() => {
-        initializeMercadoPago();
+        loadMercadoPagoScript();
     }, []);
+
+    const loadMercadoPagoScript = () => {
+        // Verificar si el script ya está cargado
+        if (window.MercadoPago) {
+            initializeMercadoPago();
+            return;
+        }
+
+        // Cargar script de MercadoPago
+        const script = document.createElement('script');
+        script.src = 'https://sdk.mercadopago.com/js/v2';
+        script.async = true;
+        script.onload = () => {
+            console.log('✅ SDK de MercadoPago cargado');
+            initializeMercadoPago();
+        };
+        script.onerror = () => {
+            console.error('❌ Error cargando SDK de MercadoPago');
+        };
+        document.head.appendChild(script);
+    };
 
     const initializeMercadoPago = async () => {
         try {
-            // Obtener configuración de MercadoPago
-            const response = await fetch('/api/mercadopago/config');
+            if (!window.MercadoPago) {
+                console.warn('⚠️ SDK de MercadoPago no está disponible');
+                return;
+            }
+
+            // Obtener configuración de MercadoPago usando nuestra nueva API
+            const response = await fetch('/api/payments/mercadopago/config');
             const data = await response.json();
             
-            if (data.status && data.config) {
+            if (data.status && data.config && data.config.public_key) {
                 setMercadoPagoConfig(data.config);
-                
-                // Inicializar SDK con public key
-                await initMercadoPago(data.config.public_key, {
-                    locale: 'es-PE'
-                });
-
                 setMpInitialized(true);
-                console.log('✅ MercadoPago SDK inicializado correctamente');
+                console.log('✅ MercadoPago configurado correctamente');
+                console.log('🔑 Public Key:', data.config.public_key.substring(0, 20) + '...');
+                console.log('🏗️ Sandbox:', data.config.sandbox ? 'Sí' : 'No');
+            } else {
+                console.warn('⚠️ MercadoPago no configurado correctamente:', data);
             }
         } catch (error) {
             console.error('❌ Error inicializando MercadoPago:', error);
@@ -468,8 +595,101 @@ export default function ShippingStep({
             return;
         }
 
-        // Abrir modal de pasos de pago en lugar de procesar directamente
-        handleOpenPaymentModal();
+        const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
+        
+        // Si es MercadoPago, abrir directamente el modal de tarjetas
+        if (selectedMethod?.slug === 'mercadopago') {
+            if (!mpInitialized || !mercadoPagoConfig) {
+                Notify.add({
+                    icon: "/assets/img/icon.svg",
+                    title: "MercadoPago no disponible",
+                    body: "MercadoPago no está configurado correctamente",
+                    type: "danger",
+                });
+                return;
+            }
+            
+            // Preparar datos para el modal de MercadoPago
+            const baseRequest = {
+                user_id: user?.id || "",
+                name: formData?.name || "",
+                lastname: formData?.lastname || "",
+                fullname: `${formData?.name} ${formData?.lastname}`,
+                email: formData?.email || "",
+                phone: formData?.phone || "",
+                country: "Perú",
+                department: departamento || "",
+                province: provincia || "",
+                district: distrito || "",
+                ubigeo: null,
+                address: formData?.address || "",
+                number: formData?.number || "",
+                comment: formData?.comment || "",
+                reference: formData?.reference || "",
+                amount: totalFinal || 0,
+                delivery: envio,
+                cart: cart,
+                payment_method: formData.paymentMethod,
+                invoiceType: formData.invoiceType,
+                documentType: formData.documentType,
+                document: formData.document,
+                businessName: formData.businessName,
+            };
+            
+            // Guardar datos para el modal
+            window.mercadoPagoPaymentResolver = { 
+                resolve: (result) => {
+                    // Manejar éxito del pago
+                    if (result && result.status) {
+                        setSale(result.sale);
+                        setCode(result.code);
+                        setCart([]);
+                        
+                        Notify.add({
+                            icon: "/assets/img/icon.svg",
+                            title: "¡Pago exitoso!",
+                            body: "Tu pago ha sido procesado correctamente",
+                            type: "success",
+                        });
+                        
+                        onContinue();
+                    }
+                }, 
+                reject: (error) => {
+                    console.error('Error en pago MercadoPago:', error);
+                    Notify.add({
+                        icon: "/assets/img/icon.svg",
+                        title: "Error en el pago",
+                        body: error.message || "No se pudo procesar el pago",
+                        type: "danger",
+                    });
+                }, 
+                baseRequest 
+            };
+            
+            // Abrir modal de MercadoPago de forma robusta
+            console.log('🔴 Abriendo modal MercadoPago con datos:', {
+                amount: totalFinal,
+                baseRequest: baseRequest ? 'Preparado' : 'Sin datos',
+                mpConfig: mercadoPagoConfig ? 'Configurado' : 'No configurado',
+                mpInitialized
+            });
+            
+            // Abrir modal inmediatamente, luego verificar estado
+            setShowMpModal(true);
+            console.log('🔵 setShowMpModal(true) ejecutado');
+            
+            // Verificación adicional para asegurar que el modal permanezca abierto
+            setTimeout(() => {
+                if (!showMpModal) {
+                    console.warn('⚠️ Modal se cerró inesperadamente, reabriéndolo');
+                    setShowMpModal(true);
+                }
+            }, 100);
+        } else {
+            // Para otros métodos de pago, usar el modal de pasos
+            handleOpenPaymentModal();
+        }
     };
 
     const [selectedOption, setSelectedOption] = useState("free");
@@ -1174,7 +1394,9 @@ export default function ShippingStep({
                                         </h4>
                                     </div>
                                     <p className={`text-sm mb-3 ${getSecondaryTextClass()}`}>
-                                        {selectedMethod.type === 'gateway' 
+                                        {selectedMethod.slug === 'mercadopago' 
+                                            ? 'Se abrirá un formulario seguro para ingresar los datos de tu tarjeta de crédito o débito.'
+                                            : selectedMethod.type === 'gateway' 
                                             ? 'Te redirigiremos al gateway de pago seguro para procesar tu transacción.'
                                             : 'Te guiaremos paso a paso para completar tu pago de forma fácil y segura.'
                                         }
@@ -1365,6 +1587,10 @@ export default function ShippingStep({
                                 const selectedMethod = availablePaymentMethods.find(method => method.slug === formData.paymentMethod);
                                 if (!selectedMethod) return 'Continuar';
                                 
+                                if (selectedMethod.slug === 'mercadopago') {
+                                    return '💳 Pagar con Tarjeta - MercadoPago';
+                                }
+                                
                                 switch (selectedMethod.type) {
                                     case 'gateway':
                                         return `Pagar con ${selectedMethod.name}`;
@@ -1417,6 +1643,7 @@ export default function ShippingStep({
                 onPaymentSuccess={handleMercadoPagoSuccess}
                 mercadoPagoConfig={mercadoPagoConfig}
             />
+            
         </div>
     );
 }

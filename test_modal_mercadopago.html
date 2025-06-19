@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Modal MercadoPago</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .status.success { background-color: #d4edda; color: #155724; }
+        .status.error { background-color: #f8d7da; color: #721c24; }
+        .status.info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #0056b3; }
+        .test-section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Modal MercadoPago</h1>
+        
+        <div class="test-section">
+            <h3>1. Verificar Scripts</h3>
+            <div id="scripts-status"></div>
+            <button onclick="checkScripts()">Verificar Scripts</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>2. Test API Backend</h3>
+            <div id="api-status"></div>
+            <button onclick="testAPI()">Test API</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>3. Test MercadoPago Config</h3>
+            <div id="mp-config-status"></div>
+            <button onclick="testMPConfig()">Test MP Config</button>
+        </div>
+        
+        <div class="test-section">
+            <h3>4. Instrucciones</h3>
+            <div class="status info">
+                <strong>Para probar el modal completo:</strong><br>
+                1. Asegúrate de que Laravel esté ejecutándose en <code>http://localhost:8000</code><br>
+                2. Ve a tu página de checkout<br>
+                3. Selecciona MercadoPago como método de pago<br>
+                4. El modal debería aparecer con el formulario de tarjeta<br>
+                5. Verifica que aparece el banner verde "✅ MODAL CARGADO CORRECTAMENTE"
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function checkScripts() {
+            const status = document.getElementById('scripts-status');
+            let html = '';
+            
+            // Verificar MercadoPago SDK
+            if (typeof window.MercadoPago !== 'undefined') {
+                html += '<div class="status success">✅ MercadoPago SDK cargado</div>';
+            } else {
+                html += '<div class="status error">❌ MercadoPago SDK NO cargado</div>';
+            }
+            
+            // Verificar fetch API
+            if (typeof fetch !== 'undefined') {
+                html += '<div class="status success">✅ Fetch API disponible</div>';
+            } else {
+                html += '<div class="status error">❌ Fetch API NO disponible</div>';
+            }
+            
+            status.innerHTML = html;
+        }
+        
+        async function testAPI() {
+            const status = document.getElementById('api-status');
+            status.innerHTML = '<div class="status info">🔄 Probando APIs...</div>';
+            
+            try {
+                // Test payment methods
+                const pmResponse = await fetch('/api/payments/methods');
+                const pmData = await pmResponse.json();
+                
+                let html = '';
+                if (pmData.status) {
+                    html += '<div class="status success">✅ API Métodos de Pago: OK</div>';
+                } else {
+                    html += '<div class="status error">❌ API Métodos de Pago: Error</div>';
+                }
+                
+                status.innerHTML = html;
+            } catch (error) {
+                status.innerHTML = '<div class="status error">❌ Error conectando con API: ' + error.message + '</div>';
+            }
+        }
+        
+        async function testMPConfig() {
+            const status = document.getElementById('mp-config-status');
+            status.innerHTML = '<div class="status info">🔄 Probando MercadoPago Config...</div>';
+            
+            try {
+                const response = await fetch('/api/payments/mercadopago/config');
+                const data = await response.json();
+                
+                let html = '';
+                if (data.status && data.config && data.config.public_key) {
+                    html += '<div class="status success">✅ MercadoPago Config: OK</div>';
+                    html += '<div class="status info">🔑 Public Key: ' + data.config.public_key.substring(0, 20) + '...</div>';
+                    html += '<div class="status info">🏗️ Sandbox: ' + (data.config.sandbox ? 'Sí' : 'No') + '</div>';
+                } else {
+                    html += '<div class="status error">❌ MercadoPago Config: Error - ' + JSON.stringify(data) + '</div>';
+                }
+                
+                status.innerHTML = html;
+            } catch (error) {
+                status.innerHTML = '<div class="status error">❌ Error obteniendo MP Config: ' + error.message + '</div>';
+            }
+        }
+        
+        // Auto-ejecutar verificaciones al cargar
+        window.onload = function() {
+            checkScripts();
+        };
+    </script>
+    
+    <!-- MercadoPago SDK -->
+    <script src="https://sdk.mercadopago.com/js/v2"></script>
+</body>
+</html>

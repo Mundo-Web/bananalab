@@ -64,7 +64,7 @@ const PaymentStepsModalNew = ({
 
             // 2. Crear preferencia de pago
             console.log('🏗️ Creando preferencia...');
-            const preferenceResponse = await fetch('/api/mercadopago/preference', {
+            const preferenceResponse = await fetch('/api/payments/mercadopago/create-preference', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
