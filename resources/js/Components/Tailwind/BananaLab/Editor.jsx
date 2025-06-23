@@ -481,20 +481,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             currentPage,
             savedAt: Date.now(),
         }));
-        
-        // Marcar la miniatura de la página actual para regeneración
-        if (newPages[currentPage]) {
-            const pageId = newPages[currentPage].id;
-            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
-            
-            // Programar regeneración de miniatura después de un breve retraso
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-            debouncedRegenerateThumbnails.current = setTimeout(() => {
-                regenerateThumbnail(pageId);
-            }, 500);
-        }
     };
 
     // Guardar currentPage en localStorage cuando cambie
@@ -597,17 +583,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPageId);
         setCurrentPage(newPageIndex);
-        
-        // Marcar la miniatura para regeneración
-        setThumbnailsGenerating(prev => ({ ...prev, [newPageId]: true }));
-        
-        // Usar el debounce existente para regenerar la miniatura
-        if (debouncedRegenerateThumbnails.current) {
-            clearTimeout(debouncedRegenerateThumbnails.current);
-        }
-        debouncedRegenerateThumbnails.current = setTimeout(() => {
-            regenerateThumbnail(newPageId);
-        }, 500);
     };
 
     // Eliminar la página actual (solo páginas de contenido)
@@ -626,23 +601,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         if (!confirm(`¿Estás seguro de eliminar la ${currentPageData.type === "content" ? `página ${currentPageData.pageNumber}` : "página"}?`)) {
             return;
         }
-        
-        // Guardar el ID de la página que se va a eliminar
-        const deletedPageId = currentPageData.id;
-        
-        // Eliminar la miniatura de la página eliminada
-        setPageThumbnails(prev => {
-            const newThumbnails = { ...prev };
-            delete newThumbnails[deletedPageId];
-            return newThumbnails;
-        });
-        
-        // Eliminar el estado de generación de la página eliminada
-        setThumbnailsGenerating(prev => {
-            const newGenerating = { ...prev };
-            delete newGenerating[deletedPageId];
-            return newGenerating;
-        });
 
         const updatedPages = pages.filter((_, index) => index !== currentPage);
         updatePages(updatedPages);
@@ -692,17 +650,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         // Navegar a la nueva página
         const newPageIndex = updatedPages.findIndex(p => p.id === newPage.id);
         setCurrentPage(newPageIndex);
-        
-        // Marcar la miniatura para regeneración
-        setThumbnailsGenerating(prev => ({ ...prev, [newPage.id]: true }));
-        
-        // Usar el debounce existente para regenerar la miniatura
-        if (debouncedRegenerateThumbnails.current) {
-            clearTimeout(debouncedRegenerateThumbnails.current);
-        }
-        debouncedRegenerateThumbnails.current = setTimeout(() => {
-            regenerateThumbnail(newPage.id);
-        }, 500);
     };
 
     // Añadir un elemento a una celda
@@ -717,18 +664,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             updatePages(updatedPages);
             setSelectedElement(element.id);
             setSelectedCell(cellId);
-            
-            // Marcar la miniatura para regeneración
-            const pageId = updatedPages[currentPage].id;
-            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
-            
-            // Usar el debounce existente para regenerar la miniatura
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-            debouncedRegenerateThumbnails.current = setTimeout(() => {
-                regenerateThumbnail(pageId);
-            }, 500);
         }
     };
 
@@ -771,18 +706,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                 }
             }
             updatePages(updatedPages);
-            
-            // Marcar la miniatura para regeneración
-            const pageId = updatedPages[currentPage].id;
-            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
-            
-            // Usar el debounce existente para regenerar la miniatura
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-            debouncedRegenerateThumbnails.current = setTimeout(() => {
-                regenerateThumbnail(pageId);
-            }, 500);
         }
     };
 
@@ -802,18 +725,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             if (selectedElement === elementId) {
                 setSelectedElement(null);
             }
-            
-            // Marcar la miniatura para regeneración
-            const pageId = updatedPages[currentPage].id;
-            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
-            
-            // Usar el debounce existente para regenerar la miniatura
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-            debouncedRegenerateThumbnails.current = setTimeout(() => {
-                regenerateThumbnail(pageId);
-            }, 500);
         }
     };
 
@@ -886,38 +797,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             },
         });
     };
-    
-    // Mostrar previsualización de miniatura con zoom mejorado
-    const handleShowThumbnailPreview = (thumbnailSrc, event) => {
-        if (!thumbnailSrc) return;
-        
-        // Calcular posición para que la previsualización aparezca cerca del cursor
-        // pero sin salirse de la pantalla
-        const x = Math.min(event.clientX + 20, window.innerWidth - 320);
-        const y = Math.min(event.clientY - 100, window.innerHeight - 240);
-        
-        setThumbnailPosition({ x, y });
-        setPreviewThumbnail(thumbnailSrc);
-        
-        // Añadir clase para animación suave
-        setTimeout(() => {
-            const previewElement = document.getElementById('thumbnail-preview');
-            if (previewElement) {
-                previewElement.classList.add('thumbnail-preview-visible');
-            }
-        }, 10);
-    };
-    
-    // Ocultar previsualización de miniatura con animación
-    const handleHideThumbnailPreview = () => {
-        const previewElement = document.getElementById('thumbnail-preview');
-        if (previewElement) {
-            previewElement.classList.remove('thumbnail-preview-visible');
-            setTimeout(() => setPreviewThumbnail(null), 200); // Esperar a que termine la animación
-        } else {
-            setPreviewThumbnail(null);
-        }
-    };
 
     const [workspaceSize, setWorkspaceSize] = useState("preset");
 
@@ -989,10 +868,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     // Estado para las dimensiones calculadas
     const [workspaceDimensions, setWorkspaceDimensions] = useState({ width: 800, height: 600 });
-    
-    // Estado para la previsualización de miniaturas
-    const [previewThumbnail, setPreviewThumbnail] = useState(null);
-    const [thumbnailPosition, setThumbnailPosition] = useState({ x: 0, y: 0 });
 
     // Actualizar dimensiones cuando cambie el preset o el tamaño del workspace
     useEffect(() => {
@@ -1001,555 +876,63 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     }, [presetData, workspaceSize]);
 
     // Actualizar dimensiones cuando cambie el tamaño de la ventana
-    // Referencia para el debounce de regeneración de miniaturas
-    const debouncedRegenerateThumbnails = useRef(null);
-    
     useEffect(() => {
         const handleResize = () => {
-            // Actualizar dimensiones del workspace
             const dimensions = getWorkspaceDimensions();
             setWorkspaceDimensions(dimensions);
-            
-            // Regenerar miniaturas cuando cambia el tamaño de la ventana
-            // Usamos un debounce para no regenerar constantemente
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-            debouncedRegenerateThumbnails.current = setTimeout(() => {
-                // Marcar todas las páginas para regeneración
-                const newGeneratingState = {};
-                pages.forEach(page => {
-                    newGeneratingState[page.id] = true;
-                });
-                setThumbnailsGenerating(prev => ({ ...prev, ...newGeneratingState }));
-                
-                // Programar regeneración después de un breve retraso
-                setTimeout(() => {
-                    regenerateAllThumbnails();
-                }, 300);
-            }, 500);
         };
 
         window.addEventListener('resize', handleResize);
-        return () => {
-            window.removeEventListener('resize', handleResize);
-            if (debouncedRegenerateThumbnails.current) {
-                clearTimeout(debouncedRegenerateThumbnails.current);
-            }
-        };
-    }, [presetData, workspaceSize, pages]);
+        return () => window.removeEventListener('resize', handleResize);
+    }, [presetData, workspaceSize]);
 
-    // Estado para controlar la generación de miniaturas
-    const [thumbnailsGenerating, setThumbnailsGenerating] = useState({});
-    
     useEffect(() => {
-        // ===== SISTEMA PROFESIONAL DE MINIATURAS ESTILO CANVA =====
-        // Esta función genera miniaturas que son copias exactas del workspace
-        const generateProfessionalThumbnails = async () => {
-            console.log('🎨 === INICIANDO GENERACIÓN PROFESIONAL DE MINIATURAS ===');
-            console.log(`📄 Generando miniaturas para ${pages.length} páginas`);
-            
+        const generateThumbnails = async () => {
             const newThumbnails = {};
-            const newGeneratingState = {};
-            
-            // Marcar todas las páginas como "generando"
-            pages.forEach(page => {
-                newGeneratingState[page.id] = true;
-            });
-            setThumbnailsGenerating({...thumbnailsGenerating, ...newGeneratingState});
-            
-            // Procesar cada página
-            for (let i = 0; i < pages.length; i++) {
-                const page = pages[i];
-                const pageId = page.id;
-                
-                console.log(`🎯 Procesando página ${i + 1}/${pages.length}: ${pageId}`);
-                
-                try {
-                    let thumbnailDataUrl = null;
-                    
-                    // MÉTODO 1: Si es la página actual, capturar el workspace visible
-                    if (i === currentPage) {
-                        console.log(`⚡ Capturando página actual visible: ${pageId}`);
-                        const visibleWorkspace = document.getElementById(`page-${pageId}`);
-                        
-                        if (visibleWorkspace) {
-                            // Esperar a que las imágenes estén cargadas
-                            const images = visibleWorkspace.querySelectorAll('img');
-                            await Promise.all(Array.from(images).map(img => {
-                                return new Promise(resolve => {
-                                    if (img.complete && img.naturalWidth > 0) {
-                                        resolve();
-                                    } else {
-                                        img.onload = resolve;
-                                        img.onerror = resolve;
-                                        setTimeout(resolve, 2000); // timeout
-                                    }
-                                });
-                            }));
-                            
-                            // Capturar con html2canvas optimizado
-                            const canvas = await html2canvas(visibleWorkspace, {
-                                scale: 1,
-                                backgroundColor: '#ffffff',
-                                useCORS: true,
-                                allowTaint: false,
+
+            await Promise.all(
+                pages.map(async (page, index) => {
+                    const pageElement = document.getElementById(
+                        `page-${page.id}`
+                    );
+                    if (pageElement) {
+                        try {
+                            // Calcula el tamaño real del elemento
+                            const rect = pageElement.getBoundingClientRect();
+                            const width = Math.round(rect.width);
+                            const height = Math.round(rect.height);
+                            const scale = window.devicePixelRatio || 1;
+                            const canvas = await html2canvas(pageElement, {
+                                scale,
+                                width,
+                                height,
                                 logging: false,
-                                imageTimeout: 5000,
-                                foreignObjectRendering: true,
+                                useCORS: true,
+                                allowTaint: true,
                                 ignoreElements: (element) => {
-                                    return element.classList.contains('ignore-thumbnail') ||
-                                           element.classList.contains('selection-indicator') ||
-                                           element.classList.contains('resize-handle') ||
-                                           element.tagName === 'BUTTON';
-                                }
+                                    return element.classList.contains(
+                                        "ignore-thumbnail"
+                                    );
+                                },
                             });
-                            
-                            thumbnailDataUrl = canvas.toDataURL('image/png', 0.9);
-                            console.log(`✅ Miniatura de página actual capturada: ${pageId}`);
+                            newThumbnails[page.id] = canvas.toDataURL();
+                        } catch (error) {
+                            console.error("Error generating thumbnail:", error);
+                            newThumbnails[page.id] = null;
                         }
                     }
-                    
-                    // MÉTODO 2: Si no es la página actual, crear una representación temporal
-                    if (!thumbnailDataUrl) {
-                        console.log(`🔄 Creando representación temporal para: ${pageId}`);
-                        thumbnailDataUrl = await createTemporaryThumbnail(page);
-                    }
-                    
-                    // Guardar miniatura generada
-                    if (thumbnailDataUrl) {
-                        newThumbnails[pageId] = thumbnailDataUrl;
-                        
-                        // Actualizar inmediatamente en la UI
-                        setPageThumbnails(prev => ({ 
-                            ...prev, 
-                            [pageId]: thumbnailDataUrl 
-                        }));
-                        
-                        console.log(`✅ Miniatura completada para: ${pageId}`);
-                    } else {
-                        console.warn(`⚠️ No se pudo generar miniatura para: ${pageId}`);
-                    }
-                    
-                } catch (error) {
-                    console.error(`❌ Error generando miniatura para ${pageId}:`, error);
-                } finally {
-                    // Marcar como completado
-                    setThumbnailsGenerating(prev => ({ 
-                        ...prev, 
-                        [pageId]: false 
-                    }));
-                }
-                
-                // Pequeña pausa para no bloquear la UI
-                await new Promise(resolve => setTimeout(resolve, 100));
-            }
-            
-            console.log('🎉 === GENERACIÓN DE MINIATURAS COMPLETADA ===');
-            console.log(`📊 Miniaturas generadas: ${Object.keys(newThumbnails).length}/${pages.length}`);
-        };
-        
-        // Función para crear miniatura temporal renderizando la página sin mostrarla
-        const createTemporaryThumbnail = async (pageData) => {
-            try {
-                // Crear contenedor temporal fuera de la vista
-                const tempContainer = document.createElement('div');
-                tempContainer.style.position = 'absolute';
-                tempContainer.style.left = '-9999px';
-                tempContainer.style.top = '-9999px';
-                tempContainer.style.width = `${workspaceDimensions.width}px`;
-                tempContainer.style.height = `${workspaceDimensions.height}px`;
-                tempContainer.style.backgroundColor = '#ffffff';
-                tempContainer.style.overflow = 'hidden';
-                tempContainer.id = `temp-page-${pageData.id}`;
-                
-                // Obtener layout de la página
-                const pageLayout = layouts.find(l => l.id === pageData.layout) || layouts[0];
-                
-                // Crear estructura HTML igual al workspace
-                tempContainer.innerHTML = `
-                    <div class="grid ${pageLayout.template} gap-6" style="width: 100%; height: 100%;">
-                        ${pageData.cells.map((cell, cellIndex) => `
-                            <div style="position: relative; background-color: #f9fafb; border-radius: 8px; overflow: hidden;">
-                                ${cell.elements.map(element => {
-                                    if (element.type === 'image' && element.content) {
-                                        // Encontrar la máscara
-                                        const mask = imageMasks.find(m => m.id === element.mask);
-                                        const maskClass = mask ? mask.class : '';
-                                        
-                                        // Crear filtros CSS
-                                        const filters = element.filters ? [
-                                            `brightness(${(element.filters.brightness || 100) / 100})`,
-                                            `contrast(${(element.filters.contrast || 100) / 100})`,
-                                            `saturate(${(element.filters.saturation || 100) / 100})`,
-                                            `sepia(${(element.filters.tint || 0) / 100})`,
-                                            `hue-rotate(${(element.filters.hue || 0) * 3.6}deg)`,
-                                            `blur(${element.filters.blur || 0}px)`
-                                        ].join(' ') : '';
-                                        
-                                        const transforms = element.filters ? [
-                                            `scale(${element.filters.scale || 1})`,
-                                            `rotate(${element.filters.rotate || 0}deg)`,
-                                            element.filters.flipHorizontal ? 'scaleX(-1)' : '',
-                                            element.filters.flipVertical ? 'scaleY(-1)' : ''
-                                        ].filter(Boolean).join(' ') : '';
-                                        
-                                        return `
-                                            <div class="${maskClass}" style="
-                                                position: absolute;
-                                                left: ${element.position.x}px;
-                                                top: ${element.position.y}px;
-                                                width: 100%;
-                                                height: 100%;
-                                                z-index: ${element.zIndex || 1};
-                                            ">
-                                                <img src="${element.content}" style="
-                                                    width: 100%;
-                                                    height: 100%;
-                                                    object-fit: cover;
-                                                    filter: ${filters};
-                                                    transform: ${transforms};
-                                                    mix-blend-mode: ${element.filters?.blendMode || 'normal'};
-                                                    opacity: ${(element.filters?.opacity || 100) / 100};
-                                                " />
-                                            </div>
-                                        `;
-                                    } else if (element.type === 'text' && element.content) {
-                                        const style = element.style || {};
-                                        return `
-                                            <div style="
-                                                position: absolute;
-                                                left: ${element.position.x}px;
-                                                top: ${element.position.y}px;
-                                                font-family: ${style.fontFamily || 'Arial'};
-                                                font-size: ${style.fontSize || '16px'};
-                                                font-weight: ${style.fontWeight || 'normal'};
-                                                font-style: ${style.fontStyle || 'normal'};
-                                                text-decoration: ${style.textDecoration || 'none'};
-                                                color: ${style.color || '#000000'};
-                                                text-align: ${style.textAlign || 'left'};
-                                                background-color: ${style.backgroundColor || 'transparent'};
-                                                padding: ${style.padding || '8px'};
-                                                border-radius: ${style.borderRadius || '0px'};
-                                                border: ${style.border || 'none'};
-                                                opacity: ${style.opacity || 1};
-                                                z-index: ${element.zIndex || 1};
-                                            ">${element.content}</div>
-                                        `;
-                                    }
-                                    return '';
-                                }).join('')}
-                            </div>
-                        `).join('')}
-                    </div>
-                `;
-                
-                // Agregar al DOM temporal
-                document.body.appendChild(tempContainer);
-                
-                // Esperar a que las imágenes se carguen
-                const images = tempContainer.querySelectorAll('img');
-                await Promise.all(Array.from(images).map(img => {
-                    return new Promise(resolve => {
-                        if (img.complete && img.naturalWidth > 0) {
-                            resolve();
-                        } else {
-                            img.onload = resolve;
-                            img.onerror = resolve;
-                            setTimeout(resolve, 3000); // timeout
-                        }
-                    });
-                }));
-                
-                // Capturar con html2canvas
-                const canvas = await html2canvas(tempContainer, {
-                    scale: 1,
-                    backgroundColor: '#ffffff',
-                    useCORS: true,
-                    allowTaint: false,
-                    logging: false,
-                    imageTimeout: 5000,
-                    foreignObjectRendering: true
-                });
-                
-                // Limpiar el contenedor temporal
-                document.body.removeChild(tempContainer);
-                
-                return canvas.toDataURL('image/png', 0.9);
-                
-            } catch (error) {
-                console.error('Error creando miniatura temporal:', error);
-                return null;
-            }
+                })
+            );
+
+            setPageThumbnails({ ...pageThumbnails, ...newThumbnails });
         };
 
-        // Debounce para no generar miniaturas constantemente
         const debouncedGenerate = setTimeout(() => {
-            generateProfessionalThumbnails();
+            generateThumbnails();
         }, 500);
 
         return () => clearTimeout(debouncedGenerate);
-    }, [pages, currentPage, workspaceDimensions]);
-    
-    // Función para regenerar una miniatura específica
-    const regenerateThumbnail = async (pageId) => {
-        const pageElement = document.getElementById(`page-${pageId}`);
-        if (!pageElement) return;
-        
-        // Evitar regenerar si ya está en proceso
-        if (thumbnailsGenerating[pageId]) return;
-        
-        setThumbnailsGenerating(prev => ({ ...prev, [pageId]: true }));
-        
-        try {
-            // Esperar a que todas las imágenes estén cargadas
-            const images = pageElement.querySelectorAll('img');
-            if (images.length > 0) {
-                await Promise.all(
-                    Array.from(images).map(img => {
-                        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
-                        return new Promise(resolve => {
-                            img.onload = resolve;
-                            img.onerror = resolve; // Continuar incluso si hay error
-                            
-                            // Forzar recarga si la imagen no está cargada correctamente
-                            if (!img.complete || img.naturalWidth === 0) {
-                                const currentSrc = img.src;
-                                if (currentSrc) {
-                                    // Intentar recargar la imagen
-                                    const timestamp = new Date().getTime();
-                                    if (currentSrc.indexOf('?') === -1) {
-                                        img.src = `${currentSrc}?t=${timestamp}`;
-                                    } else {
-                                        img.src = `${currentSrc}&t=${timestamp}`;
-                                    }
-                                }
-                            }
-                        });
-                    })
-                );
-                
-                // Dar un pequeño tiempo adicional para asegurar que el navegador ha renderizado todo
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-            
-            // Calcular dimensiones óptimas para la miniatura
-            const rect = pageElement.getBoundingClientRect();
-            const width = Math.round(rect.width);
-            const height = Math.round(rect.height);
-            
-            // Calcular escala óptima para miniaturas
-            // Usar una escala menor para miniaturas mejora el rendimiento
-            // pero mantiene suficiente calidad para la visualización
-            const scale = Math.min(window.devicePixelRatio || 1, 1.5);
-            
-            const canvas = await html2canvas(pageElement, {
-                scale: 1.5, // Usar una escala fija para mejor rendimiento y calidad
-                width,
-                height,
-                logging: true, // Activar logs para depuración
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff', // Fondo blanco para evitar transparencias no deseadas
-                imageTimeout: 15000, // Tiempo de espera más largo para cargar imágenes
-                foreignObjectRendering: false, // Desactivar para mayor compatibilidad
-                removeContainer: false,
-                proxy: null, // No usar proxy para imágenes
-                ignoreElements: (element) => {
-                    // Ignorar elementos que podrían causar problemas
-                    return element.classList.contains('ignore-thumbnail') || 
-                           element.tagName === 'SCRIPT' || 
-                           element.tagName === 'STYLE';
-                },
-                onclone: (clonedDoc) => {
-                    // Asegurar que los estilos se apliquen correctamente en el clon
-                    const clonedElement = clonedDoc.getElementById(`page-${pageId}`);
-                    if (clonedElement) {
-                        // Aplicar estilos CSS externos de manera más eficiente
-                        try {
-                            // Crear un único elemento de estilo para todos los CSS
-                            const newStyle = clonedDoc.createElement('style');
-                            let cssText = '';
-                            
-                            // Recopilar reglas CSS relevantes
-                            Array.from(document.styleSheets).forEach(sheet => {
-                                try {
-                                    if (sheet.cssRules) {
-                                        Array.from(sheet.cssRules).forEach(rule => {
-                                            // Incluir todas las reglas CSS para asegurar fidelidad visual
-                                            cssText += rule.cssText + '\n';
-                                        });
-                                    }
-                                } catch (e) {
-                                    // Ignorar errores de acceso a hojas de estilo
-                                }
-                            });
-                            
-                            // Añadir reglas específicas para asegurar que las miniaturas se muestren correctamente
-                            cssText += `
-                                .image-element img { max-width: 100%; height: auto; }
-                                .object-cover { object-fit: cover !important; }
-                                .mask-circle { clip-path: circle(50%) !important; }
-                                .mask-rounded { clip-path: inset(0% 0% 0% 0% round 8px) !important; }
-                            `;
-                            
-                            newStyle.appendChild(document.createTextNode(cssText));
-                            clonedDoc.head.appendChild(newStyle);
-                        } catch (e) {
-                            console.warn('Error al aplicar estilos CSS', e);
-                        }
-                        
-                        // Procesar imágenes y asegurar que los filtros y máscaras se apliquen
-                        const imageElements = clonedElement.querySelectorAll('.image-element');
-                        imageElements.forEach(imgEl => {
-                            // Aplicar estilos de máscara
-                            const maskElements = imgEl.querySelectorAll('[class*="mask-"]');
-                            maskElements.forEach(el => {
-                                const maskClass = Array.from(el.classList).find(c => c.startsWith('mask-'));
-                                if (maskClass) {
-                                    el.style.clipPath = window.getComputedStyle(el).clipPath;
-                                }
-                            });
-                            
-                            // Aplicar filtros y transformaciones
-                            const filteredElements = imgEl.querySelectorAll('[style*="filter"]');
-                            filteredElements.forEach(el => {
-                                el.style.filter = window.getComputedStyle(el).filter;
-                                el.style.transform = window.getComputedStyle(el).transform;
-                                el.style.mixBlendMode = window.getComputedStyle(el).mixBlendMode;
-                                el.style.opacity = window.getComputedStyle(el).opacity;
-                            });
-                        });
-                        
-                        // Manejar imágenes con enfoque más robusto
-                        const images = clonedElement.querySelectorAll('img');
-                        images.forEach(img => {
-                            // Forzar visibilidad y carga completa
-                            img.style.visibility = 'visible';
-                            img.style.opacity = '1';
-                            img.style.display = 'block';
-                            
-                            // Aplicar estilos específicos según las clases
-                            if (img.classList.contains('object-cover')) {
-                                img.style.objectFit = 'cover';
-                            } else if (img.classList.contains('object-contain')) {
-                                img.style.objectFit = 'contain';
-                            } else {
-                                // Por defecto, usar object-fit: cover para mantener la proporción de aspecto
-                                img.style.objectFit = 'cover';
-                            }
-                            
-                            // Asegurar que las dimensiones sean correctas
-                            if (img.style.width === '100%' || img.classList.contains('w-full')) {
-                                img.style.width = '100%';
-                            }
-                            if (img.style.height === '100%' || img.classList.contains('h-full')) {
-                                img.style.height = '100%';
-                            }
-                            
-                            // Si la imagen no tiene dimensiones, establecer valores por defecto
-                            if (!img.width || !img.height || img.width === 0 || img.height === 0) {
-                                img.style.width = '100%';
-                                img.style.height = '100%';
-                            }
-                            
-                            // Forzar recarga de la imagen si es necesario
-                            if (!img.complete || img.naturalWidth === 0) {
-                                const originalSrc = img.getAttribute('src');
-                                if (originalSrc) {
-                                    // Añadir timestamp para forzar recarga
-                                    const timestamp = new Date().getTime();
-                                    if (originalSrc.indexOf('?') === -1) {
-                                        img.setAttribute('src', `${originalSrc}?t=${timestamp}`);
-                                    } else {
-                                        img.setAttribute('src', `${originalSrc}&t=${timestamp}`);
-                                    }
-                                }
-                            }
-                        });
-                    }
-                },
-                ignoreElements: (element) => element.classList.contains("ignore-thumbnail"),
-            });
-            
-            // Intentar usar formato JPEG para mejor rendimiento y compatibilidad
-            let thumbnail;
-            try {
-                // Intentar primero con PNG para máxima calidad
-                thumbnail = canvas.toDataURL('image/png', 1.0);
-                
-                // Verificar que la miniatura no esté vacía
-                if (thumbnail === 'data:,' || 
-                    thumbnail === 'data:image/png;base64,' ||
-                    thumbnail.length < 100) {
-                    // Si está vacía, intentar con JPEG
-                    console.warn('PNG thumbnail vacío, intentando con JPEG');
-                    thumbnail = canvas.toDataURL('image/jpeg', 1.0);
-                }
-                
-                // Verificar nuevamente
-                if (thumbnail === 'data:,' || 
-                    thumbnail === 'data:image/jpeg;base64,' ||
-                    thumbnail.length < 100) {
-                    console.error('No se pudo generar miniatura válida');
-                }
-            } catch (e) {
-                console.warn('Error al generar miniatura, intentando alternativas:', e);
-                // Intentar diferentes formatos y calidades
-                try {
-                    thumbnail = canvas.toDataURL('image/jpeg', 0.8);
-                } catch (e2) {
-                    console.error('Error final al generar miniatura:', e2);
-                    // Último intento con formato básico
-                    thumbnail = canvas.toDataURL();
-                }
-            }
-            
-            setPageThumbnails(prev => ({ ...prev, [pageId]: thumbnail }));
-        } catch (error) {
-            console.error(`Error regenerating thumbnail for page ${pageId}:`, error);
-            
-            // Intentar una segunda vez con configuración más simple
-            try {
-                console.warn(`Reintentando regeneración de miniatura para página ${pageId} con configuración simplificada`);
-                const simpleCanvas = await html2canvas(pageElement, {
-                    scale: 1,
-                    width,
-                    height,
-                    logging: true,
-                    useCORS: true,
-                    allowTaint: true,
-                    backgroundColor: '#ffffff',
-                    imageTimeout: 0,
-                    foreignObjectRendering: false,
-                    removeContainer: false
-                });
-                
-                // Usar formato PNG para mayor compatibilidad
-                const simpleThumbnail = simpleCanvas.toDataURL('image/png', 1.0);
-                setPageThumbnails(prev => ({ ...prev, [pageId]: simpleThumbnail }));
-            } catch (retryError) {
-                console.error(`Error en segundo intento para página ${pageId}:`, retryError);
-            }
-        } finally {
-            setThumbnailsGenerating(prev => ({ ...prev, [pageId]: false }));
-        }
-    };
-    
-    // Función para regenerar todas las miniaturas
-    const regenerateAllThumbnails = async () => {
-        // Regenerar miniaturas de forma secuencial para evitar bloquear la UI
-        for (let i = 0; i < pages.length; i++) {
-            const page = pages[i];
-            const pageId = page.id;
-            
-            // Esperar un momento entre cada generación para permitir que la UI responda
-            await new Promise(resolve => setTimeout(resolve, 50));
-            
-            // Regenerar la miniatura
-            await regenerateThumbnail(pageId);
-        }
-    };
+    }, [pages, currentPage]);
 
 
 
@@ -3073,11 +2456,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div 
-                                                    className="relative bg-purple-50 overflow-hidden border aspect-[4/3]"
-                                                    onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
-                                                    onMouseLeave={handleHideThumbnailPreview}
-                                                >
+                                                <div className="relative bg-purple-50  overflow-hidden border aspect-[4/3] ">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
@@ -3086,16 +2465,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            {thumbnailsGenerating[page.id] ? (
-                                                                <div className="flex flex-col items-center justify-center">
-                                                                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-purple-400"></div>
-                                                                    <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-purple-300">
-                                                                    <Book className="h-8 w-8" />
-                                                                </div>
-                                                            )}
+                                                            <div className="text-purple-300">
+                                                                <Book className="h-8 w-8" />
+                                                            </div>
                                                         </div>
                                                     )}
 
@@ -3112,34 +2484,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                                     {/* Content pages */}
                                     <div>
-                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center justify-between">
-                                            <div className="flex items-center">
-                                                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></div>
-                                                Páginas de contenido
-                                            </div>
-                                            {/* Botón para regenerar miniaturas */}
-                                            <button
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    console.log('🔄 Regenerando miniaturas manualmente...');
-                                                    regenerateAllThumbnails();
-                                                }}
-                                                disabled={Object.values(thumbnailsGenerating).some(isGenerating => isGenerating)}
-                                                className="text-xs px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-600 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                                                title="Regenerar todas las miniaturas"
-                                            >
-                                                {Object.values(thumbnailsGenerating).some(isGenerating => isGenerating) ? (
-                                                    <>
-                                                        <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin mr-1"></div>
-                                                        Generando...
-                                                    </>
-                                                ) : (
-                                                    <>
-                                                        <ImageIcon className="w-3 h-3 mr-1" />
-                                                        Actualizar
-                                                    </>
-                                                )}
-                                            </button>
+                                        <div className="text-xs font-medium text-gray-500 mb-2 flex items-center">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mr-1.5"></div>
+                                            Páginas de contenido
                                         </div>
                                         <div className="space-y-2">
                                             {pages.filter(page => page.type === "content").map((page, index) => (
@@ -3152,11 +2499,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                 mb-1`}
                                                     onClick={() => setCurrentPage(pages.indexOf(page))}
                                                 >
-                                                    <div 
-                                                        className="relative overflow-hidden border aspect-[4/3]"
-                                                        onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
-                                                        onMouseLeave={handleHideThumbnailPreview}
-                                                    >
+                                                    <div className="relative  overflow-hidden border aspect-[4/3]">
                                                         {pageThumbnails[page.id] ? (
                                                             <img
                                                                 src={pageThumbnails[page.id]}
@@ -3165,25 +2508,18 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                             />
                                                         ) : (
                                                             <div className="w-full h-full flex items-center justify-center">
-                                                                {thumbnailsGenerating[page.id] ? (
-                                                                    <div className="flex flex-col items-center justify-center">
-                                                                        <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-blue-400"></div>
-                                                                        <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
-                                                                    </div>
-                                                                ) : (
-                                                                    <div
-                                                                        className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full `}
-                                                                    >
-                                                                        {Array.from({
-                                                                            length: getCurrentLayout().cells,
-                                                                        }).map((_, i) => (
-                                                                            <div
-                                                                                key={i}
-                                                                                className="bg-gray-200 rounded-sm"
-                                                                            ></div>
-                                                                        ))}
-                                                                    </div>
-                                                                )}
+                                                                <div
+                                                                    className={`grid ${getCurrentLayout().template} gap-0.5 w-full h-full `}
+                                                                >
+                                                                    {Array.from({
+                                                                        length: getCurrentLayout().cells,
+                                                                    }).map((_, i) => (
+                                                                        <div
+                                                                            key={i}
+                                                                            className="bg-gray-200 rounded-sm"
+                                                                        ></div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
                                                         )}
 
@@ -3241,11 +2577,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                             mb-2`}
                                                 onClick={() => setCurrentPage(pages.indexOf(page))}
                                             >
-                                                <div 
-                                                    className="relative overflow-hidden border mb-1 aspect-[4/3]"
-                                                    onMouseEnter={(e) => pageThumbnails[page.id] && handleShowThumbnailPreview(pageThumbnails[page.id], e)}
-                                                    onMouseLeave={handleHideThumbnailPreview}
-                                                >
+                                                <div className="relative  overflow-hidden border mb-1 aspect-[4/3]">
                                                     {pageThumbnails[page.id] ? (
                                                         <img
                                                             src={pageThumbnails[page.id]}
@@ -3254,16 +2586,9 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                         />
                                                     ) : (
                                                         <div className="w-full h-full flex items-center justify-center">
-                                                            {thumbnailsGenerating[page.id] ? (
-                                                                <div className="flex flex-col items-center justify-center">
-                                                                    <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-green-400"></div>
-                                                                    <span className="text-[8px] text-gray-400 mt-1">Generando...</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className="text-green-300">
-                                                                    <Book className="h-8 w-8" />
-                                                                </div>
-                                                            )}
+                                                            <div className="text-green-300">
+                                                                <Book className="h-8 w-8" />
+                                                            </div>
                                                         </div>
                                                     )}
 
@@ -3286,42 +2611,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
             
             {/* Toaster para notificaciones */}
             <Toaster />
-            
-            {/* Previsualización de miniatura con animación mejorada */}
-            {previewThumbnail && (
-                <div 
-                    id="thumbnail-preview"
-                    className="fixed z-50 shadow-xl rounded-lg overflow-hidden border-2 border-white bg-white opacity-0 scale-95 transform"
-                    style={{
-                        left: `${thumbnailPosition.x}px`,
-                        top: `${thumbnailPosition.y}px`,
-                        width: '300px',
-                        height: '225px',
-                        pointerEvents: 'none', // Para que no interfiera con los eventos del mouse
-                        transition: 'all 0.2s ease-in-out',
-                    }}
-                >
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-200 animate-pulse" style={{opacity: 0.5}}>
-                        <span className="text-xs text-gray-500">Cargando vista previa...</span>
-                    </div>
-                    <img 
-                        src={previewThumbnail} 
-                        alt="Vista previa" 
-                        className="w-full h-full object-contain relative z-10"
-                        onLoad={(e) => e.target.parentNode.querySelector('.animate-pulse').style.display = 'none'}
-                    />
-                </div>
-            )}
-            
-            {/* Indicador de estado de generación de miniaturas */}
-            <div className="fixed bottom-4 right-4 z-50">
-                {Object.values(thumbnailsGenerating).some(generating => generating) && (
-                    <div className="bg-white shadow-lg rounded-lg p-3 flex items-center space-x-3 border border-gray-200">
-                        <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
-                        <span className="text-xs text-gray-600">Generando miniaturas...</span>
-                    </div>
-                )}
-            </div>
         </DndProvider>
     );
 }
@@ -3333,13 +2622,6 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
         scrollbar-width: thin;
         scrollbar-color: #c7d2fe #f5f3ff;
     }
-    
-    /* Estilos para la animación de miniaturas */
-    .thumbnail-preview-visible {
-        opacity: 1 !important;
-        transform: scale(1) !important;
-    }
-    
     .custom-scroll::-webkit-scrollbar {
         height: 6px;
     }
@@ -3350,10 +2632,5 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     .custom-scroll::-webkit-scrollbar-thumb {
         background-color: #c7d2fe;
         border-radius: 3px;
-    }
-    
-    @keyframes fadeIn {
-        from { opacity: 0; transform: scale(0.95); }
-        to { opacity: 1; transform: scale(1); }
     }
 `}</style>
