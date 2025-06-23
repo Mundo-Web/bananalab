@@ -77,6 +77,25 @@ const BookPreviewModal = ({
     const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
     const flipBook = useRef();
 
+    // Reemplazar la función drawImageCover por una versión fiel a object-fit: cover
+    function drawImageCover(ctx, img, dx, dy, dWidth, dHeight) {
+        const sWidth = img.width;
+        const sHeight = img.height;
+        const dRatio = dWidth / dHeight;
+        const sRatio = sWidth / sHeight;
+        let sx = 0, sy = 0, sw = sWidth, sh = sHeight;
+        if (dRatio > sRatio) {
+            // El área destino es más ancha: recorta arriba/abajo
+            sh = sWidth / dRatio;
+            sy = (sHeight - sh) / 2;
+        } else {
+            // El área destino es más alta: recorta a los lados
+            sw = sHeight * dRatio;
+            sx = (sWidth - sw) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dWidth, dHeight);
+    }
+
     // Función para generar thumbnails de alta calidad
     const generateHighQualityThumbnails = useCallback(async () => {
         if (!pages || pages.length === 0 || !isOpen) return;
@@ -188,6 +207,50 @@ const BookPreviewModal = ({
                 customCtx.fillText(`Página ${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : page.pageNumber || 'Contenido'}`, 
                                   workspaceDimensions.width / 2, 
                                   workspaceDimensions.height / 2);
+                
+                // --- INICIO: Renderizado fiel de elementos en el canvas ---
+                if (page.cells && Array.isArray(page.cells)) {
+                    for (const cell of page.cells) {
+                        if (!cell || !cell.elements) continue;
+                        const cellSize = cell.size && cell.size.width && cell.size.height
+                            ? cell.size
+                            : { width: workspaceDimensions.width, height: workspaceDimensions.height };
+                        if (!cell.size) {
+                            console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
+                        }
+                        for (const element of cell.elements) {
+                            if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
+                            if (element.type === 'image') {
+                                const img = new window.Image();
+                                img.src = element.content;
+                                await new Promise((resolve, reject) => {
+                                    if (img.complete) return resolve();
+                                    img.onload = resolve;
+                                    img.onerror = reject;
+                                });
+                                const elX = typeof element.position?.x === 'number'
+                                    ? (element.position.x <= 1 ? element.position.x * cellSize.width : element.position.x)
+                                    : 0;
+                                const elY = typeof element.position?.y === 'number'
+                                    ? (element.position.y <= 1 ? element.position.y * cellSize.height : element.position.y)
+                                    : 0;
+                                const elW = element.size?.width
+                                    ? (element.size.width <= 1 ? element.size.width * cellSize.width : element.size.width)
+                                    : cellSize.width;
+                                const elH = element.size?.height
+                                    ? (element.size.height <= 1 ? element.size.height * cellSize.height : element.size.height)
+                                    : cellSize.height;
+                                const dx = cell.position?.x ? cell.position.x + elX : elX;
+                                const dy = cell.position?.y ? cell.position.y + elY : elY;
+                                const dWidth = elW;
+                                const dHeight = elH;
+                                console.log(`[THUMB] page:${page.id} cell:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
+                                drawImageCover(customCtx, img, dx, dy, dWidth, dHeight);
+                            }
+                        }
+                    }
+                }
+                // --- FIN: Renderizado fiel de elementos en el canvas ---
                 
                 // Crear thumbnail final con downscaling progresivo
                 const thumbnailCanvas = document.createElement('canvas');
@@ -932,4 +995,158 @@ const InlinePlaceholder = ({ page, pageIdx }) => {
     );
 };
 
+// --- INICIO: Función exportable para thumbnails fieles ---
+async function generateHighQualityThumbnails({ pages, workspaceDimensions, presetData }) {
+    const newThumbnails = {};
+    const scale = 4;
+    function drawImageCover(ctx, img, dx, dy, dWidth, dHeight) {
+        const sWidth = img.width;
+        const sHeight = img.height;
+        const dRatio = dWidth / dHeight;
+        const sRatio = sWidth / sHeight;
+        let sx = 0, sy = 0, sw = sWidth, sh = sHeight;
+        if (dRatio > sRatio) {
+            sh = sWidth / dRatio;
+            sy = (sHeight - sh) / 2;
+        } else {
+            sw = sHeight * dRatio;
+            sx = (sWidth - sw) / 2;
+        }
+        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dWidth, dHeight);
+    }
+    for (const page of pages) {
+        try {
+            const customCanvas = document.createElement('canvas');
+            const customCtx = customCanvas.getContext('2d');
+            customCanvas.width = workspaceDimensions.width * scale;
+            customCanvas.height = workspaceDimensions.height * scale;
+            customCtx.scale(scale, scale);
+            customCtx.imageSmoothingEnabled = true;
+            customCtx.imageSmoothingQuality = 'high';
+            customCtx.textRendering = 'geometricPrecision';
+            customCtx.webkitImageSmoothingEnabled = true;
+            customCtx.mozImageSmoothingEnabled = true;
+            customCtx.msImageSmoothingEnabled = true;
+            // --- Renderizar background layer igual que en el workspace ---
+            let bgUrl = null;
+            if (page.type === 'cover' && presetData?.cover_image) {
+                bgUrl = presetData.cover_image.startsWith('http')
+                    ? presetData.cover_image
+                    : `/storage/images/item_preset/${presetData.cover_image}`;
+            } else if (page.type === 'content' && presetData?.content_layer_image) {
+                bgUrl = presetData.content_layer_image.startsWith('http')
+                    ? presetData.content_layer_image
+                    : `/storage/images/item_preset/${presetData.content_layer_image}`;
+            } else if (page.type === 'final' && presetData?.final_layer_image) {
+                bgUrl = presetData.final_layer_image.startsWith('http')
+                    ? presetData.final_layer_image
+                    : `/storage/images/item_preset/${presetData.final_layer_image}`;
+            }
+            if (bgUrl) {
+                const bgImg = new window.Image();
+                bgImg.crossOrigin = 'anonymous';
+                bgImg.src = bgUrl;
+                await new Promise((resolve, reject) => {
+                    if (bgImg.complete) return resolve();
+                    bgImg.onload = resolve;
+                    bgImg.onerror = reject;
+                });
+                drawImageCover(customCtx, bgImg, 0, 0, workspaceDimensions.width, workspaceDimensions.height);
+            } else {
+                // Si no hay background, fondo blanco
+                customCtx.fillStyle = '#ffffff';
+                customCtx.fillRect(0, 0, workspaceDimensions.width, workspaceDimensions.height);
+            }
+            // --- Fin background layer ---
+            if (page.cells && Array.isArray(page.cells)) {
+                for (const cell of page.cells) {
+                    if (!cell || !cell.elements) continue;
+                    const cellSize = cell.size && cell.size.width && cell.size.height
+                        ? cell.size
+                        : { width: workspaceDimensions.width, height: workspaceDimensions.height };
+                    if (!cell.size) {
+                        console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
+                    }
+                    for (const element of cell.elements) {
+                        if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
+                        if (element.type === 'image') {
+                            const img = new window.Image();
+                            img.src = element.content;
+                            await new Promise((resolve, reject) => {
+                                if (img.complete) return resolve();
+                                img.onload = resolve;
+                                img.onerror = reject;
+                            });
+                            const elX = typeof element.position?.x === 'number'
+                                ? (element.position.x <= 1 ? element.position.x * cellSize.width : element.position.x)
+                                : 0;
+                            const elY = typeof element.position?.y === 'number'
+                                ? (element.position.y <= 1 ? element.position.y * cellSize.height : element.position.y)
+                                : 0;
+                            const elW = element.size?.width
+                                ? (element.size.width <= 1 ? element.size.width * cellSize.width : element.size.width)
+                                : cellSize.width;
+                            const elH = element.size?.height
+                                ? (element.size.height <= 1 ? element.size.height * cellSize.height : element.size.height)
+                                : cellSize.height;
+                            const dx = cell.position?.x ? cell.position.x + elX : elX;
+                            const dy = cell.position?.y ? cell.position.y + elY : elY;
+                            const dWidth = elW;
+                            const dHeight = elH;
+                            console.log(`[THUMB] page:${page.id} cell:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
+                            drawImageCover(customCtx, img, dx, dy, dWidth, dHeight);
+                        }
+                    }
+                }
+            }
+            // Downscaling progresivo
+            const thumbnailCanvas = document.createElement('canvas');
+            const thumbnailCtx = thumbnailCanvas.getContext('2d');
+            const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
+            const thumbnailBaseSize = 900;
+            let thumbWidth, thumbHeight;
+            if (workspaceAspectRatio >= 1) {
+                thumbWidth = thumbnailBaseSize;
+                thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
+            } else {
+                thumbHeight = thumbnailBaseSize;
+                thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
+            }
+            thumbWidth = Math.round(thumbWidth);
+            thumbHeight = Math.round(thumbHeight);
+            thumbnailCanvas.width = thumbWidth;
+            thumbnailCanvas.height = thumbHeight;
+            thumbnailCtx.imageSmoothingEnabled = true;
+            thumbnailCtx.imageSmoothingQuality = 'high';
+            thumbnailCtx.webkitImageSmoothingEnabled = true;
+            thumbnailCtx.mozImageSmoothingEnabled = true;
+            thumbnailCtx.msImageSmoothingEnabled = true;
+            const tempCanvas = document.createElement('canvas');
+            const tempCtx = tempCanvas.getContext('2d');
+            const intermediateWidth = thumbWidth * 2;
+            const intermediateHeight = thumbHeight * 2;
+            tempCanvas.width = intermediateWidth;
+            tempCanvas.height = intermediateHeight;
+            tempCtx.imageSmoothingEnabled = true;
+            tempCtx.imageSmoothingQuality = 'high';
+            tempCtx.drawImage(
+                customCanvas,
+                0, 0, intermediateWidth, intermediateHeight
+            );
+            thumbnailCtx.drawImage(
+                tempCanvas,
+                0, 0, intermediateWidth, intermediateHeight,
+                0, 0, thumbWidth, thumbHeight
+            );
+            newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
+        } catch (error) {
+            console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
+            newThumbnails[page.id] = null;
+        }
+    }
+    return newThumbnails;
+}
+// --- FIN: Función exportable para thumbnails fieles ---
+
+export { generateHighQualityThumbnails };
 export default BookPreviewModal;

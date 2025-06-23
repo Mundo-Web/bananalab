@@ -42,6 +42,7 @@ import TextToolbar from "./components/Elements/TextToolbar";
 import WorkspaceControls from "./components/Elements/WorkspaceControls";
 import BookPreviewModal from "./components/Editor/BookPreview";
 import Global from "../../../Utils/Global";
+import { generateHighQualityThumbnails } from "./components/Editor/BookPreview";
 
 // Componente principal del editor
 export default function EditorLibro({ albumId, itemId, presetId, pages: initialPages }) {
@@ -888,51 +889,22 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     useEffect(() => {
         const generateThumbnails = async () => {
-            const newThumbnails = {};
-
-            await Promise.all(
-                pages.map(async (page, index) => {
-                    const pageElement = document.getElementById(
-                        `page-${page.id}`
-                    );
-                    if (pageElement) {
-                        try {
-                            // Calcula el tamaño real del elemento
-                            const rect = pageElement.getBoundingClientRect();
-                            const width = Math.round(rect.width);
-                            const height = Math.round(rect.height);
-                            const scale = window.devicePixelRatio || 1;
-                            const canvas = await html2canvas(pageElement, {
-                                scale,
-                                width,
-                                height,
-                                logging: false,
-                                useCORS: true,
-                                allowTaint: true,
-                                ignoreElements: (element) => {
-                                    return element.classList.contains(
-                                        "ignore-thumbnail"
-                                    );
-                                },
-                            });
-                            newThumbnails[page.id] = canvas.toDataURL();
-                        } catch (error) {
-                            console.error("Error generating thumbnail:", error);
-                            newThumbnails[page.id] = null;
-                        }
-                    }
-                })
-            );
-
-            setPageThumbnails({ ...pageThumbnails, ...newThumbnails });
+            try {
+                const thumbnails = await generateHighQualityThumbnails({
+                    pages,
+                    workspaceDimensions,
+                    presetData
+                });
+                setPageThumbnails({ ...pageThumbnails, ...thumbnails });
+            } catch (error) {
+                console.error("Error generating thumbnail:", error);
+            }
         };
-
         const debouncedGenerate = setTimeout(() => {
             generateThumbnails();
         }, 500);
-
         return () => clearTimeout(debouncedGenerate);
-    }, [pages, currentPage]);
+    }, [pages, currentPage, workspaceDimensions, presetData]);
 
 
 
@@ -1711,15 +1683,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
                             {/* Action buttons */}
                             <div className="flex gap-3 items-center">
-                                <Button
-                                    variant={previewMode ? "secondary" : "outline"}
-                                    size="sm"
-                                    onClick={togglePreview}
-                                    icon={<Eye className="h-4 w-4" />}
-                                    className="border-white/20 text-white hover:bg-white/10 hover:text-white"
-                                >
-                                    {previewMode ? "Editar" : "Vista previa"}
-                                </Button>
+                               
                                 <Button
                                     variant="secondary"
                                     size="sm"
