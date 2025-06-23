@@ -219,6 +219,17 @@ const BookPreviewModal = ({
                             console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
                         }
                         for (const element of cell.elements) {
+                            // Filtro robusto: ignorar imágenes base del layout (background duplicado)
+                            if (
+                                element.type === 'image' && (
+                                    element.id === 'cover-base' ||
+                                    element.id === 'final-base' ||
+                                    (typeof element.id === 'string' && element.id.startsWith('content-base-'))
+                                )
+                            ) {
+                                continue;
+                            }
+                            // Solo renderizar elementos de tipo 'image' y 'text' (o los que sean del usuario)
                             if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
                             if (element.type === 'image') {
                                 const img = new window.Image();
@@ -1068,6 +1079,17 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                         console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
                     }
                     for (const element of cell.elements) {
+                        // Filtro robusto: ignorar imágenes base del layout (background duplicado)
+                        if (
+                            element.type === 'image' && (
+                                element.id === 'cover-base' ||
+                                element.id === 'final-base' ||
+                                (typeof element.id === 'string' && element.id.startsWith('content-base-'))
+                            )
+                        ) {
+                            continue;
+                        }
+                        // Solo renderizar elementos de tipo 'image' y 'text' (o los que sean del usuario)
                         if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
                         if (element.type === 'image') {
                             const img = new window.Image();
