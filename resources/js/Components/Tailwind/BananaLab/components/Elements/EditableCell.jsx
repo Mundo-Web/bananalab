@@ -42,7 +42,8 @@ export default function EditableCell({
                             },
                             mask: "none",
                         };
-                        onAddElement(newElement);
+                        onAddElement(newElement, id);
+                        console.log('[EditableCell] onAddElement', { cellId: id, elementId: newElement.id });
                         onSelectElement(newElement.id, id);
                     }
                 };
@@ -82,7 +83,8 @@ export default function EditableCell({
                             },
                             mask: "none",
                         };
-                        onAddElement(newElement);
+                        onAddElement(newElement, id);
+                        console.log('[EditableCell] onAddElement', { cellId: id, elementId: newElement.id });
                         onSelectElement(newElement.id, id);
                     }
                 };

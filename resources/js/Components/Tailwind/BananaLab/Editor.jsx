@@ -655,17 +655,17 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
 
     // Añadir un elemento a una celda
     const addElementToCell = (cellId, element) => {
+        console.log('[Editor] addElementToCell', { cellId, elementId: element.id });
         const updatedPages = [...pages];
-        const cellIndex = updatedPages[currentPage].cells.findIndex(
-            (cell) => cell.id === cellId
-        );
-
-        if (cellIndex !== -1) {
-            updatedPages[currentPage].cells[cellIndex].elements.push(element);
-            updatePages(updatedPages);
-            setSelectedElement(element.id);
-            setSelectedCell(cellId);
+        // Asegurarse de que solo se agrega a la celda correcta
+        for (let i = 0; i < updatedPages[currentPage].cells.length; i++) {
+            if (updatedPages[currentPage].cells[i].id === cellId) {
+                updatedPages[currentPage].cells[i].elements.push(element);
+            }
         }
+        updatePages(updatedPages);
+        setSelectedElement(element.id);
+        setSelectedCell(cellId);
     };
 
     // Actualizar un elemento en una celda
@@ -2191,80 +2191,25 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                 className={`grid ${getCurrentLayout().template} gap-6`}
                                                 style={{ width: '100%', height: '100%' }}
                                             >
-                                                {pages[currentPage].cells.map((cell) => (
-                                                    <div
-                                                        key={cell.id}
-                                                        className="relative bg-gray-50 rounded-lg overflow-hidden"
-                                                    >
-                                                        {cell.elements.map((element) =>
-                                                            element.type === "image" ? (
-                                                                <div
-                                                                    key={element.id}
-                                                                    className={`absolute ${imageMasks.find(
-                                                                        (m) => m.id === element.mask
-                                                                    )?.class || ""
-                                                                        }`}
-                                                                    style={{
-                                                                        left: `${element.position.x}px`,
-                                                                        top: `${element.position.y}px`,
-                                                                        width: "100%",
-                                                                        height: "100%",
-                                                                    }}
-                                                                >
-                                                                    <img
-                                                                        src={element.content}
-                                                                        alt=""
-                                                                        className="w-full h-full object-cover"
-                                                                        style={{
-                                                                            filter: `
-                                                                            brightness(${(element.filters?.brightness || 100) / 100})
-                                                                            contrast(${(element.filters?.contrast || 100) / 100})
-                                                                            saturate(${(element.filters?.saturation || 100) / 100})
-                                                                            sepia(${(element.filters?.tint || 0) / 100})
-                                                                            hue-rotate(${(element.filters?.hue || 0) * 3.6}deg)
-                                                                            blur(${element.filters?.blur || 0}px)
-                                                                        `,
-                                                                            transform: `scale(${element.filters?.scale || 1
-                                                                                }) rotate(${element.filters?.rotate || 0
-                                                                                }deg) ${element.filters?.flipHorizontal
-                                                                                    ? "scaleX(-1)"
-                                                                                    : ""
-                                                                                } ${element.filters?.flipVertical
-                                                                                    ? "scaleY(-1)"
-                                                                                    : ""
-                                                                                }`,
-                                                                            mixBlendMode: element.filters?.blendMode || "normal",
-                                                                            opacity: (element.filters?.opacity || 100) / 100,
-                                                                        }}
-                                                                    />
-                                                                </div>
-                                                            ) : (
-                                                                <div
-                                                                    key={element.id}
-                                                                    className="absolute"
-                                                                    style={{
-                                                                        left: `${element.position.x}px`,
-                                                                        top: `${element.position.y}px`,
-                                                                        fontFamily: element.style?.fontFamily,
-                                                                        fontSize: element.style?.fontSize,
-                                                                        fontWeight: element.style?.fontWeight,
-                                                                        fontStyle: element.style?.fontStyle,
-                                                                        textDecoration: element.style?.textDecoration,
-                                                                        color: element.style?.color,
-                                                                        textAlign: element.style?.textAlign,
-                                                                        backgroundColor: element.style?.backgroundColor || "transparent",
-                                                                        padding: element.style?.padding || "8px",
-                                                                        borderRadius: element.style?.borderRadius || "0px",
-                                                                        border: element.style?.border || "none",
-                                                                        opacity: element.style?.opacity || 1,
-                                                                    }}
-                                                                >
-                                                                    {element.content}
-                                                                </div>
-                                                            )
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                {pages[currentPage].cells.map((cell, idx) => {
+                                                    console.log('[WORKSPACE] cell', cell.id, 'elements:', cell.elements.map(e => e.id));
+                                                    return (
+                                                        <EditableCell
+                                                            key={cell.id}
+                                                            id={cell.id}
+                                                            elements={cell.elements.filter(el => !el.locked)}
+                                                            workspaceSize={workspaceDimensions}
+                                                            cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
+                                                            selectedElement={selectedCell === cell.id ? selectedElement : null}
+                                                            onSelectElement={handleSelectElement}
+                                                            onAddElement={(element, cellId) => addElementToCell(cellId, element)}
+                                                            onUpdateElement={(elementId, updates, isDuplicate) =>
+                                                                updateElementInCell(cell.id, elementId, updates, isDuplicate)}
+                                                            onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}
+                                                            availableMasks={getCurrentLayout().maskCategories.flatMap((cat) => cat.masks)}
+                                                        />
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     </div>
@@ -2335,7 +2280,7 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
                                                     cellStyle={getCurrentLayout().cellStyles?.[pages[currentPage].cells.indexOf(cell)]}
                                                     selectedElement={selectedCell === cell.id ? selectedElement : null}
                                                     onSelectElement={handleSelectElement}
-                                                    onAddElement={(element) => addElementToCell(cell.id, element)}
+                                                    onAddElement={(element, cellId) => addElementToCell(cellId, element)}
                                                     onUpdateElement={(elementId, updates, isDuplicate) =>
                                                         updateElementInCell(cell.id, elementId, updates, isDuplicate)}
                                                     onDeleteElement={(elementId) => deleteElementFromCell(cell.id, elementId)}

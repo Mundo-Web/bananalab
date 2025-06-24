@@ -3,6 +3,7 @@ import Modal from "react-modal";
 import { X, ChevronLeft, ChevronRight } from "lucide-react";
 import HTMLFlipBook from "react-pageflip";
 import Global from "../../../../../Utils/Global";
+import { layouts } from '../../constants/layouts';
 
 // Estilos para el modal
 const customStyles = {
@@ -96,6 +97,94 @@ const BookPreviewModal = ({
         ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dWidth, dHeight);
     }
 
+    function parseGridTemplate(template) {
+        const colsMatch = template.match(/grid-cols-(\d+)/);
+        const rowsMatch = template.match(/grid-rows-(\d+)/);
+        const gapMatch = template.match(/gap-(\d+)/);
+        return {
+            cols: colsMatch ? parseInt(colsMatch[1], 10) : 1,
+            rows: rowsMatch ? parseInt(rowsMatch[1], 10) : 1,
+            gap: gapMatch ? parseInt(gapMatch[1], 10) * 4 : 0 // tailwind gap-1 = 0.25rem = 4px
+        };
+    }
+
+    function parseCellSpan(styleStr, key, defaultVal = 1) {
+        const match = styleStr && styleStr.match(new RegExp(`${key}-span-(\\d+)`));
+        return match ? parseInt(match[1], 10) : defaultVal;
+    }
+
+    function findFirstFreeSpot(grid, rows, cols, rowSpan, colSpan) {
+        for (let row = 0; row <= rows - rowSpan; row++) {
+            for (let col = 0; col <= cols - colSpan; col++) {
+                let canPlace = true;
+                for (let r = row; r < row + rowSpan; r++) {
+                    for (let c = col; c < col + colSpan; c++) {
+                        if (grid[r][c] !== null) {
+                            canPlace = false;
+                            break;
+                        }
+                    }
+                    if (!canPlace) break;
+                }
+                if (canPlace) return { row, col };
+            }
+        }
+        return null;
+    }
+
+    function getLayoutCellPositions(layout, workspaceDimensions, pageCells) {
+        const { cols, rows, gap } = parseGridTemplate(layout.template);
+        const padding = layout.style && layout.style.padding ? parseInt(layout.style.padding) : 0;
+        const width = workspaceDimensions.width - 2 * padding;
+        const height = workspaceDimensions.height - 2 * padding;
+        const cellWidth = (width - gap * (cols - 1)) / cols;
+        const cellHeight = (height - gap * (rows - 1)) / rows;
+        const grid = Array.from({ length: rows }, () => Array(cols).fill(false));
+        const positions = {};
+        for (let i = 0; i < layout.cells; i++) {
+            const styleStr = layout.cellStyles && layout.cellStyles[i] ? layout.cellStyles[i] : '';
+            const colSpan = parseCellSpan(styleStr, 'col', 1);
+            const rowSpan = parseCellSpan(styleStr, 'row', 1);
+            let placed = false;
+            for (let r = 0; r <= rows - rowSpan && !placed; r++) {
+                for (let c = 0; c <= cols - colSpan && !placed; c++) {
+                    let canPlace = true;
+                    for (let rr = r; rr < r + rowSpan; rr++) {
+                        for (let cc = c; cc < c + colSpan; cc++) {
+                            if (grid[rr][cc]) {
+                                canPlace = false;
+                                break;
+                            }
+                        }
+                        if (!canPlace) break;
+                    }
+                    if (canPlace) {
+                        for (let rr = r; rr < r + rowSpan; rr++) {
+                            for (let cc = c; cc < c + colSpan; cc++) {
+                                grid[rr][cc] = true;
+                            }
+                        }
+                        const cellId = pageCells && pageCells[i] ? pageCells[i].id : i;
+                        positions[cellId] = {
+                            x: padding + c * (cellWidth + gap),
+                            y: padding + r * (cellHeight + gap),
+                            width: cellWidth * colSpan + gap * (colSpan - 1),
+                            height: cellHeight * rowSpan + gap * (rowSpan - 1)
+                        };
+                        console.log(`[GRID-PLACEMENT] cellId:${cellId} col-span:${colSpan} row-span:${rowSpan} => x:${positions[cellId].x} y:${positions[cellId].y} w:${positions[cellId].width} h:${positions[cellId].height}`);
+                        placed = true;
+                    }
+                }
+            }
+            if (!placed) {
+                const cellId = pageCells && pageCells[i] ? pageCells[i].id : i;
+                console.warn(`[GRID-PLACEMENT] No se pudo ubicar la celda ${cellId}`);
+                positions[cellId] = { x: 0, y: 0, width: cellWidth, height: cellHeight };
+            }
+        }
+        return positions;
+    }
+
     // Función para generar thumbnails de alta calidad
     const generateHighQualityThumbnails = useCallback(async () => {
         if (!pages || pages.length === 0 || !isOpen) return;
@@ -107,243 +196,83 @@ const BookPreviewModal = ({
         const newThumbnails = {};
         const scale = 4; // Factor de escala para alta resolución
         
-        // Definir funciones para aplicar máscaras en canvas
-        const applyMaskToCanvas = (ctx, maskId, x, y, width, height) => {
-            ctx.save();
-            ctx.translate(x, y);
-            ctx.beginPath();
+        // Función auxiliar para dibujar elementos en la posición correcta
+        const drawElementInCell = (ctx, element, cellPosition, scale) => {
+            if (!element || !element.image) return;
             
-            switch (maskId) {
-                case 'circle':
-                    ctx.arc(width / 2, height / 2, Math.min(width, height) / 2, 0, 2 * Math.PI);
-                    break;
-                case 'diamond':
-                    ctx.moveTo(width / 2, 0);
-                    ctx.lineTo(width, height / 2);
-                    ctx.lineTo(width / 2, height);
-                    ctx.lineTo(0, height / 2);
-                    ctx.closePath();
-                    break;
-                case 'triangle':
-                    ctx.moveTo(width / 2, 0);
-                    ctx.lineTo(width, height);
-                    ctx.lineTo(0, height);
-                    ctx.closePath();
-                    break;
-                case 'hexagon':
-                    const hexPoints = [
-                        [width * 0.25, height * 0.05],
-                        [width * 0.75, height * 0.05],
-                        [width * 1.0, height * 0.5],
-                        [width * 0.75, height * 0.95],
-                        [width * 0.25, height * 0.95],
-                        [width * 0.0, height * 0.5]
-                    ];
-                    ctx.moveTo(hexPoints[0][0], hexPoints[0][1]);
-                    hexPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                case 'star':
-                    const starPoints = [
-                        [width * 0.5, height * 0],
-                        [width * 0.61, height * 0.35],
-                        [width * 0.98, height * 0.35],
-                        [width * 0.68, height * 0.57],
-                        [width * 0.79, height * 0.91],
-                        [width * 0.5, height * 0.7],
-                        [width * 0.21, height * 0.91],
-                        [width * 0.32, height * 0.57],
-                        [width * 0.02, height * 0.35],
-                        [width * 0.39, height * 0.35]
-                    ];
-                    ctx.moveTo(starPoints[0][0], starPoints[0][1]);
-                    starPoints.slice(1).forEach(point => ctx.lineTo(point[0], point[1]));
-                    ctx.closePath();
-                    break;
-                default:
-                    // Sin máscara - rectángulo completo
-                    ctx.rect(0, 0, width, height);
-                    break;
-            }
+            const img = new Image();
+            img.src = element.image;
             
-            ctx.clip();
+            img.onload = () => {
+                // Calcular posición y tamaño del elemento dentro de la celda
+                const elementX = cellPosition.x + element.x * scale;
+                const elementY = cellPosition.y + element.y * scale;
+                const elementWidth = element.width * scale;
+                const elementHeight = element.height * scale;
+                
+                // Dibujar imagen usando la función drawImageCover
+                drawImageCover(ctx, img, elementX, elementY, elementWidth, elementHeight);
+            };
         };
 
-        for (const page of pages) {
-            try {
-                console.log(`📄 Generando thumbnail para página ${page.id}...`);
-                
-                // Crear canvas personalizado
-                const customCanvas = document.createElement('canvas');
-                const customCtx = customCanvas.getContext('2d');
-                
-                // Usar un factor de escala mayor para mejor calidad
-                customCanvas.width = workspaceDimensions.width * scale;
-                customCanvas.height = workspaceDimensions.height * scale;
-                
-                // Escalar el contexto para dibujar en alta resolución
-                customCtx.scale(scale, scale);
-                
-                // Configuración de alta calidad
-                customCtx.imageSmoothingEnabled = true;
-                customCtx.imageSmoothingQuality = 'high';
-                customCtx.textRendering = 'geometricPrecision';
-                customCtx.webkitImageSmoothingEnabled = true;
-                customCtx.mozImageSmoothingEnabled = true;
-                customCtx.msImageSmoothingEnabled = true;
-                
-                // Fondo blanco
-                customCtx.fillStyle = '#ffffff';
-                customCtx.fillRect(0, 0, workspaceDimensions.width, workspaceDimensions.height);
-                
-                // Simular contenido básico (en lugar de renderizar elementos reales)
-                customCtx.fillStyle = '#f0f0f0';
-                customCtx.fillRect(20, 20, workspaceDimensions.width - 40, workspaceDimensions.height - 40);
-                
-                // Texto de ejemplo
-                customCtx.fillStyle = '#333333';
-                customCtx.font = 'bold 24px Arial';
-                customCtx.textAlign = 'center';
-                customCtx.fillText(`Página ${page.type === 'cover' ? 'Portada' : page.type === 'final' ? 'Contraportada' : page.pageNumber || 'Contenido'}`, 
-                                  workspaceDimensions.width / 2, 
-                                  workspaceDimensions.height / 2);
-                
-                // --- INICIO: Renderizado fiel de elementos en el canvas ---
-                if (page.cells && Array.isArray(page.cells)) {
-                    for (const cell of page.cells) {
-                        if (!cell || !cell.elements) continue;
-                        const cellSize = cell.size && cell.size.width && cell.size.height
-                            ? cell.size
-                            : { width: workspaceDimensions.width, height: workspaceDimensions.height };
-                        if (!cell.size) {
-                            console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
-                        }
-                        for (const element of cell.elements) {
-                            // Filtro robusto: ignorar imágenes base del layout (background duplicado)
-                            if (
-                                element.type === 'image' && (
-                                    element.id === 'cover-base' ||
-                                    element.id === 'final-base' ||
-                                    (typeof element.id === 'string' && element.id.startsWith('content-base-'))
-                                )
-                            ) {
-                                continue;
-                            }
-                            // Solo renderizar elementos de tipo 'image' y 'text' (o los que sean del usuario)
-                            if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
-                            if (element.type === 'image') {
-                                const img = new window.Image();
-                                img.src = element.content;
-                                await new Promise((resolve, reject) => {
-                                    if (img.complete) return resolve();
-                                    img.onload = resolve;
-                                    img.onerror = reject;
-                                });
-                                const elX = typeof element.position?.x === 'number'
-                                    ? (element.position.x <= 1 ? element.position.x * cellSize.width : element.position.x)
-                                    : 0;
-                                const elY = typeof element.position?.y === 'number'
-                                    ? (element.position.y <= 1 ? element.position.y * cellSize.height : element.position.y)
-                                    : 0;
-                                const elW = element.size?.width
-                                    ? (element.size.width <= 1 ? element.size.width * cellSize.width : element.size.width)
-                                    : cellSize.width;
-                                const elH = element.size?.height
-                                    ? (element.size.height <= 1 ? element.size.height * cellSize.height : element.size.height)
-                                    : cellSize.height;
-                                const dx = cell.position?.x ? cell.position.x + elX : elX;
-                                const dy = cell.position?.y ? cell.position.y + elY : elY;
-                                const dWidth = elW;
-                                const dHeight = elH;
-                                console.log(`[THUMB] page:${page.id} cell:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
-                                drawImageCover(customCtx, img, dx, dy, dWidth, dHeight);
-                            }
-                        }
-                    }
-                }
-                // --- FIN: Renderizado fiel de elementos en el canvas ---
-                
-                // Crear thumbnail final con downscaling progresivo
-                const thumbnailCanvas = document.createElement('canvas');
-                const thumbnailCtx = thumbnailCanvas.getContext('2d');
-                
-                // Usar las dimensiones REALES del workspace para calcular la proporción exacta
-                const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
-                
-                // Tamaño base para mejor calidad
-                const thumbnailBaseSize = 900;
-                
-                // Calcular dimensiones del thumbnail manteniendo la proporción EXACTA
-                let thumbWidth, thumbHeight;
-                
-                if (workspaceAspectRatio >= 1) {
-                    // Workspace más ancho que alto
-                    thumbWidth = thumbnailBaseSize;
-                    thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
-                } else {
-                    // Workspace más alto que ancho
-                    thumbHeight = thumbnailBaseSize;
-                    thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
-                }
-                
-                thumbWidth = Math.round(thumbWidth);
-                thumbHeight = Math.round(thumbHeight);
-                thumbnailCanvas.width = thumbWidth;
-                thumbnailCanvas.height = thumbHeight;
-                
-                // Configuración de alta calidad para el thumbnail
-                thumbnailCtx.imageSmoothingEnabled = true;
-                thumbnailCtx.imageSmoothingQuality = 'high';
-                thumbnailCtx.webkitImageSmoothingEnabled = true;
-                thumbnailCtx.mozImageSmoothingEnabled = true;
-                thumbnailCtx.msImageSmoothingEnabled = true;
-                
-                // Downscaling progresivo en dos pasos
-                const tempCanvas = document.createElement('canvas');
-                const tempCtx = tempCanvas.getContext('2d');
-                
-                // Tamaño intermedio (2x tamaño final)
-                const intermediateWidth = thumbWidth * 2;
-                const intermediateHeight = thumbHeight * 2;
-                
-                tempCanvas.width = intermediateWidth;
-                tempCanvas.height = intermediateHeight;
-                
-                // Configurar suavizado en canvas intermedio
-                tempCtx.imageSmoothingEnabled = true;
-                tempCtx.imageSmoothingQuality = 'high';
-                
-                // Paso 1: Escalar a tamaño intermedio
-                tempCtx.drawImage(
-                    customCanvas,
-                    0, 0, intermediateWidth, intermediateHeight
-                );
-                
-                // Paso 2: Escalar de intermedio a tamaño final
-                thumbnailCtx.drawImage(
-                    tempCanvas,
-                    0, 0, intermediateWidth, intermediateHeight,
-                    0, 0, thumbWidth, thumbHeight
-                );
-                
-                newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
-                console.log(`✅ Thumbnail generado para página ${page.id}`);
-                
-                // Actualizar parcialmente para mostrar progreso
-                setGeneratedThumbnails(prev => ({ ...prev, [page.id]: thumbnailCanvas.toDataURL('image/png', 1.0) }));
-                
-            } catch (error) {
-                console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
-                newThumbnails[page.id] = createElegantPlaceholderForPage(page, workspaceDimensions);
+        // Función para generar thumbnail de una página
+        const generatePageThumbnail = async (page, index) => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Establecer dimensiones del canvas
+            canvas.width = workspaceDimensions.width * scale;
+            canvas.height = workspaceDimensions.height * scale;
+            
+            // Dibujar fondo de la página
+            if (presetData && presetData.final_layer_image) {
+                const bgImg = new Image();
+                bgImg.src = presetData.final_layer_image;
+                bgImg.onload = () => {
+                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+                };
             }
-        }
+
+            // Obtener posiciones de las celdas
+            const layout = layouts.find(l => l.id === page.layoutId);
+            if (!layout) return;
+            
+            const cellPositions = getLayoutCellPositions(layout, workspaceDimensions, page.cells);
+            
+            // Dibujar elementos en sus celdas correspondientes
+            page.cells.forEach(cell => {
+                const cellPosition = cellPositions[cell.id];
+                if (cellPosition) {
+                    cell.elements.forEach(element => {
+                        drawElementInCell(ctx, element, cellPosition, scale);
+                    });
+                }
+            });
+
+            // Generar thumbnail
+            const thumbnail = canvas.toDataURL('image/jpeg', 0.9);
+            return { [index]: thumbnail };
+        };
+
+        // Generar thumbnails para todas las páginas
+        const promises = pages.map((page, index) => generatePageThumbnail(page, index));
+        const thumbnails = await Promise.all(promises);
         
+        // Combinar todos los thumbnails
+        thumbnails.forEach(thumb => {
+            Object.assign(newThumbnails, thumb);
+        });
+
+        // Actualizar estado
         setGeneratedThumbnails(newThumbnails);
         setIsGeneratingThumbnails(false);
-        console.log('🎉 Generación de thumbnails para BookPreview completada');
-        
-    }, [pages, workspaceDimensions, isOpen]);
+    }, [pages, isOpen, workspaceDimensions, layouts, presetData]);
+          
 
+    // Funciones auxiliares
+
+
+    // Efectos de React
     useEffect(() => {
         if (isOpen) {
             if (Object.keys(pageThumbnails).length === 0) {
@@ -352,7 +281,17 @@ const BookPreviewModal = ({
                 setGeneratedThumbnails(pageThumbnails);
             }
         }
-    }, [isOpen, pageThumbnails, generateHighQualityThumbnails]);
+    }, [isOpen, pageThumbnails]);
+
+    useEffect(() => {
+        if (!isOpen) {
+            setGeneratedThumbnails({});
+        }
+    }, [isOpen]);
+
+
+
+       
 
      // Función para crear un placeholder elegante para una página específica
     const createElegantPlaceholderForPage = (page, workspaceDimensions) => {
@@ -1099,6 +1038,7 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                                 img.onload = resolve;
                                 img.onerror = reject;
                             });
+                            // Posición y tamaño relativos a la celda
                             const elX = typeof element.position?.x === 'number'
                                 ? (element.position.x <= 1 ? element.position.x * cellSize.width : element.position.x)
                                 : 0;
@@ -1115,7 +1055,7 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                             const dy = cell.position?.y ? cell.position.y + elY : elY;
                             const dWidth = elW;
                             const dHeight = elH;
-                            console.log(`[THUMB] page:${page.id} cell:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
+                            console.log(`[THUMB-FIXED] page:${page.id} cell:${cell.id} cellBox:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
                             drawImageCover(customCtx, img, dx, dy, dWidth, dHeight);
                         }
                     }
