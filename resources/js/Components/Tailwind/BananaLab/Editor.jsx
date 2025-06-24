@@ -890,19 +890,73 @@ export default function EditorLibro({ albumId, itemId, presetId, pages: initialP
     useEffect(() => {
         const generateThumbnails = async () => {
             try {
+                console.log('🔄 Iniciando generación de miniaturas...');
+                
+                // Crear una copia profunda de las páginas para evitar mutaciones
+                const pagesToProcess = JSON.parse(JSON.stringify(pages));
+                
+                // Procesar cada página para asegurar el orden correcto de celdas y elementos
+                const processedPages = pagesToProcess.map(page => ({
+                    ...page,
+                    cells: (page.cells || []).map(cell => ({
+                        ...cell,
+                        position: {
+                            x: cell.position?.x || 0,
+                            y: cell.position?.y || 0,
+                            ...cell.position
+                        },
+                        size: {
+                            width: cell.size?.width || workspaceDimensions.width,
+                            height: cell.size?.height || workspaceDimensions.height,
+                            ...cell.size
+                        },
+                        elements: (cell.elements || []).map(el => ({
+                            ...el,
+                            zIndex: el.zIndex || 0
+                        })).sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0))
+                    })).sort((a, b) => {
+                        // Ordenar celdas por posición (Y, luego X)
+                        const aY = a.position?.y || 0;
+                        const bY = b.position?.y || 0;
+                        if (aY !== bY) return aY - bY;
+                        return (a.position?.x || 0) - (b.position?.x || 0);
+                    })
+                }));
+
+                console.log('📝 Procesando miniaturas con páginas procesadas:', processedPages);
+                
                 const thumbnails = await generateHighQualityThumbnails({
-                    pages,
+                    pages: processedPages,
                     workspaceDimensions,
                     presetData
                 });
-                setPageThumbnails({ ...pageThumbnails, ...thumbnails });
+                
+                console.log('🖼️ Miniaturas generadas:', thumbnails);
+                
+                // Actualizar solo las miniaturas para las páginas que han cambiado
+                setPageThumbnails(prev => {
+                    const updated = {
+                        ...prev,
+                        ...Object.fromEntries(
+                            Object.entries(thumbnails || {}).map(([pageId, thumbnail]) => [
+                                pageId,
+                                thumbnail || prev[pageId] // Mantener la miniatura anterior si la nueva es nula
+                            ])
+                        )
+                    };
+                    console.log('🔄 Miniaturas actualizadas:', updated);
+                    return updated;
+                });
+                
             } catch (error) {
-                console.error("Error generating thumbnail:", error);
+                console.error("❌ Error generando miniatura:", error);
             }
         };
+
         const debouncedGenerate = setTimeout(() => {
             generateThumbnails();
         }, 500);
+        
         return () => clearTimeout(debouncedGenerate);
     }, [pages, currentPage, workspaceDimensions, presetData]);
 

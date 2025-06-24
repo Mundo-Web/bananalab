@@ -948,35 +948,93 @@ const InlinePlaceholder = ({ page, pageIdx }) => {
 // --- INICIO: Función exportable para thumbnails fieles ---
 async function generateHighQualityThumbnails({ pages, workspaceDimensions, presetData }) {
     const newThumbnails = {};
-    const scale = 4;
+    const scale = 2; // Reducir la escala para mejor rendimiento
+    
+    // Función para dibujar imagen manteniendo la relación de aspecto
     function drawImageCover(ctx, img, dx, dy, dWidth, dHeight) {
+        if (!img || !ctx) {
+            console.warn('⚠️ No se puede dibujar: contexto o imagen no válidos');
+            return;
+        }
+        
         const sWidth = img.width;
         const sHeight = img.height;
+        
+        if (sWidth === 0 || sHeight === 0) {
+            console.warn('⚠️ Imagen con dimensiones cero:', { sWidth, sHeight });
+            return;
+        }
+        
+        // Asegurarse de que las dimensiones de destino sean válidas
+        if (dWidth <= 0 || dHeight <= 0) {
+            console.warn('⚠️ Dimensiones de destino inválidas:', { dWidth, dHeight });
+            return;
+        }
+        
+        // Calcular relación de aspecto
         const dRatio = dWidth / dHeight;
         const sRatio = sWidth / sHeight;
-        let sx = 0, sy = 0, sw = sWidth, sh = sHeight;
+        
+        // Calcular el área de recorte (source) para mantener la relación de aspecto
+        let sx, sy, sw, sh;
+        
         if (dRatio > sRatio) {
-            sh = sWidth / dRatio;
+            // La imagen es más ancha que el área de destino
+            sw = sWidth;
+            sh = sw / dRatio;
+            sx = 0;
             sy = (sHeight - sh) / 2;
         } else {
-            sw = sHeight * dRatio;
+            // La imagen es más alta que el área de destino
+            sh = sHeight;
+            sw = sh * dRatio;
             sx = (sWidth - sw) / 2;
+            sy = 0;
         }
-        ctx.drawImage(img, sx, sy, sw, sh, dx, dy, dWidth, dHeight);
+        
+        try {
+            // Dibujar la imagen con las coordenadas y dimensiones calculadas
+            ctx.save();
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 
+                Math.max(0, sx), 
+                Math.max(0, sy), 
+                Math.min(sw, sWidth - sx), 
+                Math.min(sh, sHeight - sy),
+                dx, 
+                dy, 
+                dWidth, 
+                dHeight
+            );
+            ctx.restore();
+        } catch (e) {
+            console.error('❌ Error al dibujar imagen:', e);
+            console.error('Detalles:', { 
+                source: { x: sx, y: sy, width: sw, height: sh },
+                dest: { x: dx, y: dy, width: dWidth, height: dHeight },
+                imgSize: { width: sWidth, height: sHeight }
+            });
+        }
     }
     for (const page of pages) {
         try {
             const customCanvas = document.createElement('canvas');
-            const customCtx = customCanvas.getContext('2d');
-            customCanvas.width = workspaceDimensions.width * scale;
-            customCanvas.height = workspaceDimensions.height * scale;
-            customCtx.scale(scale, scale);
+            const customCtx = customCanvas.getContext('2d', { willReadFrequently: true });
+            
+            // Calcular dimensiones del canvas basadas en el workspace
+            // Usar escala 1:1 para evitar problemas de redondeo
+            customCanvas.width = workspaceDimensions.width;
+            customCanvas.height = workspaceDimensions.height;
+            
+            // No aplicar escala aquí, manejaremos el escalado después
+            customCtx.scale(1, 1);
             customCtx.imageSmoothingEnabled = true;
             customCtx.imageSmoothingQuality = 'high';
             customCtx.textRendering = 'geometricPrecision';
             customCtx.webkitImageSmoothingEnabled = true;
             customCtx.mozImageSmoothingEnabled = true;
             customCtx.msImageSmoothingEnabled = true;
+            
             // --- Renderizar background layer igual que en el workspace ---
             let bgUrl = null;
             if (page.type === 'cover' && presetData?.cover_image) {
@@ -991,6 +1049,12 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                 bgUrl = presetData.final_layer_image.startsWith('http')
                     ? presetData.final_layer_image
                     : `/storage/images/item_preset/${presetData.final_layer_image}`;
+            }
+            
+            // Si no hay fondo, usar blanco
+            if (!bgUrl) {
+                customCtx.fillStyle = '#ffffff';
+                customCtx.fillRect(0, 0, workspaceDimensions.width, workspaceDimensions.height);
             }
             if (bgUrl) {
                 const bgImg = new window.Image();
@@ -1009,15 +1073,31 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
             }
             // --- Fin background layer ---
             if (page.cells && Array.isArray(page.cells)) {
-                for (const cell of page.cells) {
+                // Ordenar celdas por posición (Y, luego X) para renderizado consistente
+                const sortedCells = [...page.cells].sort((a, b) => {
+                    const aY = a.position?.y || 0;
+                    const bY = b.position?.y || 0;
+                    if (aY !== bY) return aY - bY;
+                    return (a.position?.x || 0) - (b.position?.x || 0);
+                });
+
+                for (const cell of sortedCells) {
                     if (!cell || !cell.elements) continue;
-                    const cellSize = cell.size && cell.size.width && cell.size.height
-                        ? cell.size
-                        : { width: workspaceDimensions.width, height: workspaceDimensions.height };
+                    
+                    // Calcular dimensiones de la celda
+                    const cellWidth = cell.size?.width || workspaceDimensions.width;
+                    const cellHeight = cell.size?.height || workspaceDimensions.height;
+                    const cellX = cell.position?.x || 0;
+                    const cellY = cell.position?.y || 0;
+
                     if (!cell.size) {
                         console.warn('⚠️ cell.size no definido, usando tamaño workspace', cell);
                     }
-                    for (const element of cell.elements) {
+
+                    // Ordenar elementos por zIndex
+                    const sortedElements = [...(cell.elements || [])].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
+
+                    for (const element of sortedElements) {
                         // Filtro robusto: ignorar imágenes base del layout (background duplicado)
                         if (
                             element.type === 'image' && (
@@ -1028,79 +1108,102 @@ async function generateHighQualityThumbnails({ pages, workspaceDimensions, prese
                         ) {
                             continue;
                         }
-                        // Solo renderizar elementos de tipo 'image' y 'text' (o los que sean del usuario)
+
+                        // Solo renderizar elementos de tipo 'image' y 'text'
                         if (!element || (element.type !== 'image' && element.type !== 'text') || !element.content) continue;
+                        
                         if (element.type === 'image') {
-                            const img = new window.Image();
-                            img.src = element.content;
-                            await new Promise((resolve, reject) => {
-                                if (img.complete) return resolve();
-                                img.onload = resolve;
-                                img.onerror = reject;
-                            });
-                            // Posición y tamaño relativos a la celda
-                            const elX = typeof element.position?.x === 'number'
-                                ? (element.position.x <= 1 ? element.position.x * cellSize.width : element.position.x)
-                                : 0;
-                            const elY = typeof element.position?.y === 'number'
-                                ? (element.position.y <= 1 ? element.position.y * cellSize.height : element.position.y)
-                                : 0;
-                            const elW = element.size?.width
-                                ? (element.size.width <= 1 ? element.size.width * cellSize.width : element.size.width)
-                                : cellSize.width;
-                            const elH = element.size?.height
-                                ? (element.size.height <= 1 ? element.size.height * cellSize.height : element.size.height)
-                                : cellSize.height;
-                            const dx = cell.position?.x ? cell.position.x + elX : elX;
-                            const dy = cell.position?.y ? cell.position.y + elY : elY;
-                            const dWidth = elW;
-                            const dHeight = elH;
-                            console.log(`[THUMB-FIXED] page:${page.id} cell:${cell.id} cellBox:`, cell, 'element:', element, { dx, dy, dWidth, dHeight });
-                            drawImageCover(customCtx, img, dx, dy, dWidth, dHeight);
+                            try {
+                                const img = new Image();
+                                img.crossOrigin = 'anonymous';
+                                
+                                // Cargar la imagen
+                                await new Promise((resolve, reject) => {
+                                    img.onload = resolve;
+                                    img.onerror = reject;
+                                    img.src = element.content;
+                                });
+
+                                // Calcular posición y tamaño relativos a la celda
+                                // Las posiciones y tamaños pueden venir en píxeles o como fracción (0-1)
+                                const isRelativeX = element.position?.x !== undefined && Math.abs(element.position.x) <= 1;
+                                const isRelativeY = element.position?.y !== undefined && Math.abs(element.position.y) <= 1;
+                                const isRelativeWidth = element.size?.width !== undefined && element.size.width <= 1;
+                                const isRelativeHeight = element.size?.height !== undefined && element.size.height <= 1;
+
+                                // Calcular posición absoluta en píxeles
+                                const elX = isRelativeX ? element.position.x * cellWidth : (element.position?.x || 0);
+                                const elY = isRelativeY ? element.position.y * cellHeight : (element.position?.y || 0);
+                                
+                                // Calcular dimensiones en píxeles
+                                const elW = isRelativeWidth ? element.size.width * cellWidth : (element.size?.width || cellWidth);
+                                const elH = isRelativeHeight ? element.size.height * cellHeight : (element.size?.height || cellHeight);
+
+                                // Posición absoluta en la página (ajustada por la posición de la celda)
+                                const dx = cellX + elX;
+                                const dy = cellY + elY;
+
+                                console.log('📐 Renderizando elemento:', {
+                                    elementId: element.id,
+                                    cellId: cell.id,
+                                    cellPosition: { x: cellX, y: cellY, width: cellWidth, height: cellHeight },
+                                    elementPosition: { x: elX, y: elY, width: elW, height: elH },
+                                    finalPosition: { dx, dy },
+                                    isRelative: { x: isRelativeX, y: isRelativeY, w: isRelativeWidth, h: isRelativeHeight },
+                                    elementData: element
+                                });
+
+                                // Dibujar la imagen con las coordenadas y dimensiones calculadas
+                                drawImageCover(customCtx, img, dx, dy, elW, elH);
+                                
+                            } catch (error) {
+                                console.error('Error al cargar imagen:', error, element);
+                            }
                         }
                     }
                 }
             }
-            // Downscaling progresivo
+            // Crear el thumbnail con tamaño fijo manteniendo relación de aspecto
             const thumbnailCanvas = document.createElement('canvas');
             const thumbnailCtx = thumbnailCanvas.getContext('2d');
-            const workspaceAspectRatio = workspaceDimensions.width / workspaceDimensions.height;
-            const thumbnailBaseSize = 900;
+            
+            // Tamaño máximo del thumbnail
+            const maxThumbnailSize = 900;
             let thumbWidth, thumbHeight;
-            if (workspaceAspectRatio >= 1) {
-                thumbWidth = thumbnailBaseSize;
-                thumbHeight = thumbnailBaseSize / workspaceAspectRatio;
+            
+            // Calcular dimensiones manteniendo la relación de aspecto
+            if (workspaceDimensions.width > workspaceDimensions.height) {
+                thumbWidth = Math.min(maxThumbnailSize, workspaceDimensions.width);
+                thumbHeight = (thumbWidth / workspaceDimensions.width) * workspaceDimensions.height;
             } else {
-                thumbHeight = thumbnailBaseSize;
-                thumbWidth = thumbnailBaseSize * workspaceAspectRatio;
+                thumbHeight = Math.min(maxThumbnailSize, workspaceDimensions.height);
+                thumbWidth = (thumbHeight / workspaceDimensions.height) * workspaceDimensions.width;
             }
+            
+            // Asegurar valores enteros
             thumbWidth = Math.round(thumbWidth);
             thumbHeight = Math.round(thumbHeight);
+            
+            // Configurar canvas del thumbnail
             thumbnailCanvas.width = thumbWidth;
             thumbnailCanvas.height = thumbHeight;
+            
+            // Configurar calidad de renderizado
             thumbnailCtx.imageSmoothingEnabled = true;
             thumbnailCtx.imageSmoothingQuality = 'high';
             thumbnailCtx.webkitImageSmoothingEnabled = true;
             thumbnailCtx.mozImageSmoothingEnabled = true;
             thumbnailCtx.msImageSmoothingEnabled = true;
-            const tempCanvas = document.createElement('canvas');
-            const tempCtx = tempCanvas.getContext('2d');
-            const intermediateWidth = thumbWidth * 2;
-            const intermediateHeight = thumbHeight * 2;
-            tempCanvas.width = intermediateWidth;
-            tempCanvas.height = intermediateHeight;
-            tempCtx.imageSmoothingEnabled = true;
-            tempCtx.imageSmoothingQuality = 'high';
-            tempCtx.drawImage(
-                customCanvas,
-                0, 0, intermediateWidth, intermediateHeight
-            );
+            
+            // Dibujar el contenido escalado al tamaño del thumbnail
             thumbnailCtx.drawImage(
-                tempCanvas,
-                0, 0, intermediateWidth, intermediateHeight,
+                customCanvas,
+                0, 0, customCanvas.width, customCanvas.height,
                 0, 0, thumbWidth, thumbHeight
             );
-            newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 1.0);
+            
+            // Convertir a base64
+            newThumbnails[page.id] = thumbnailCanvas.toDataURL('image/png', 0.92);
         } catch (error) {
             console.error(`❌ Error generando thumbnail para página ${page.id}:`, error);
             newThumbnails[page.id] = null;
